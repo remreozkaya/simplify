@@ -1,36 +1,218 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Simplify
 
-## Getting Started
+Simplify is a web application designed to make university life easier by bringing different student-planning tools into one place.
 
-First, run the development server:
+The first goal of the project is to build a weekly lecture planner for ITU students. Users will be able to create a weekly course schedule by selecting course codes, courses, and course sessions. The selected lectures will appear on a weekly calendar view.
+
+This project is being developed step by step as a long-term full-stack web application.
+
+## Current Status
+
+The project is in the early development stage.
+
+Implemented or in progress:
+
+* Next.js project setup
+* TypeScript support
+* Tailwind CSS styling
+* Weekly calendar layout
+* Monday-Sunday calendar view
+* Time range from 08:00 to 20:00
+
+## First Main Feature: Weekly Lecture Program
+
+The Weekly Lecture Program will allow users to create a visual weekly schedule.
+
+Planned functionality:
+
+* View a weekly calendar
+* Add lectures to the calendar
+* Select lecture code, such as BLG, EEF, EHB, MAT
+* Select a course under the chosen lecture code
+* Select a course session/CRN
+* Display the selected session on the weekly calendar
+* Detect overlapping lecture times
+* Save selected lectures locally
+* Later, fetch real course data from ITU OBS
+
+## Future Features
+
+The long-term goal is to turn Simplify into a broader university-life planning platform.
+
+Possible future features:
+
+* Course schedule planner
+* Time conflict detection
+* Multiple saved weekly schedules
+* Course search and filtering
+* Automatic data sync from ITU OBS
+* Exam calendar
+* Assignment and deadline tracker
+* GPA calculator
+* Degree progress tracker
+* Double-major/minor planning support
+* Study plan generator
+* Export schedule as image or PDF
+* User accounts and cloud-saved schedules
+
+## Tech Stack
+
+Current stack:
+
+* Next.js
+* TypeScript
+* Tailwind CSS
+* React
+
+Planned future additions:
+
+* Prisma
+* PostgreSQL
+* Authentication
+* Scheduled course-data sync
+* Deployment on Vercel or a similar platform
+
+## Project Structure
+
+Planned structure:
+
+```txt
+src/
+  app/
+    page.tsx
+
+  components/
+    calendar/
+      WeeklyCalendar.tsx
+
+    courses/
+      AddLectureModal.tsx
+
+  data/
+    mockCourses.ts
+
+  lib/
+    time.ts
+    conflict.ts
+
+  types/
+    course.ts
+```
+
+## Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the app:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```txt
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Git Workflow
 
-## Learn More
+The project currently uses a simple branch workflow.
 
-To learn more about Next.js, take a look at the following resources:
+```txt
+main
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Stable version of the project.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```txt
+feature/weekly-calendar
+```
 
-## Deploy on Vercel
+Development branch for the weekly calendar feature.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Typical workflow:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git checkout main
+git pull
+git checkout -b feature/name-of-feature
+```
+
+After making changes:
+
+```bash
+git add .
+git commit -m "Describe the change"
+git push -u origin feature/name-of-feature
+```
+
+## Roadmap
+
+### Phase 1 — Project Setup
+
+* [x] Create GitHub repository
+* [x] Create Next.js project
+* [x] Configure TypeScript and Tailwind CSS
+* [ ] Create clean project folder structure
+* [ ] Update README
+
+### Phase 2 — Weekly Calendar Layout
+
+* [ ] Build weekly calendar grid
+* [ ] Show Monday-Sunday columns
+* [ ] Show time range from 08:00 to 20:00
+* [ ] Align time labels with calendar lines
+* [ ] Make layout visually clean and responsive
+
+### Phase 3 — Mock Course Data
+
+* [ ] Define course data types
+* [ ] Add mock lecture codes
+* [ ] Add mock courses
+* [ ] Add mock course sessions
+* [ ] Render a selected mock course on the calendar
+
+### Phase 4 — Add Lecture Flow
+
+* [ ] Add "Add Lecture" button
+* [ ] Create lecture selection modal
+* [ ] Select course code
+* [ ] Select course
+* [ ] Select session/CRN
+* [ ] Add selected session to calendar
+
+### Phase 5 — Conflict Detection
+
+* [ ] Detect overlapping lectures
+* [ ] Warn the user about conflicts
+* [ ] Prevent or mark conflicting sessions
+
+### Phase 6 — Persistence
+
+* [ ] Save selected lectures in localStorage
+* [ ] Restore selected lectures after page refresh
+* [ ] Later, save schedules in a database
+
+### Phase 7 — ITU OBS Integration
+
+* [ ] Investigate ITU OBS course schedule requests
+* [ ] Parse real course schedule data
+* [ ] Store course data in database
+* [ ] Add manual course-data sync
+* [ ] Later, add automatic sync every 5 minutes
+
+### Phase 8 — Deployment
+
+* [ ] Prepare production build
+* [ ] Deploy first public version
+* [ ] Add environment variables if needed
+* [ ] Document deployment process
+
+## Notes
+
+This project is intentionally being built incrementally. The first priority is to create a clean and working weekly lecture planner with mock data. Real ITU OBS integration and database synchronization will be added after the core user interface and schedule logic are stable.
