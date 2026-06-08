@@ -6,9 +6,62 @@ const days = [
   "Friday",
   "Saturday",
   "Sunday",
-];
+] as const;
+
+type Day = (typeof days)[number];
+
+type CourseBlock = {
+  id: string;
+  code: string;
+  title: string;
+  day: Day;
+  startTime: string;
+  endTime: string;
+  room?: string;
+};
 
 const SLOT_HEIGHT = 26;
+const SLOT_MINUTES = 30;
+const START_TIME = "08:00";
+
+const courseBlocks: CourseBlock[] = [
+  {
+    id: "1",
+    code: "BLG 312E",
+    title: "Operating Systems",
+    day: "Monday",
+    startTime: "09:30",
+    endTime: "12:30",
+    room: "MED A-23",
+  },
+  {
+    id: "2",
+    code: "MAT 271E",
+    title: "Probability and Statistics",
+    day: "Tuesday",
+    startTime: "10:00",
+    endTime: "12:00",
+    room: "FEB B-04",
+  },
+  {
+    id: "3",
+    code: "EEF 231E",
+    title: "Circuit Analysis",
+    day: "Wednesday",
+    startTime: "13:30",
+    endTime: "15:30",
+    room: "EEF 2101",
+  },
+  {
+    id: "4",
+    code: "EHB 222E",
+    title: "Signals and Systems",
+    day: "Friday",
+    startTime: "08:30",
+    endTime: "11:30",
+    room: "EHB Z-01",
+  },
+];
 
 function generateTimeLabels() {
   const labels: string[] = [];
@@ -21,6 +74,29 @@ function generateTimeLabels() {
   labels.push("20:00");
 
   return labels;
+}
+
+function timeToMinutes(time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function getCourseTop(startTime: string) {
+  const startMinutes = timeToMinutes(startTime);
+  const calendarStartMinutes = timeToMinutes(START_TIME);
+
+  return ((startMinutes - calendarStartMinutes) / SLOT_MINUTES) * SLOT_HEIGHT;
+}
+
+function getCourseHeight(startTime: string, endTime: string) {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+
+  return ((endMinutes - startMinutes) / SLOT_MINUTES) * SLOT_HEIGHT;
+}
+
+function getDayIndex(day: Day) {
+  return days.indexOf(day);
 }
 
 const timeLabels = generateTimeLabels();
@@ -71,6 +147,41 @@ export default function WeeklyCalendar() {
               />
             ))}
           </div>
+
+          {courseBlocks.map((course) => {
+            const dayIndex = getDayIndex(course.day);
+            const top = getCourseTop(course.startTime);
+            const height = getCourseHeight(course.startTime, course.endTime);
+
+            return (
+              <div
+                key={course.id}
+                className="absolute z-10 px-1"
+                style={{
+                  top,
+                  height,
+                  left: `${(dayIndex / days.length) * 100}%`,
+                  width: `${100 / days.length}%`,
+                }}
+              >
+                <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100 p-2 text-xs shadow-sm">
+                  <div className="font-semibold text-blue-900">
+                    {course.code}
+                  </div>
+
+                  <div className="mt-1 text-blue-800">{course.title}</div>
+
+                  <div className="mt-1 text-blue-700">
+                    {course.startTime} - {course.endTime}
+                  </div>
+
+                  {course.room && (
+                    <div className="mt-1 text-blue-700">{course.room}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
