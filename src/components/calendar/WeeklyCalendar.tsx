@@ -105,7 +105,7 @@ const courseCatalog: FacultyOption[] = [
       {
         id: "mat-271e",
         code: "MAT 271E",
-        title: "Probability and Statistics",
+        title: "Probability and Statistics With A Very Long Example Name",
         sessions: [
           {
             id: "mat-271e-1",
@@ -164,6 +164,9 @@ const courseCatalog: FacultyOption[] = [
     ],
   },
 ];
+
+const selectClassName =
+  "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
 
 function generateTimeLabels() {
   const labels: string[] = [];
@@ -403,14 +406,14 @@ export default function WeeklyCalendar() {
               return (
                 <div
                   key={selection.id}
-                  className="grid grid-cols-[1fr_2fr_3fr_auto] gap-3"
+                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3"
                 >
                   <select
                     value={selection.facultyCode}
                     onChange={(event) =>
                       handleFacultyChange(selection.id, event.target.value)
                     }
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className={selectClassName}
                   >
                     <option value="">Faculty Code</option>
 
@@ -430,7 +433,7 @@ export default function WeeklyCalendar() {
                       handleCourseChange(selection.id, event.target.value)
                     }
                     disabled={!selection.facultyCode}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                    className={selectClassName}
                   >
                     <option value="">Course Code and Name</option>
 
@@ -447,7 +450,7 @@ export default function WeeklyCalendar() {
                       handleSessionChange(selection.id, event.target.value)
                     }
                     disabled={!selection.courseId}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                    className={selectClassName}
                   >
                     <option value="">Session</option>
 
@@ -462,7 +465,7 @@ export default function WeeklyCalendar() {
                   <button
                     type="button"
                     onClick={() => handleDeleteSelection(selection)}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100"
+                    className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100"
                   >
                     Delete
                   </button>
