@@ -248,19 +248,35 @@ export default function WeeklyCalendar() {
     ]);
   }
 
-  function removeCourseBlockIfExists(selection: CourseSelection) {
-    if (!selection.courseBlockId) {
+  function removeCourseBlock(courseBlockId: string | undefined) {
+    if (!courseBlockId) {
       return;
     }
 
     setCourseBlocks((currentCourseBlocks) =>
       currentCourseBlocks.filter(
-        (courseBlock) => courseBlock.id !== selection.courseBlockId,
+        (courseBlock) => courseBlock.id !== courseBlockId,
+      ),
+    );
+  }
+
+  function handleDeleteSelection(selection: CourseSelection) {
+    removeCourseBlock(selection.courseBlockId);
+
+    setCourseSelections((currentSelections) =>
+      currentSelections.filter(
+        (currentSelection) => currentSelection.id !== selection.id,
       ),
     );
   }
 
   function handleFacultyChange(selectionId: string, facultyCode: string) {
+    const currentSelection = courseSelections.find(
+      (selection) => selection.id === selectionId,
+    );
+
+    removeCourseBlock(currentSelection?.courseBlockId);
+
     setCourseSelections((currentSelections) =>
       currentSelections.map((selection) => {
         if (selection.id !== selectionId) {
@@ -268,8 +284,6 @@ export default function WeeklyCalendar() {
         }
 
         // Changing faculty resets the later choices and removes the old calendar block.
-        removeCourseBlockIfExists(selection);
-
         return {
           ...selection,
           facultyCode,
@@ -282,6 +296,12 @@ export default function WeeklyCalendar() {
   }
 
   function handleCourseChange(selectionId: string, courseId: string) {
+    const currentSelection = courseSelections.find(
+      (selection) => selection.id === selectionId,
+    );
+
+    removeCourseBlock(currentSelection?.courseBlockId);
+
     setCourseSelections((currentSelections) =>
       currentSelections.map((selection) => {
         if (selection.id !== selectionId) {
@@ -289,8 +309,6 @@ export default function WeeklyCalendar() {
         }
 
         // Changing course resets the selected session and removes the old calendar block.
-        removeCourseBlockIfExists(selection);
-
         return {
           ...selection,
           courseId,
@@ -385,7 +403,7 @@ export default function WeeklyCalendar() {
               return (
                 <div
                   key={selection.id}
-                  className="grid grid-cols-[1fr_2fr_3fr] gap-3"
+                  className="grid grid-cols-[1fr_2fr_3fr_auto] gap-3"
                 >
                   <select
                     value={selection.facultyCode}
@@ -440,6 +458,14 @@ export default function WeeklyCalendar() {
                       </option>
                     ))}
                   </select>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSelection(selection)}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
                 </div>
               );
             })}
