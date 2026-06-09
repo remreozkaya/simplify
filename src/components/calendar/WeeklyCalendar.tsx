@@ -164,7 +164,7 @@ export default function WeeklyCalendar() {
                   width: `${100 / days.length}%`,
                 }}
               >
-                <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100 p-2 text-xs shadow-sm">
+                <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100 p-2 text-xs opacity-[0.85] shadow-sm transition-all duration-200 hover:scale-[1.02] hover:opacity-100">
                   <div className="font-semibold text-blue-900">
                     {course.code}
                   </div>
