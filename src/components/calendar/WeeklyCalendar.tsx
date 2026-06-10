@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   days,
@@ -29,6 +29,11 @@ const inputClassName =
   "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
 const timeLabels = generateTimeLabels();
+
+type CourseLayout = {
+  leftPercent: number;
+  widthPercent: number;
+};
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -78,6 +83,93 @@ function getCourseHeight(startTime: string, endTime: string) {
 
 function getDayIndex(day: Day) {
   return days.indexOf(day);
+}
+
+function coursesOverlap(firstCourse: CourseBlock, secondCourse: CourseBlock) {
+  if (firstCourse.day !== secondCourse.day) {
+    return false;
+  }
+
+  const firstStart = timeToMinutes(firstCourse.startTime);
+  const firstEnd = timeToMinutes(firstCourse.endTime);
+  const secondStart = timeToMinutes(secondCourse.startTime);
+  const secondEnd = timeToMinutes(secondCourse.endTime);
+
+  return firstStart < secondEnd && firstEnd > secondStart;
+}
+
+function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
+  const layoutMap: Record<string, CourseLayout> = {};
+  const courseOrderMap = new Map<string, number>();
+
+  courseBlocks.forEach((courseBlock, index) => {
+    courseOrderMap.set(courseBlock.id, index);
+  });
+
+  const dayColumnWidth = 100 / days.length;
+
+  days.forEach((day) => {
+    const dayCourses = courseBlocks.filter((course) => course.day === day);
+    const unvisitedCourseIds = new Set(dayCourses.map((course) => course.id));
+
+    while (unvisitedCourseIds.size > 0) {
+      const firstCourseId = Array.from(unvisitedCourseIds)[0];
+      const firstCourse = dayCourses.find(
+        (course) => course.id === firstCourseId,
+      );
+
+      if (!firstCourse) {
+        break;
+      }
+
+      const overlapGroup: CourseBlock[] = [];
+      const queue: CourseBlock[] = [firstCourse];
+
+      unvisitedCourseIds.delete(firstCourse.id);
+
+      while (queue.length > 0) {
+        const currentCourse = queue.shift();
+
+        if (!currentCourse) {
+          continue;
+        }
+
+        overlapGroup.push(currentCourse);
+
+        dayCourses.forEach((possibleOverlappingCourse) => {
+          if (!unvisitedCourseIds.has(possibleOverlappingCourse.id)) {
+            return;
+          }
+
+          if (!coursesOverlap(currentCourse, possibleOverlappingCourse)) {
+            return;
+          }
+
+          unvisitedCourseIds.delete(possibleOverlappingCourse.id);
+          queue.push(possibleOverlappingCourse);
+        });
+      }
+
+      const orderedOverlapGroup = [...overlapGroup].sort((first, second) => {
+        return (
+          (courseOrderMap.get(first.id) ?? 0) -
+          (courseOrderMap.get(second.id) ?? 0)
+        );
+      });
+
+      const dayIndex = getDayIndex(day);
+      const groupWidth = dayColumnWidth / orderedOverlapGroup.length;
+
+      orderedOverlapGroup.forEach((course, index) => {
+        layoutMap[course.id] = {
+          leftPercent: dayIndex * dayColumnWidth + index * groupWidth,
+          widthPercent: groupWidth,
+        };
+      });
+    }
+  });
+
+  return layoutMap;
 }
 
 function getCoursesByFaculty(
@@ -143,6 +235,10 @@ export default function WeeklyCalendar() {
   const selectedProgram = weeklyPrograms.find(
     (program) => program.id === selectedProgramId,
   );
+
+  const courseLayoutMap = useMemo(() => {
+    return getCourseLayoutMap(courseBlocks);
+  }, [courseBlocks]);
 
   useEffect(() => {
     let savedPrograms: WeeklyProgram[] = [];
@@ -446,8 +542,7 @@ export default function WeeklyCalendar() {
       return;
     }
 
-    const courseBlockId =
-      currentSelection.courseBlockId ?? createId("course");
+    const courseBlockId = currentSelection.courseBlockId ?? createId("course");
 
     const newCourseBlock: CourseBlock = {
       id: courseBlockId,
@@ -700,9 +795,13 @@ export default function WeeklyCalendar() {
             </div>
 
             {courseBlocks.map((course) => {
-              const dayIndex = getDayIndex(course.day);
               const top = getCourseTop(course.startTime);
               const height = getCourseHeight(course.startTime, course.endTime);
+              const layout = courseLayoutMap[course.id];
+
+              if (!layout) {
+                return null;
+              }
 
               return (
                 <div
@@ -711,8 +810,8 @@ export default function WeeklyCalendar() {
                   style={{
                     top,
                     height,
-                    left: `${(dayIndex / days.length) * 100}%`,
-                    width: `${100 / days.length}%`,
+                    left: `${layout.leftPercent}%`,
+                    width: `${layout.widthPercent}%`,
                   }}
                 >
                   <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-all duration-200 hover:scale-[1.02] hover:bg-blue-100">
