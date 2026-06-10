@@ -2,47 +2,15 @@
 
 import { useState } from "react";
 
-const days = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
+import {
+  days,
+  type CourseBlock,
+  type CourseOption,
+  type Day,
+  type FacultyOption,
+} from "@/types/calendar";
 
-type Day = (typeof days)[number];
-
-type CourseBlock = {
-  id: string;
-  code: string;
-  title: string;
-  day: Day;
-  startTime: string;
-  endTime: string;
-  room?: string;
-};
-
-type CourseSession = {
-  id: string;
-  day: Day;
-  startTime: string;
-  endTime: string;
-  room?: string;
-};
-
-type CourseOption = {
-  id: string;
-  code: string;
-  title: string;
-  sessions: CourseSession[];
-};
-
-type FacultyOption = {
-  facultyCode: string;
-  courses: CourseOption[];
-};
+import { mockCourseCatalog } from "@/data/mockCourseCatalog";
 
 type CourseSelection = {
   id: string;
@@ -57,116 +25,10 @@ const SLOT_HEIGHT = 26;
 const SLOT_MINUTES = 30;
 const START_TIME = "08:00";
 
-// Temporary static course data. Later, this can come from an API or database.
-const courseCatalog: FacultyOption[] = [
-  {
-    facultyCode: "BLG",
-    courses: [
-      {
-        id: "blg-312e",
-        code: "BLG 312E",
-        title: "Operating Systems",
-        sessions: [
-          {
-            id: "blg-312e-1",
-            day: "Monday",
-            startTime: "09:30",
-            endTime: "12:30",
-            room: "MED A-23",
-          },
-          {
-            id: "blg-312e-2",
-            day: "Thursday",
-            startTime: "13:30",
-            endTime: "16:30",
-            room: "MED A-24",
-          },
-        ],
-      },
-      {
-        id: "blg-242e",
-        code: "BLG 242E",
-        title: "Logic Circuits Laboratory",
-        sessions: [
-          {
-            id: "blg-242e-1",
-            day: "Friday",
-            startTime: "14:00",
-            endTime: "16:00",
-            room: "DCL LAB",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    facultyCode: "MAT",
-    courses: [
-      {
-        id: "mat-271e",
-        code: "MAT 271E",
-        title: "Probability and Statistics With A Very Long Example Name",
-        sessions: [
-          {
-            id: "mat-271e-1",
-            day: "Tuesday",
-            startTime: "10:00",
-            endTime: "12:00",
-            room: "FEB B-04",
-          },
-          {
-            id: "mat-271e-2",
-            day: "Wednesday",
-            startTime: "15:30",
-            endTime: "17:30",
-            room: "FEB B-07",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    facultyCode: "EEF",
-    courses: [
-      {
-        id: "eef-231e",
-        code: "EEF 231E",
-        title: "Circuit Analysis",
-        sessions: [
-          {
-            id: "eef-231e-1",
-            day: "Wednesday",
-            startTime: "13:30",
-            endTime: "15:30",
-            room: "EEF 2101",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    facultyCode: "EHB",
-    courses: [
-      {
-        id: "ehb-222e",
-        code: "EHB 222E",
-        title: "Signals and Systems",
-        sessions: [
-          {
-            id: "ehb-222e-1",
-            day: "Friday",
-            startTime: "08:30",
-            endTime: "11:30",
-            room: "EHB Z-01",
-          },
-        ],
-      },
-    ],
-  },
-];
-
 const selectClassName =
   "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
+
+const timeLabels = generateTimeLabels();
 
 function generateTimeLabels() {
   const labels: string[] = [];
@@ -186,7 +48,6 @@ function timeToMinutes(time: string) {
   return hour * 60 + minute;
 }
 
-// Converts a course start time into its vertical position in the calendar.
 function getCourseTop(startTime: string) {
   const startMinutes = timeToMinutes(startTime);
   const calendarStartMinutes = timeToMinutes(START_TIME);
@@ -194,7 +55,6 @@ function getCourseTop(startTime: string) {
   return ((startMinutes - calendarStartMinutes) / SLOT_MINUTES) * SLOT_HEIGHT;
 }
 
-// Converts course duration into visual block height.
 function getCourseHeight(startTime: string, endTime: string) {
   const startMinutes = timeToMinutes(startTime);
   const endMinutes = timeToMinutes(endTime);
@@ -206,15 +66,22 @@ function getDayIndex(day: Day) {
   return days.indexOf(day);
 }
 
-function getCoursesByFaculty(facultyCode: string) {
+function getCoursesByFaculty(
+  courseCatalog: FacultyOption[],
+  facultyCode: string,
+) {
   return (
     courseCatalog.find((faculty) => faculty.facultyCode === facultyCode)
       ?.courses ?? []
   );
 }
 
-function getCourseById(facultyCode: string, courseId: string) {
-  return getCoursesByFaculty(facultyCode).find(
+function getCourseById(
+  courseCatalog: FacultyOption[],
+  facultyCode: string,
+  courseId: string,
+) {
+  return getCoursesByFaculty(courseCatalog, facultyCode).find(
     (course) => course.id === courseId,
   );
 }
@@ -223,9 +90,9 @@ function getSessionById(course: CourseOption | undefined, sessionId: string) {
   return course?.sessions.find((session) => session.id === sessionId);
 }
 
-const timeLabels = generateTimeLabels();
-
 export default function WeeklyCalendar() {
+  const [courseCatalog] = useState<FacultyOption[]>(mockCourseCatalog);
+
   // Actual course blocks shown on the weekly calendar.
   const [courseBlocks, setCourseBlocks] = useState<CourseBlock[]>([]);
 
@@ -244,7 +111,6 @@ export default function WeeklyCalendar() {
       sessionId: "",
     };
 
-    // New selection rows appear above older rows.
     setCourseSelections((currentSelections) => [
       newSelection,
       ...currentSelections,
@@ -286,7 +152,6 @@ export default function WeeklyCalendar() {
           return selection;
         }
 
-        // Changing faculty resets the later choices and removes the old calendar block.
         return {
           ...selection,
           facultyCode,
@@ -311,7 +176,6 @@ export default function WeeklyCalendar() {
           return selection;
         }
 
-        // Changing course resets the selected session and removes the old calendar block.
         return {
           ...selection,
           courseId,
@@ -323,53 +187,72 @@ export default function WeeklyCalendar() {
   }
 
   function handleSessionChange(selectionId: string, sessionId: string) {
+    const currentSelection = courseSelections.find(
+      (selection) => selection.id === selectionId,
+    );
+
+    if (!currentSelection) {
+      return;
+    }
+
+    const selectedCourse = getCourseById(
+      courseCatalog,
+      currentSelection.facultyCode,
+      currentSelection.courseId,
+    );
+
+    const selectedSession = getSessionById(selectedCourse, sessionId);
+
+    if (!selectedCourse || !selectedSession) {
+      setCourseSelections((currentSelections) =>
+        currentSelections.map((selection) => {
+          if (selection.id !== selectionId) {
+            return selection;
+          }
+
+          return {
+            ...selection,
+            sessionId,
+          };
+        }),
+      );
+
+      return;
+    }
+
+    const courseBlockId =
+      currentSelection.courseBlockId ?? `course-${Date.now()}`;
+
+    const newCourseBlock: CourseBlock = {
+      id: courseBlockId,
+      code: selectedCourse.code,
+      title: selectedCourse.title,
+      day: selectedSession.day,
+      startTime: selectedSession.startTime,
+      endTime: selectedSession.endTime,
+      room: selectedSession.room,
+      instructor: selectedSession.instructor,
+    };
+
+    setCourseBlocks((currentCourseBlocks) => {
+      const courseBlockAlreadyExists = currentCourseBlocks.some(
+        (courseBlock) => courseBlock.id === courseBlockId,
+      );
+
+      if (courseBlockAlreadyExists) {
+        return currentCourseBlocks.map((courseBlock) =>
+          courseBlock.id === courseBlockId ? newCourseBlock : courseBlock,
+        );
+      }
+
+      return [...currentCourseBlocks, newCourseBlock];
+    });
+
     setCourseSelections((currentSelections) =>
       currentSelections.map((selection) => {
         if (selection.id !== selectionId) {
           return selection;
         }
-
-        const selectedCourse = getCourseById(
-          selection.facultyCode,
-          selection.courseId,
-        );
-
-        const selectedSession = getSessionById(selectedCourse, sessionId);
-
-        if (!selectedCourse || !selectedSession) {
-          return {
-            ...selection,
-            sessionId,
-          };
-        }
-
-        const courseBlockId =
-          selection.courseBlockId ?? `course-${Date.now()}`;
-
-        const newCourseBlock: CourseBlock = {
-          id: courseBlockId,
-          code: selectedCourse.code,
-          title: selectedCourse.title,
-          day: selectedSession.day,
-          startTime: selectedSession.startTime,
-          endTime: selectedSession.endTime,
-          room: selectedSession.room,
-        };
-
-        // Selecting the session creates or updates the visible course block.
-        setCourseBlocks((currentCourseBlocks) => {
-          const courseBlockAlreadyExists = currentCourseBlocks.some(
-            (courseBlock) => courseBlock.id === courseBlockId,
-          );
-
-          if (courseBlockAlreadyExists) {
-            return currentCourseBlocks.map((courseBlock) =>
-              courseBlock.id === courseBlockId ? newCourseBlock : courseBlock,
-            );
-          }
-
-          return [...currentCourseBlocks, newCourseBlock];
-        });
 
         return {
           ...selection,
@@ -395,10 +278,12 @@ export default function WeeklyCalendar() {
           <div className="mt-4 space-y-3">
             {courseSelections.map((selection) => {
               const availableCourses = getCoursesByFaculty(
+                courseCatalog,
                 selection.facultyCode,
               );
 
               const selectedCourse = getCourseById(
+                courseCatalog,
                 selection.facultyCode,
                 selection.courseId,
               );
@@ -548,6 +433,12 @@ export default function WeeklyCalendar() {
 
                     {course.room && (
                       <div className="mt-1 text-blue-700">{course.room}</div>
+                    )}
+
+                    {course.instructor && (
+                      <div className="mt-1 text-blue-700">
+                        {course.instructor}
+                      </div>
                     )}
                   </div>
                 </div>
