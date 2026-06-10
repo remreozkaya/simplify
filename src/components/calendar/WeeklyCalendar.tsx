@@ -141,7 +141,16 @@ function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
             return;
           }
 
-          if (!coursesOverlap(currentCourse, possibleOverlappingCourse)) {
+          const overlapsWithGroup = overlapGroup.some((groupCourse) =>
+            coursesOverlap(groupCourse, possibleOverlappingCourse),
+          );
+
+          const overlapsWithCurrentCourse = coursesOverlap(
+            currentCourse,
+            possibleOverlappingCourse,
+          );
+
+          if (!overlapsWithGroup && !overlapsWithCurrentCourse) {
             return;
           }
 
@@ -157,13 +166,48 @@ function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
         );
       });
 
-      const dayIndex = getDayIndex(day);
-      const groupWidth = dayColumnWidth / orderedOverlapGroup.length;
+      const courseColumnMap = new Map<string, number>();
 
-      orderedOverlapGroup.forEach((course, index) => {
+      orderedOverlapGroup.forEach((course) => {
+        const usedColumns = new Set<number>();
+
+        orderedOverlapGroup.forEach((otherCourse) => {
+          if (course.id === otherCourse.id) {
+            return;
+          }
+
+          const otherCourseColumn = courseColumnMap.get(otherCourse.id);
+
+          if (otherCourseColumn === undefined) {
+            return;
+          }
+
+          if (coursesOverlap(course, otherCourse)) {
+            usedColumns.add(otherCourseColumn);
+          }
+        });
+
+        let columnIndex = 0;
+
+        while (usedColumns.has(columnIndex)) {
+          columnIndex += 1;
+        }
+
+        courseColumnMap.set(course.id, columnIndex);
+      });
+
+      const totalColumns =
+        Math.max(...Array.from(courseColumnMap.values())) + 1;
+
+      const dayIndex = getDayIndex(day);
+      const courseWidth = dayColumnWidth / totalColumns;
+
+      orderedOverlapGroup.forEach((course) => {
+        const columnIndex = courseColumnMap.get(course.id) ?? 0;
+
         layoutMap[course.id] = {
-          leftPercent: dayIndex * dayColumnWidth + index * groupWidth,
-          widthPercent: groupWidth,
+          leftPercent: dayIndex * dayColumnWidth + columnIndex * courseWidth,
+          widthPercent: courseWidth,
         };
       });
     }
@@ -806,7 +850,7 @@ export default function WeeklyCalendar() {
               return (
                 <div
                   key={course.id}
-                  className="absolute z-10 px-1"
+                  className="absolute z-10 px-0.4"
                   style={{
                     top,
                     height,
