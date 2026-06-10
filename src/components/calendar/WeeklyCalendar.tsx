@@ -1,34 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   days,
   type CourseBlock,
   type CourseOption,
+  type CourseSelection,
   type Day,
   type FacultyOption,
+  type WeeklyProgram,
 } from "@/types/calendar";
 
 import { mockCourseCatalog } from "@/data/mockCourseCatalog";
-
-type CourseSelection = {
-  id: string;
-  facultyCode: string;
-  courseId: string;
-  sessionId: string;
-  courseBlockId?: string;
-};
 
 // Calendar scale settings.
 const SLOT_HEIGHT = 26;
 const SLOT_MINUTES = 30;
 const START_TIME = "08:00";
 
+const WEEKLY_PROGRAMS_STORAGE_KEY = "simplify-weekly-programs";
+const NEW_PROGRAM_VALUE = "__new_program__";
+
 const selectClassName =
   "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
 
+const inputClassName =
+  "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
 const timeLabels = generateTimeLabels();
+
+function createId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createEmptyProgram(name: string): WeeklyProgram {
+  return {
+    id: createId("program"),
+    name,
+    courseBlocks: [],
+    courseSelections: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 function generateTimeLabels() {
   const labels: string[] = [];
@@ -90,8 +104,28 @@ function getSessionById(course: CourseOption | undefined, sessionId: string) {
   return course?.sessions.find((session) => session.id === sessionId);
 }
 
+function formatUpdatedAt(updatedAt: string) {
+  const date = new Date(updatedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function WeeklyCalendar() {
   const [courseCatalog] = useState<FacultyOption[]>(mockCourseCatalog);
+
+  const [weeklyPrograms, setWeeklyPrograms] = useState<WeeklyProgram[]>([]);
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [programName, setProgramName] = useState("");
 
   // Actual course blocks shown on the weekly calendar.
   const [courseBlocks, setCourseBlocks] = useState<CourseBlock[]>([]);
@@ -101,11 +135,193 @@ export default function WeeklyCalendar() {
     [],
   );
 
+  const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const calendarHeight = (timeLabels.length - 1) * SLOT_HEIGHT;
+
+  const selectedProgram = weeklyPrograms.find(
+    (program) => program.id === selectedProgramId,
+  );
+
+  useEffect(() => {
+    let savedPrograms: WeeklyProgram[] = [];
+
+    try {
+      const storedPrograms = localStorage.getItem(WEEKLY_PROGRAMS_STORAGE_KEY);
+
+      if (storedPrograms) {
+        const parsedPrograms = JSON.parse(storedPrograms);
+
+        if (Array.isArray(parsedPrograms)) {
+          savedPrograms = parsedPrograms;
+        }
+      }
+    } catch {
+      savedPrograms = [];
+    }
+
+    const initialPrograms =
+      savedPrograms.length > 0
+        ? savedPrograms
+        : [createEmptyProgram("Program 1")];
+
+    const firstProgram = initialPrograms[0];
+
+    setWeeklyPrograms(initialPrograms);
+    setSelectedProgramId(firstProgram.id);
+    setProgramName(firstProgram.name);
+    setCourseBlocks(firstProgram.courseBlocks ?? []);
+    setCourseSelections(firstProgram.courseSelections ?? []);
+    setHasLoadedPrograms(true);
+    setHasUnsavedChanges(false);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPrograms) {
+      return;
+    }
+
+    localStorage.setItem(
+      WEEKLY_PROGRAMS_STORAGE_KEY,
+      JSON.stringify(weeklyPrograms),
+    );
+  }, [weeklyPrograms, hasLoadedPrograms]);
+
+  function markProgramAsChanged() {
+    setHasUnsavedChanges(true);
+  }
+
+  function confirmDiscardUnsavedChanges() {
+    if (!hasUnsavedChanges) {
+      return true;
+    }
+
+    return window.confirm(
+      "You have unsaved changes. If you continue, your current changes will be lost. Continue?",
+    );
+  }
+
+  function loadProgram(programId: string) {
+    if (programId === NEW_PROGRAM_VALUE) {
+      handleCreateProgram();
+      return;
+    }
+
+    if (!confirmDiscardUnsavedChanges()) {
+      return;
+    }
+
+    const programToLoad = weeklyPrograms.find(
+      (program) => program.id === programId,
+    );
+
+    if (!programToLoad) {
+      return;
+    }
+
+    setSelectedProgramId(programToLoad.id);
+    setProgramName(programToLoad.name);
+    setCourseBlocks(programToLoad.courseBlocks ?? []);
+    setCourseSelections(programToLoad.courseSelections ?? []);
+    setHasUnsavedChanges(false);
+  }
+
+  function handleCreateProgram() {
+    if (!confirmDiscardUnsavedChanges()) {
+      return;
+    }
+
+    const newProgram = createEmptyProgram(`Program ${weeklyPrograms.length + 1}`);
+
+    setWeeklyPrograms((currentPrograms) => [...currentPrograms, newProgram]);
+    setSelectedProgramId(newProgram.id);
+    setProgramName(newProgram.name);
+    setCourseBlocks([]);
+    setCourseSelections([]);
+    setHasUnsavedChanges(false);
+  }
+
+  function handleSaveProgram() {
+    const trimmedProgramName = programName.trim() || "Untitled Program";
+
+    const savedProgram: WeeklyProgram = {
+      id: selectedProgramId || createId("program"),
+      name: trimmedProgramName,
+      courseBlocks,
+      courseSelections,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setWeeklyPrograms((currentPrograms) => {
+      const programAlreadyExists = currentPrograms.some(
+        (program) => program.id === savedProgram.id,
+      );
+
+      if (!programAlreadyExists) {
+        return [...currentPrograms, savedProgram];
+      }
+
+      return currentPrograms.map((program) =>
+        program.id === savedProgram.id ? savedProgram : program,
+      );
+    });
+
+    setSelectedProgramId(savedProgram.id);
+    setProgramName(trimmedProgramName);
+    setHasUnsavedChanges(false);
+  }
+
+  function handleDeleteProgram() {
+    const programToDelete = weeklyPrograms.find(
+      (program) => program.id === selectedProgramId,
+    );
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${
+        programToDelete?.name ?? "this program"
+      }"? This action cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const remainingPrograms = weeklyPrograms.filter(
+      (program) => program.id !== selectedProgramId,
+    );
+
+    if (remainingPrograms.length === 0) {
+      const newProgram = createEmptyProgram("Program 1");
+
+      setWeeklyPrograms([newProgram]);
+      setSelectedProgramId(newProgram.id);
+      setProgramName(newProgram.name);
+      setCourseBlocks([]);
+      setCourseSelections([]);
+      setHasUnsavedChanges(false);
+
+      return;
+    }
+
+    const nextProgram = remainingPrograms[0];
+
+    setWeeklyPrograms(remainingPrograms);
+    setSelectedProgramId(nextProgram.id);
+    setProgramName(nextProgram.name);
+    setCourseBlocks(nextProgram.courseBlocks ?? []);
+    setCourseSelections(nextProgram.courseSelections ?? []);
+    setHasUnsavedChanges(false);
+  }
+
+  function handleProgramNameChange(newProgramName: string) {
+    setProgramName(newProgramName);
+    markProgramAsChanged();
+  }
 
   function handleAddSelectionRow() {
     const newSelection: CourseSelection = {
-      id: `selection-${Date.now()}`,
+      id: createId("selection"),
       facultyCode: "",
       courseId: "",
       sessionId: "",
@@ -115,6 +331,8 @@ export default function WeeklyCalendar() {
       newSelection,
       ...currentSelections,
     ]);
+
+    markProgramAsChanged();
   }
 
   function removeCourseBlock(courseBlockId: string | undefined) {
@@ -137,6 +355,8 @@ export default function WeeklyCalendar() {
         (currentSelection) => currentSelection.id !== selection.id,
       ),
     );
+
+    markProgramAsChanged();
   }
 
   function handleFacultyChange(selectionId: string, facultyCode: string) {
@@ -161,6 +381,8 @@ export default function WeeklyCalendar() {
         };
       }),
     );
+
+    markProgramAsChanged();
   }
 
   function handleCourseChange(selectionId: string, courseId: string) {
@@ -184,6 +406,8 @@ export default function WeeklyCalendar() {
         };
       }),
     );
+
+    markProgramAsChanged();
   }
 
   function handleSessionChange(selectionId: string, sessionId: string) {
@@ -217,11 +441,13 @@ export default function WeeklyCalendar() {
         }),
       );
 
+      markProgramAsChanged();
+
       return;
     }
 
     const courseBlockId =
-      currentSelection.courseBlockId ?? `course-${Date.now()}`;
+      currentSelection.courseBlockId ?? createId("course");
 
     const newCourseBlock: CourseBlock = {
       id: courseBlockId,
@@ -261,11 +487,80 @@ export default function WeeklyCalendar() {
         };
       }),
     );
+
+    markProgramAsChanged();
   }
 
   return (
     <div className="w-full space-y-4">
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-semibold text-gray-600">
+              Weekly Program
+            </label>
+
+            <select
+              value={selectedProgramId}
+              onChange={(event) => loadProgram(event.target.value)}
+              disabled={!hasLoadedPrograms}
+              className={selectClassName}
+            >
+              {weeklyPrograms.map((program) => (
+                <option key={program.id} value={program.id}>
+                  {program.name}
+                </option>
+              ))}
+
+              <option value={NEW_PROGRAM_VALUE}>+ New Program</option>
+            </select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-semibold text-gray-600">
+              Program Name
+            </label>
+
+            <input
+              type="text"
+              value={programName}
+              onChange={(event) => handleProgramNameChange(event.target.value)}
+              placeholder="Program name"
+              className={inputClassName}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSaveProgram}
+            disabled={!hasLoadedPrograms}
+            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+          >
+            Save
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDeleteProgram}
+            disabled={!hasLoadedPrograms}
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Delete Program
+          </button>
+        </div>
+
+        <div className="mb-4 text-xs text-gray-500">
+          {hasUnsavedChanges ? (
+            <span className="font-medium text-orange-600">
+              Unsaved changes
+            </span>
+          ) : selectedProgram?.updatedAt ? (
+            <span>Saved at {formatUpdatedAt(selectedProgram.updatedAt)}</span>
+          ) : (
+            <span>No saved changes yet</span>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={handleAddSelectionRow}

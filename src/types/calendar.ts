@@ -41,3 +41,19 @@ export type FacultyOption = {
   facultyCode: string;
   courses: CourseOption[];
 };
+
+export type CourseSelection = {
+  id: string;
+  facultyCode: string;
+  courseId: string;
+  sessionId: string;
+  courseBlockId?: string;
+};
+
+export type WeeklyProgram = {
+  id: string;
+  name: string;
+  courseBlocks: CourseBlock[];
+  courseSelections: CourseSelection[];
+  updatedAt: string;
+};
