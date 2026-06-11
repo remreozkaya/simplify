@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type DragEvent,
   type KeyboardEvent,
 } from "react";
 
@@ -101,6 +102,40 @@ function coursesOverlap(firstCourse: CourseBlock, secondCourse: CourseBlock) {
   const secondEnd = timeToMinutes(secondCourse.endTime);
 
   return firstStart < secondEnd && firstEnd > secondStart;
+}
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  const updatedItems = [...items];
+  const [movedItem] = updatedItems.splice(fromIndex, 1);
+
+  updatedItems.splice(toIndex, 0, movedItem);
+
+  return updatedItems;
+}
+
+function reorderCourseBlocksBySelections(
+  courseBlocks: CourseBlock[],
+  courseSelections: CourseSelection[],
+) {
+  const courseBlockMap = new Map(
+    courseBlocks.map((courseBlock) => [courseBlock.id, courseBlock]),
+  );
+
+  const orderedCourseBlockIds = courseSelections
+    .map((selection) => selection.courseBlockId)
+    .filter((courseBlockId): courseBlockId is string => Boolean(courseBlockId));
+
+  const orderedCourseBlocks = orderedCourseBlockIds
+    .map((courseBlockId) => courseBlockMap.get(courseBlockId))
+    .filter((courseBlock): courseBlock is CourseBlock => Boolean(courseBlock));
+
+  const orderedCourseBlockIdSet = new Set(orderedCourseBlockIds);
+
+  const remainingCourseBlocks = courseBlocks.filter(
+    (courseBlock) => !orderedCourseBlockIdSet.has(courseBlock.id),
+  );
+
+  return [...orderedCourseBlocks, ...remainingCourseBlocks];
 }
 
 function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
@@ -276,6 +311,9 @@ export default function WeeklyCalendar() {
   const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const [draggedSelectionId, setDraggedSelectionId] = useState("");
+  const [dragOverSelectionId, setDragOverSelectionId] = useState("");
+
   const calendarHeight = (timeLabels.length - 1) * SLOT_HEIGHT;
 
   const selectedProgram = weeklyPrograms.find(
@@ -366,6 +404,8 @@ export default function WeeklyCalendar() {
     setProgramName(programToLoad.name);
     setCourseBlocks(programToLoad.courseBlocks ?? []);
     setCourseSelections(programToLoad.courseSelections ?? []);
+    setDraggedSelectionId("");
+    setDragOverSelectionId("");
     setHasUnsavedChanges(false);
   }
 
@@ -381,6 +421,8 @@ export default function WeeklyCalendar() {
     setProgramName(newProgram.name);
     setCourseBlocks([]);
     setCourseSelections([]);
+    setDraggedSelectionId("");
+    setDragOverSelectionId("");
     setHasUnsavedChanges(false);
   }
 
@@ -469,6 +511,8 @@ export default function WeeklyCalendar() {
       setProgramName(newProgram.name);
       setCourseBlocks([]);
       setCourseSelections([]);
+      setDraggedSelectionId("");
+      setDragOverSelectionId("");
       setHasUnsavedChanges(false);
 
       return;
@@ -481,6 +525,8 @@ export default function WeeklyCalendar() {
     setProgramName(nextProgram.name);
     setCourseBlocks(nextProgram.courseBlocks ?? []);
     setCourseSelections(nextProgram.courseSelections ?? []);
+    setDraggedSelectionId("");
+    setDragOverSelectionId("");
     setHasUnsavedChanges(false);
   }
 
@@ -659,6 +705,87 @@ export default function WeeklyCalendar() {
     markProgramAsChanged();
   }
 
+  function reorderSelectionRows(
+    draggedSelectionIdValue: string,
+    targetSelectionId: string,
+  ) {
+    if (draggedSelectionIdValue === targetSelectionId) {
+      return;
+    }
+
+    const draggedSelectionIndex = courseSelections.findIndex(
+      (selection) => selection.id === draggedSelectionIdValue,
+    );
+
+    const targetSelectionIndex = courseSelections.findIndex(
+      (selection) => selection.id === targetSelectionId,
+    );
+
+    if (draggedSelectionIndex === -1 || targetSelectionIndex === -1) {
+      return;
+    }
+
+    const reorderedSelections = moveArrayItem(
+      courseSelections,
+      draggedSelectionIndex,
+      targetSelectionIndex,
+    );
+
+    setCourseSelections(reorderedSelections);
+
+    setCourseBlocks((currentCourseBlocks) =>
+      reorderCourseBlocksBySelections(currentCourseBlocks, reorderedSelections),
+    );
+
+    markProgramAsChanged();
+  }
+
+  function handleSelectionDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    selectionId: string,
+  ) {
+    setDraggedSelectionId(selectionId);
+    setDragOverSelectionId("");
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", selectionId);
+  }
+
+  function handleSelectionDragOver(
+    event: DragEvent<HTMLDivElement>,
+    selectionId: string,
+  ) {
+    if (!draggedSelectionId || draggedSelectionId === selectionId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverSelectionId(selectionId);
+  }
+
+  function handleSelectionDrop(
+    event: DragEvent<HTMLDivElement>,
+    targetSelectionId: string,
+  ) {
+    event.preventDefault();
+
+    const draggedSelectionIdFromEvent =
+      draggedSelectionId || event.dataTransfer.getData("text/plain");
+
+    if (draggedSelectionIdFromEvent) {
+      reorderSelectionRows(draggedSelectionIdFromEvent, targetSelectionId);
+    }
+
+    setDraggedSelectionId("");
+    setDragOverSelectionId("");
+  }
+
+  function handleSelectionDragEnd() {
+    setDraggedSelectionId("");
+    setDragOverSelectionId("");
+  }
+
   return (
     <div className="w-full space-y-4" onKeyDown={handleEnterToSave}>
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -739,6 +866,11 @@ export default function WeeklyCalendar() {
 
         {courseSelections.length > 0 && (
           <div className="mt-4 space-y-3">
+            <div className="text-xs text-gray-500">
+              Drag the handle on the left side of a course row to reorder your
+              selected courses.
+            </div>
+
             {courseSelections.map((selection) => {
               const availableCourses = getCoursesByFaculty(
                 courseCatalog,
@@ -751,11 +883,50 @@ export default function WeeklyCalendar() {
                 selection.courseId,
               );
 
+              const isDragged = draggedSelectionId === selection.id;
+              const isDragTarget = dragOverSelectionId === selection.id;
+
               return (
                 <div
                   key={selection.id}
-                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3"
+                  onDragOver={(event) =>
+                    handleSelectionDragOver(event, selection.id)
+                  }
+                  onDrop={(event) => handleSelectionDrop(event, selection.id)}
+                  className={
+                    isDragTarget
+                      ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-blue-300 bg-blue-50 p-2"
+                      : isDragged
+                        ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-gray-200 bg-gray-50 p-2 opacity-60"
+                        : "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-transparent p-2"
+                  }
                 >
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={(event) =>
+                      handleSelectionDragStart(event, selection.id)
+                    }
+                    onDragEnd={handleSelectionDragEnd}
+                    aria-label="Drag to reorder course"
+                    title="Drag to reorder"
+                    className="flex h-10 w-9 cursor-grab items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-500 shadow-sm transition hover:bg-gray-100 active:cursor-grabbing"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      aria-hidden="true"
+                      className="h-5 w-5"
+                    >
+                      <path
+                        d="M4 6h12M4 10h12M4 14h12"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                  </button>
+
                   <select
                     value={selection.facultyCode}
                     onChange={(event) =>
