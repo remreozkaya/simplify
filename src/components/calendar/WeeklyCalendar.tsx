@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 import {
   days,
@@ -263,10 +268,7 @@ export default function WeeklyCalendar() {
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [programName, setProgramName] = useState("");
 
-  // Actual course blocks shown on the weekly calendar.
   const [courseBlocks, setCourseBlocks] = useState<CourseBlock[]>([]);
-
-  // Selection rows shown under the Add Course button.
   const [courseSelections, setCourseSelections] = useState<CourseSelection[]>(
     [],
   );
@@ -410,6 +412,34 @@ export default function WeeklyCalendar() {
     setSelectedProgramId(savedProgram.id);
     setProgramName(trimmedProgramName);
     setHasUnsavedChanges(false);
+  }
+
+  function handleEnterToSave(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+      return;
+    }
+
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    const ignoredTags = ["BUTTON", "SELECT", "TEXTAREA"];
+
+    if (ignoredTags.includes(target.tagName)) {
+      return;
+    }
+
+    if (!hasLoadedPrograms) {
+      return;
+    }
+
+    event.preventDefault();
+    handleSaveProgram();
   }
 
   function handleDeleteProgram() {
@@ -582,7 +612,6 @@ export default function WeeklyCalendar() {
       );
 
       markProgramAsChanged();
-
       return;
     }
 
@@ -631,7 +660,7 @@ export default function WeeklyCalendar() {
   }
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-4" onKeyDown={handleEnterToSave}>
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
           <div className="min-w-0">
@@ -850,7 +879,7 @@ export default function WeeklyCalendar() {
               return (
                 <div
                   key={course.id}
-                  className="absolute z-10 px-0.4"
+                  className="absolute z-10 px-[1px]"
                   style={{
                     top,
                     height,
