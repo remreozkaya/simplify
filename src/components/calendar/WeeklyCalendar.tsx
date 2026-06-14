@@ -1,13 +1,27 @@
 "use client";
 
 import {
-  useEffect,
-  useMemo,
-  useState,
-  type DragEvent,
-  type KeyboardEvent,
-} from "react";
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
+import { mockCourseCatalog } from "@/data/mockCourseCatalog";
 import {
   days,
   type CourseBlock,
@@ -18,9 +32,6 @@ import {
   type WeeklyProgram,
 } from "@/types/calendar";
 
-import { mockCourseCatalog } from "@/data/mockCourseCatalog";
-
-// Calendar scale settings.
 const SLOT_HEIGHT = 26;
 const SLOT_MINUTES = 30;
 const START_TIME = "08:00";
@@ -29,20 +40,42 @@ const WEEKLY_PROGRAMS_STORAGE_KEY = "simplify-weekly-programs";
 const NEW_PROGRAM_VALUE = "__new_program__";
 
 const selectClassName =
-  "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
+  "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
 
 const inputClassName =
-  "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+  "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
+const overlayFieldClassName =
+  "flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm";
+
+const sortableGridClassName =
+  "grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-3 rounded-xl p-2";
 
 const timeLabels = generateTimeLabels();
+
+const dropAnimation = {
+  duration: 220,
+  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+};
 
 type CourseLayout = {
   leftPercent: number;
   widthPercent: number;
 };
 
+type SortableCourseRowProps = {
+  selection: CourseSelection;
+  courseCatalog: FacultyOption[];
+  onFacultyChange: (selectionId: string, facultyCode: string) => void;
+  onCourseChange: (selectionId: string, courseId: string) => void;
+  onSessionChange: (selectionId: string, sessionId: string) => void;
+  onDelete: (selection: CourseSelection) => void;
+};
+
 function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 function createEmptyProgram(name: string): WeeklyProgram {
@@ -58,7 +91,7 @@ function createEmptyProgram(name: string): WeeklyProgram {
 function generateTimeLabels() {
   const labels: string[] = [];
 
-  for (let hour = 8; hour < 20; hour++) {
+  for (let hour = 8; hour < 20; hour += 1) {
     labels.push(`${hour.toString().padStart(2, "0")}:00`);
     labels.push(`${hour.toString().padStart(2, "0")}:30`);
   }
@@ -70,6 +103,7 @@ function generateTimeLabels() {
 
 function timeToMinutes(time: string) {
   const [hour, minute] = time.split(":").map(Number);
+
   return hour * 60 + minute;
 }
 
@@ -102,15 +136,6 @@ function coursesOverlap(firstCourse: CourseBlock, secondCourse: CourseBlock) {
   const secondEnd = timeToMinutes(secondCourse.endTime);
 
   return firstStart < secondEnd && firstEnd > secondStart;
-}
-
-function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number) {
-  const updatedItems = [...items];
-  const [movedItem] = updatedItems.splice(fromIndex, 1);
-
-  updatedItems.splice(toIndex, 0, movedItem);
-
-  return updatedItems;
 }
 
 function reorderCourseBlocksBySelections(
@@ -150,10 +175,14 @@ function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
 
   days.forEach((day) => {
     const dayCourses = courseBlocks.filter((course) => course.day === day);
-    const unvisitedCourseIds = new Set(dayCourses.map((course) => course.id));
+
+    const unvisitedCourseIds = new Set(
+      dayCourses.map((course) => course.id),
+    );
 
     while (unvisitedCourseIds.size > 0) {
       const firstCourseId = Array.from(unvisitedCourseIds)[0];
+
       const firstCourse = dayCourses.find(
         (course) => course.id === firstCourseId,
       );
@@ -246,7 +275,8 @@ function getCourseLayoutMap(courseBlocks: CourseBlock[]) {
         const columnIndex = courseColumnMap.get(course.id) ?? 0;
 
         layoutMap[course.id] = {
-          leftPercent: dayIndex * dayColumnWidth + columnIndex * courseWidth,
+          leftPercent:
+            dayIndex * dayColumnWidth + columnIndex * courseWidth,
           widthPercent: courseWidth,
         };
       });
@@ -261,8 +291,9 @@ function getCoursesByFaculty(
   facultyCode: string,
 ) {
   return (
-    courseCatalog.find((faculty) => faculty.facultyCode === facultyCode)
-      ?.courses ?? []
+    courseCatalog.find(
+      (faculty) => faculty.facultyCode === facultyCode,
+    )?.courses ?? []
   );
 }
 
@@ -276,7 +307,10 @@ function getCourseById(
   );
 }
 
-function getSessionById(course: CourseOption | undefined, sessionId: string) {
+function getSessionById(
+  course: CourseOption | undefined,
+  sessionId: string,
+) {
   return course?.sessions.find((session) => session.id === sessionId);
 }
 
@@ -296,45 +330,276 @@ function formatUpdatedAt(updatedAt: string) {
   });
 }
 
+function removeCourseBlock(
+  courseBlocks: CourseBlock[],
+  courseBlockId: string | undefined,
+) {
+  if (!courseBlockId) {
+    return courseBlocks;
+  }
+
+  return courseBlocks.filter(
+    (courseBlock) => courseBlock.id !== courseBlockId,
+  );
+}
+
+function DragHandleIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-5 w-5">
+      <path
+        d="M4 6h12M4 10h12M4 14h12"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function SortableCourseRow({
+  selection,
+  courseCatalog,
+  onFacultyChange,
+  onCourseChange,
+  onSessionChange,
+  onDelete,
+}: SortableCourseRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: selection.id,
+  });
+
+  const availableCourses = getCoursesByFaculty(
+    courseCatalog,
+    selection.facultyCode,
+  );
+
+  const selectedCourse = getCourseById(
+    courseCatalog,
+    selection.facultyCode,
+    selection.courseId,
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition:
+          transition ??
+          "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease, box-shadow 160ms ease",
+        zIndex: isDragging ? 20 : undefined,
+      }}
+      className={`${sortableGridClassName} border transition-[background-color,border-color,box-shadow,opacity] duration-200 ease-out ${
+        isDragging
+          ? "border-blue-200 bg-blue-50/40 opacity-20"
+          : "border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50/70"
+      }`}
+    >
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        aria-label="Drag to reorder course"
+        title="Drag to reorder"
+        className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out hover:bg-gray-100/80 hover:text-gray-600 active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+        {...attributes}
+        {...listeners}
+      >
+        <DragHandleIcon />
+      </button>
+
+      <select
+        value={selection.facultyCode}
+        onChange={(event) =>
+          onFacultyChange(selection.id, event.target.value)
+        }
+        className={selectClassName}
+      >
+        <option value="">Faculty Code</option>
+
+        {courseCatalog.map((faculty) => (
+          <option
+            key={faculty.facultyCode}
+            value={faculty.facultyCode}
+          >
+            {faculty.facultyCode}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={selection.courseId}
+        onChange={(event) =>
+          onCourseChange(selection.id, event.target.value)
+        }
+        disabled={!selection.facultyCode}
+        className={selectClassName}
+      >
+        <option value="">Course Code and Name</option>
+
+        {availableCourses.map((course) => (
+          <option key={course.id} value={course.id}>
+            {course.code} - {course.title}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={selection.sessionId}
+        onChange={(event) =>
+          onSessionChange(selection.id, event.target.value)
+        }
+        disabled={!selection.courseId}
+        className={selectClassName}
+      >
+        <option value="">Session</option>
+
+        {selectedCourse?.sessions.map((session) => (
+          <option key={session.id} value={session.id}>
+            {session.day}, {session.startTime} - {session.endTime}
+            {session.room ? `, ${session.room}` : ""}
+          </option>
+        ))}
+      </select>
+
+      <button
+        type="button"
+        onClick={() => onDelete(selection)}
+        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100"
+      >
+        Delete
+      </button>
+    </div>
+  );
+}
+
+function DraggedCourseRow({
+  selection,
+  courseCatalog,
+}: {
+  selection: CourseSelection;
+  courseCatalog: FacultyOption[];
+}) {
+  const selectedCourse = getCourseById(
+    courseCatalog,
+    selection.facultyCode,
+    selection.courseId,
+  );
+
+  const selectedSession = getSessionById(
+    selectedCourse,
+    selection.sessionId,
+  );
+
+  const facultyText = selection.facultyCode || "Faculty Code";
+
+  const courseText = selectedCourse
+    ? `${selectedCourse.code} - ${selectedCourse.title}`
+    : "Course Code and Name";
+
+  const sessionText = selectedSession
+    ? `${selectedSession.day}, ${selectedSession.startTime} - ${
+        selectedSession.endTime
+      }${selectedSession.room ? `, ${selectedSession.room}` : ""}`
+    : "Session";
+
+  return (
+    <div
+      className={`${sortableGridClassName} cursor-grabbing border border-blue-300 bg-white shadow-xl ring-2 ring-blue-100/80`}
+    >
+      <div className="flex h-10 w-9 items-center justify-center rounded-lg bg-transparent text-gray-500">
+        <DragHandleIcon />
+      </div>
+
+      <div className={overlayFieldClassName}>
+        <span className="truncate">{facultyText}</span>
+      </div>
+
+      <div className={overlayFieldClassName}>
+        <span className="truncate">{courseText}</span>
+      </div>
+
+      <div className={overlayFieldClassName}>
+        <span className="truncate">{sessionText}</span>
+      </div>
+
+      <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm">
+        Delete
+      </div>
+    </div>
+  );
+}
+
 export default function WeeklyCalendar() {
   const [courseCatalog] = useState<FacultyOption[]>(mockCourseCatalog);
 
   const [weeklyPrograms, setWeeklyPrograms] = useState<WeeklyProgram[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [programName, setProgramName] = useState("");
+  const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
 
-  const [courseBlocks, setCourseBlocks] = useState<CourseBlock[]>([]);
-  const [courseSelections, setCourseSelections] = useState<CourseSelection[]>(
-    [],
+  const [activeSelectionId, setActiveSelectionId] = useState<
+    string | null
+  >(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
-  const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const selectedProgram = useMemo(
+    () =>
+      weeklyPrograms.find(
+        (program) => program.id === selectedProgramId,
+      ) ?? null,
+    [weeklyPrograms, selectedProgramId],
+  );
 
-  const [draggedSelectionId, setDraggedSelectionId] = useState("");
-  const [dragOverSelectionId, setDragOverSelectionId] = useState("");
+  const courseBlocks = selectedProgram?.courseBlocks ?? [];
+  const courseSelections = selectedProgram?.courseSelections ?? [];
+  const savedProgramName = selectedProgram?.name ?? "";
+
+  const hasUnsavedNameChanges = programName !== savedProgramName;
 
   const calendarHeight = (timeLabels.length - 1) * SLOT_HEIGHT;
 
-  const selectedProgram = weeklyPrograms.find(
-    (program) => program.id === selectedProgramId,
-  );
+  const activeSelection =
+    courseSelections.find(
+      (selection) => selection.id === activeSelectionId,
+    ) ?? null;
 
-  const courseLayoutMap = useMemo(() => {
-    return getCourseLayoutMap(courseBlocks);
-  }, [courseBlocks]);
+  const courseLayoutMap = useMemo(
+    () => getCourseLayoutMap(courseBlocks),
+    [courseBlocks],
+  );
 
   useEffect(() => {
     let savedPrograms: WeeklyProgram[] = [];
 
     try {
-      const storedPrograms = localStorage.getItem(WEEKLY_PROGRAMS_STORAGE_KEY);
+      const storedPrograms = localStorage.getItem(
+        WEEKLY_PROGRAMS_STORAGE_KEY,
+      );
 
       if (storedPrograms) {
-        const parsedPrograms = JSON.parse(storedPrograms);
+        const parsedPrograms: unknown = JSON.parse(storedPrograms);
 
         if (Array.isArray(parsedPrograms)) {
-          savedPrograms = parsedPrograms;
+          savedPrograms = parsedPrograms as WeeklyProgram[];
         }
       }
     } catch {
@@ -351,10 +616,7 @@ export default function WeeklyCalendar() {
     setWeeklyPrograms(initialPrograms);
     setSelectedProgramId(firstProgram.id);
     setProgramName(firstProgram.name);
-    setCourseBlocks(firstProgram.courseBlocks ?? []);
-    setCourseSelections(firstProgram.courseSelections ?? []);
     setHasLoadedPrograms(true);
-    setHasUnsavedChanges(false);
   }, []);
 
   useEffect(() => {
@@ -368,17 +630,25 @@ export default function WeeklyCalendar() {
     );
   }, [weeklyPrograms, hasLoadedPrograms]);
 
-  function markProgramAsChanged() {
-    setHasUnsavedChanges(true);
+  function updateSelectedProgram(
+    updater: (program: WeeklyProgram) => WeeklyProgram,
+  ) {
+    setWeeklyPrograms((currentPrograms) =>
+      currentPrograms.map((program) =>
+        program.id === selectedProgramId
+          ? updater(program)
+          : program,
+      ),
+    );
   }
 
-  function confirmDiscardUnsavedChanges() {
-    if (!hasUnsavedChanges) {
+  function confirmDiscardUnsavedName() {
+    if (!hasUnsavedNameChanges) {
       return true;
     }
 
     return window.confirm(
-      "You have unsaved changes. If you continue, your current changes will be lost. Continue?",
+      "The program name has not been saved. Discard the name change?",
     );
   }
 
@@ -388,7 +658,7 @@ export default function WeeklyCalendar() {
       return;
     }
 
-    if (!confirmDiscardUnsavedChanges()) {
+    if (!confirmDiscardUnsavedName()) {
       return;
     }
 
@@ -402,96 +672,60 @@ export default function WeeklyCalendar() {
 
     setSelectedProgramId(programToLoad.id);
     setProgramName(programToLoad.name);
-    setCourseBlocks(programToLoad.courseBlocks ?? []);
-    setCourseSelections(programToLoad.courseSelections ?? []);
-    setDraggedSelectionId("");
-    setDragOverSelectionId("");
-    setHasUnsavedChanges(false);
+    setActiveSelectionId(null);
   }
 
   function handleCreateProgram() {
-    if (!confirmDiscardUnsavedChanges()) {
+    if (!confirmDiscardUnsavedName()) {
       return;
     }
 
-    const newProgram = createEmptyProgram(`Program ${weeklyPrograms.length + 1}`);
+    const newProgram = createEmptyProgram(
+      `Program ${weeklyPrograms.length + 1}`,
+    );
 
-    setWeeklyPrograms((currentPrograms) => [...currentPrograms, newProgram]);
+    setWeeklyPrograms((currentPrograms) => [
+      ...currentPrograms,
+      newProgram,
+    ]);
+
     setSelectedProgramId(newProgram.id);
     setProgramName(newProgram.name);
-    setCourseBlocks([]);
-    setCourseSelections([]);
-    setDraggedSelectionId("");
-    setDragOverSelectionId("");
-    setHasUnsavedChanges(false);
+    setActiveSelectionId(null);
   }
 
-  function handleSaveProgram() {
-    const trimmedProgramName = programName.trim() || "Untitled Program";
+  function handleSaveProgramName() {
+    if (!selectedProgram) {
+      return;
+    }
 
-    const savedProgram: WeeklyProgram = {
-      id: selectedProgramId || createId("program"),
+    const trimmedProgramName =
+      programName.trim() || "Untitled Program";
+
+    updateSelectedProgram((program) => ({
+      ...program,
       name: trimmedProgramName,
-      courseBlocks,
-      courseSelections,
       updatedAt: new Date().toISOString(),
-    };
+    }));
 
-    setWeeklyPrograms((currentPrograms) => {
-      const programAlreadyExists = currentPrograms.some(
-        (program) => program.id === savedProgram.id,
-      );
-
-      if (!programAlreadyExists) {
-        return [...currentPrograms, savedProgram];
-      }
-
-      return currentPrograms.map((program) =>
-        program.id === savedProgram.id ? savedProgram : program,
-      );
-    });
-
-    setSelectedProgramId(savedProgram.id);
     setProgramName(trimmedProgramName);
-    setHasUnsavedChanges(false);
   }
 
-  function handleEnterToSave(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "Enter") {
-      return;
-    }
-
-    if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
-      return;
-    }
-
-    if (event.nativeEvent.isComposing) {
-      return;
-    }
-
-    const target = event.target as HTMLElement;
-    const ignoredTags = ["BUTTON", "SELECT", "TEXTAREA"];
-
-    if (ignoredTags.includes(target.tagName)) {
-      return;
-    }
-
-    if (!hasLoadedPrograms) {
+  function handleProgramNameKeyDown(
+    event: KeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) {
       return;
     }
 
     event.preventDefault();
-    handleSaveProgram();
+    handleSaveProgramName();
   }
 
   function handleDeleteProgram() {
-    const programToDelete = weeklyPrograms.find(
-      (program) => program.id === selectedProgramId,
-    );
-
     const confirmed = window.confirm(
       `Are you sure you want to delete "${
-        programToDelete?.name ?? "this program"
+        selectedProgram?.name ?? "this program"
       }"? This action cannot be undone.`,
     );
 
@@ -509,11 +743,7 @@ export default function WeeklyCalendar() {
       setWeeklyPrograms([newProgram]);
       setSelectedProgramId(newProgram.id);
       setProgramName(newProgram.name);
-      setCourseBlocks([]);
-      setCourseSelections([]);
-      setDraggedSelectionId("");
-      setDragOverSelectionId("");
-      setHasUnsavedChanges(false);
+      setActiveSelectionId(null);
 
       return;
     }
@@ -523,16 +753,7 @@ export default function WeeklyCalendar() {
     setWeeklyPrograms(remainingPrograms);
     setSelectedProgramId(nextProgram.id);
     setProgramName(nextProgram.name);
-    setCourseBlocks(nextProgram.courseBlocks ?? []);
-    setCourseSelections(nextProgram.courseSelections ?? []);
-    setDraggedSelectionId("");
-    setDragOverSelectionId("");
-    setHasUnsavedChanges(false);
-  }
-
-  function handleProgramNameChange(newProgramName: string) {
-    setProgramName(newProgramName);
-    markProgramAsChanged();
+    setActiveSelectionId(null);
   }
 
   function handleAddSelectionRow() {
@@ -543,251 +764,230 @@ export default function WeeklyCalendar() {
       sessionId: "",
     };
 
-    setCourseSelections((currentSelections) => [
-      newSelection,
-      ...currentSelections,
-    ]);
-
-    markProgramAsChanged();
-  }
-
-  function removeCourseBlock(courseBlockId: string | undefined) {
-    if (!courseBlockId) {
-      return;
-    }
-
-    setCourseBlocks((currentCourseBlocks) =>
-      currentCourseBlocks.filter(
-        (courseBlock) => courseBlock.id !== courseBlockId,
-      ),
-    );
+    updateSelectedProgram((program) => ({
+      ...program,
+      courseSelections: [
+        newSelection,
+        ...(program.courseSelections ?? []),
+      ],
+      updatedAt: new Date().toISOString(),
+    }));
   }
 
   function handleDeleteSelection(selection: CourseSelection) {
-    removeCourseBlock(selection.courseBlockId);
-
-    setCourseSelections((currentSelections) =>
-      currentSelections.filter(
-        (currentSelection) => currentSelection.id !== selection.id,
+    updateSelectedProgram((program) => ({
+      ...program,
+      courseBlocks: removeCourseBlock(
+        program.courseBlocks ?? [],
+        selection.courseBlockId,
       ),
-    );
-
-    markProgramAsChanged();
+      courseSelections: (program.courseSelections ?? []).filter(
+        (currentSelection) =>
+          currentSelection.id !== selection.id,
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
   }
 
-  function handleFacultyChange(selectionId: string, facultyCode: string) {
-    const currentSelection = courseSelections.find(
-      (selection) => selection.id === selectionId,
-    );
+  function handleFacultyChange(
+    selectionId: string,
+    facultyCode: string,
+  ) {
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
 
-    removeCourseBlock(currentSelection?.courseBlockId);
-
-    setCourseSelections((currentSelections) =>
-      currentSelections.map((selection) => {
-        if (selection.id !== selectionId) {
-          return selection;
-        }
-
-        return {
-          ...selection,
-          facultyCode,
-          courseId: "",
-          sessionId: "",
-          courseBlockId: undefined,
-        };
-      }),
-    );
-
-    markProgramAsChanged();
-  }
-
-  function handleCourseChange(selectionId: string, courseId: string) {
-    const currentSelection = courseSelections.find(
-      (selection) => selection.id === selectionId,
-    );
-
-    removeCourseBlock(currentSelection?.courseBlockId);
-
-    setCourseSelections((currentSelections) =>
-      currentSelections.map((selection) => {
-        if (selection.id !== selectionId) {
-          return selection;
-        }
-
-        return {
-          ...selection,
-          courseId,
-          sessionId: "",
-          courseBlockId: undefined,
-        };
-      }),
-    );
-
-    markProgramAsChanged();
-  }
-
-  function handleSessionChange(selectionId: string, sessionId: string) {
-    const currentSelection = courseSelections.find(
-      (selection) => selection.id === selectionId,
-    );
-
-    if (!currentSelection) {
-      return;
-    }
-
-    const selectedCourse = getCourseById(
-      courseCatalog,
-      currentSelection.facultyCode,
-      currentSelection.courseId,
-    );
-
-    const selectedSession = getSessionById(selectedCourse, sessionId);
-
-    if (!selectedCourse || !selectedSession) {
-      setCourseSelections((currentSelections) =>
-        currentSelections.map((selection) => {
-          if (selection.id !== selectionId) {
-            return selection;
-          }
-
-          return {
-            ...selection,
-            sessionId,
-          };
-        }),
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
       );
 
-      markProgramAsChanged();
-      return;
-    }
+      return {
+        ...program,
+        courseBlocks: removeCourseBlock(
+          program.courseBlocks ?? [],
+          currentSelection?.courseBlockId,
+        ),
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                facultyCode,
+                courseId: "",
+                sessionId: "",
+                courseBlockId: undefined,
+              }
+            : selection,
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
 
-    const courseBlockId = currentSelection.courseBlockId ?? createId("course");
+  function handleCourseChange(
+    selectionId: string,
+    courseId: string,
+  ) {
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
 
-    const newCourseBlock: CourseBlock = {
-      id: courseBlockId,
-      code: selectedCourse.code,
-      title: selectedCourse.title,
-      day: selectedSession.day,
-      startTime: selectedSession.startTime,
-      endTime: selectedSession.endTime,
-      room: selectedSession.room,
-      instructor: selectedSession.instructor,
-    };
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
+      );
 
-    setCourseBlocks((currentCourseBlocks) => {
+      return {
+        ...program,
+        courseBlocks: removeCourseBlock(
+          program.courseBlocks ?? [],
+          currentSelection?.courseBlockId,
+        ),
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                courseId,
+                sessionId: "",
+                courseBlockId: undefined,
+              }
+            : selection,
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  function handleSessionChange(
+    selectionId: string,
+    sessionId: string,
+  ) {
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
+
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
+      );
+
+      if (!currentSelection) {
+        return program;
+      }
+
+      const selectedCourse = getCourseById(
+        courseCatalog,
+        currentSelection.facultyCode,
+        currentSelection.courseId,
+      );
+
+      const selectedSession = getSessionById(
+        selectedCourse,
+        sessionId,
+      );
+
+      if (!selectedCourse || !selectedSession) {
+        return {
+          ...program,
+          courseSelections: currentSelections.map((selection) =>
+            selection.id === selectionId
+              ? {
+                  ...selection,
+                  sessionId,
+                }
+              : selection,
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      const courseBlockId =
+        currentSelection.courseBlockId ?? createId("course");
+
+      const newCourseBlock: CourseBlock = {
+        id: courseBlockId,
+        code: selectedCourse.code,
+        title: selectedCourse.title,
+        day: selectedSession.day,
+        startTime: selectedSession.startTime,
+        endTime: selectedSession.endTime,
+        room: selectedSession.room,
+        instructor: selectedSession.instructor,
+      };
+
+      const currentCourseBlocks = program.courseBlocks ?? [];
+
       const courseBlockAlreadyExists = currentCourseBlocks.some(
         (courseBlock) => courseBlock.id === courseBlockId,
       );
 
-      if (courseBlockAlreadyExists) {
-        return currentCourseBlocks.map((courseBlock) =>
-          courseBlock.id === courseBlockId ? newCourseBlock : courseBlock,
-        );
+      const updatedCourseBlocks = courseBlockAlreadyExists
+        ? currentCourseBlocks.map((courseBlock) =>
+            courseBlock.id === courseBlockId
+              ? newCourseBlock
+              : courseBlock,
+          )
+        : [...currentCourseBlocks, newCourseBlock];
+
+      return {
+        ...program,
+        courseBlocks: updatedCourseBlocks,
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                sessionId,
+                courseBlockId,
+              }
+            : selection,
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveSelectionId(String(event.active.id));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    setActiveSelectionId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
+
+      const oldIndex = currentSelections.findIndex(
+        (selection) => selection.id === String(active.id),
+      );
+
+      const newIndex = currentSelections.findIndex(
+        (selection) => selection.id === String(over.id),
+      );
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return program;
       }
 
-      return [...currentCourseBlocks, newCourseBlock];
+      const reorderedSelections = arrayMove(
+        currentSelections,
+        oldIndex,
+        newIndex,
+      );
+
+      return {
+        ...program,
+        courseSelections: reorderedSelections,
+        courseBlocks: reorderCourseBlocksBySelections(
+          program.courseBlocks ?? [],
+          reorderedSelections,
+        ),
+        updatedAt: new Date().toISOString(),
+      };
     });
-
-    setCourseSelections((currentSelections) =>
-      currentSelections.map((selection) => {
-        if (selection.id !== selectionId) {
-          return selection;
-        }
-
-        return {
-          ...selection,
-          sessionId,
-          courseBlockId,
-        };
-      }),
-    );
-
-    markProgramAsChanged();
-  }
-
-  function reorderSelectionRows(
-    draggedSelectionIdValue: string,
-    targetSelectionId: string,
-  ) {
-    if (draggedSelectionIdValue === targetSelectionId) {
-      return;
-    }
-
-    const draggedSelectionIndex = courseSelections.findIndex(
-      (selection) => selection.id === draggedSelectionIdValue,
-    );
-
-    const targetSelectionIndex = courseSelections.findIndex(
-      (selection) => selection.id === targetSelectionId,
-    );
-
-    if (draggedSelectionIndex === -1 || targetSelectionIndex === -1) {
-      return;
-    }
-
-    const reorderedSelections = moveArrayItem(
-      courseSelections,
-      draggedSelectionIndex,
-      targetSelectionIndex,
-    );
-
-    setCourseSelections(reorderedSelections);
-
-    setCourseBlocks((currentCourseBlocks) =>
-      reorderCourseBlocksBySelections(currentCourseBlocks, reorderedSelections),
-    );
-
-    markProgramAsChanged();
-  }
-
-  function handleSelectionDragStart(
-    event: DragEvent<HTMLButtonElement>,
-    selectionId: string,
-  ) {
-    setDraggedSelectionId(selectionId);
-    setDragOverSelectionId("");
-
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", selectionId);
-  }
-
-  function handleSelectionDragOver(
-    event: DragEvent<HTMLDivElement>,
-    selectionId: string,
-  ) {
-    if (!draggedSelectionId || draggedSelectionId === selectionId) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDragOverSelectionId(selectionId);
-  }
-
-  function handleSelectionDrop(
-    event: DragEvent<HTMLDivElement>,
-    targetSelectionId: string,
-  ) {
-    event.preventDefault();
-
-    const draggedSelectionIdFromEvent =
-      draggedSelectionId || event.dataTransfer.getData("text/plain");
-
-    if (draggedSelectionIdFromEvent) {
-      reorderSelectionRows(draggedSelectionIdFromEvent, targetSelectionId);
-    }
-
-    setDraggedSelectionId("");
-    setDragOverSelectionId("");
-  }
-
-  function handleSelectionDragEnd() {
-    setDraggedSelectionId("");
-    setDragOverSelectionId("");
   }
 
   return (
-    <div className="w-full space-y-4" onKeyDown={handleEnterToSave}>
+    <div className="w-full space-y-4">
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
           <div className="min-w-0">
@@ -807,7 +1007,9 @@ export default function WeeklyCalendar() {
                 </option>
               ))}
 
-              <option value={NEW_PROGRAM_VALUE}>+ New Program</option>
+              <option value={NEW_PROGRAM_VALUE}>
+                + New Program
+              </option>
             </select>
           </div>
 
@@ -819,7 +1021,10 @@ export default function WeeklyCalendar() {
             <input
               type="text"
               value={programName}
-              onChange={(event) => handleProgramNameChange(event.target.value)}
+              onChange={(event) =>
+                setProgramName(event.target.value)
+              }
+              onKeyDown={handleProgramNameKeyDown}
               placeholder="Program name"
               className={inputClassName}
             />
@@ -827,9 +1032,11 @@ export default function WeeklyCalendar() {
 
           <button
             type="button"
-            onClick={handleSaveProgram}
-            disabled={!hasLoadedPrograms}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+            onClick={handleSaveProgramName}
+            disabled={
+              !hasLoadedPrograms || !hasUnsavedNameChanges
+            }
+            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
           >
             Save
           </button>
@@ -838,28 +1045,36 @@ export default function WeeklyCalendar() {
             type="button"
             onClick={handleDeleteProgram}
             disabled={!hasLoadedPrograms}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete Program
           </button>
         </div>
 
-        <div className="mb-4 text-xs text-gray-500">
-          {hasUnsavedChanges ? (
+        <div
+          className="mb-4 text-xs text-gray-500"
+          aria-live="polite"
+        >
+          {hasUnsavedNameChanges ? (
             <span className="font-medium text-orange-600">
-              Unsaved changes
+              Program name is not saved. Course changes are saved
+              automatically.
             </span>
           ) : selectedProgram?.updatedAt ? (
-            <span>Saved at {formatUpdatedAt(selectedProgram.updatedAt)}</span>
+            <span>
+              Courses save automatically · Last updated{" "}
+              {formatUpdatedAt(selectedProgram.updatedAt)}
+            </span>
           ) : (
-            <span>No saved changes yet</span>
+            <span>Courses save automatically</span>
           )}
         </div>
 
         <button
           type="button"
           onClick={handleAddSelectionRow}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          disabled={!selectedProgram}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         >
           Add Course
         </button>
@@ -867,130 +1082,50 @@ export default function WeeklyCalendar() {
         {courseSelections.length > 0 && (
           <div className="mt-4 space-y-3">
             <div className="text-xs text-gray-500">
-              Drag the handle on the left side of a course row to reorder your
-              selected courses.
+              Hold the three-line handle and drag the complete row to
+              change the course order.
             </div>
 
-            {courseSelections.map((selection) => {
-              const availableCourses = getCoursesByFaculty(
-                courseCatalog,
-                selection.facultyCode,
-              );
-
-              const selectedCourse = getCourseById(
-                courseCatalog,
-                selection.facultyCode,
-                selection.courseId,
-              );
-
-              const isDragged = draggedSelectionId === selection.id;
-              const isDragTarget = dragOverSelectionId === selection.id;
-
-              return (
-                <div
-                  key={selection.id}
-                  onDragOver={(event) =>
-                    handleSelectionDragOver(event, selection.id)
-                  }
-                  onDrop={(event) => handleSelectionDrop(event, selection.id)}
-                  className={
-                    isDragTarget
-                      ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-blue-300 bg-blue-50 p-2"
-                      : isDragged
-                        ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-gray-200 bg-gray-50 p-2 opacity-60"
-                        : "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] gap-3 rounded-lg border border-transparent p-2"
-                  }
-                >
-                  <button
-                    type="button"
-                    draggable
-                    onDragStart={(event) =>
-                      handleSelectionDragStart(event, selection.id)
-                    }
-                    onDragEnd={handleSelectionDragEnd}
-                    aria-label="Drag to reorder course"
-                    title="Drag to reorder"
-                    className="flex h-10 w-9 cursor-grab items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-500 shadow-sm transition hover:bg-gray-100 active:cursor-grabbing"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                    >
-                      <path
-                        d="M4 6h12M4 10h12M4 14h12"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeWidth="1.8"
-                      />
-                    </svg>
-                  </button>
-
-                  <select
-                    value={selection.facultyCode}
-                    onChange={(event) =>
-                      handleFacultyChange(selection.id, event.target.value)
-                    }
-                    className={selectClassName}
-                  >
-                    <option value="">Faculty Code</option>
-
-                    {courseCatalog.map((faculty) => (
-                      <option
-                        key={faculty.facultyCode}
-                        value={faculty.facultyCode}
-                      >
-                        {faculty.facultyCode}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selection.courseId}
-                    onChange={(event) =>
-                      handleCourseChange(selection.id, event.target.value)
-                    }
-                    disabled={!selection.facultyCode}
-                    className={selectClassName}
-                  >
-                    <option value="">Course Code and Name</option>
-
-                    {availableCourses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.code} - {course.title}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selection.sessionId}
-                    onChange={(event) =>
-                      handleSessionChange(selection.id, event.target.value)
-                    }
-                    disabled={!selection.courseId}
-                    className={selectClassName}
-                  >
-                    <option value="">Session</option>
-
-                    {selectedCourse?.sessions.map((session) => (
-                      <option key={session.id} value={session.id}>
-                        {session.day}, {session.startTime} - {session.endTime}
-                        {session.room ? `, ${session.room}` : ""}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSelection(selection)}
-                    className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100"
-                  >
-                    Delete
-                  </button>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={() => setActiveSelectionId(null)}
+            >
+              <SortableContext
+                items={courseSelections.map(
+                  (selection) => selection.id,
+                )}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {courseSelections.map((selection) => (
+                    <SortableCourseRow
+                      key={selection.id}
+                      selection={selection}
+                      courseCatalog={courseCatalog}
+                      onFacultyChange={handleFacultyChange}
+                      onCourseChange={handleCourseChange}
+                      onSessionChange={handleSessionChange}
+                      onDelete={handleDeleteSelection}
+                    />
+                  ))}
                 </div>
-              );
-            })}
+              </SortableContext>
+
+              <DragOverlay
+                adjustScale={false}
+                dropAnimation={dropAnimation}
+              >
+                {activeSelection ? (
+                  <DraggedCourseRow
+                    selection={activeSelection}
+                    courseCatalog={courseCatalog}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </div>
         )}
       </div>
@@ -1008,12 +1143,19 @@ export default function WeeklyCalendar() {
             ))}
           </div>
 
-          <div className="relative ml-12" style={{ height: calendarHeight }}>
+          <div
+            className="relative ml-12"
+            style={{
+              height: calendarHeight,
+            }}
+          >
             {timeLabels.map((time, index) => (
               <div
                 key={time}
                 className="absolute left-0 w-full border-t border-gray-200"
-                style={{ top: index * SLOT_HEIGHT }}
+                style={{
+                  top: index * SLOT_HEIGHT,
+                }}
               >
                 {time !== "20:00" && (
                   <span
@@ -1040,7 +1182,12 @@ export default function WeeklyCalendar() {
 
             {courseBlocks.map((course) => {
               const top = getCourseTop(course.startTime);
-              const height = getCourseHeight(course.startTime, course.endTime);
+
+              const height = getCourseHeight(
+                course.startTime,
+                course.endTime,
+              );
+
               const layout = courseLayoutMap[course.id];
 
               if (!layout) {
@@ -1050,7 +1197,7 @@ export default function WeeklyCalendar() {
               return (
                 <div
                   key={course.id}
-                  className="absolute z-10 px-[1px]"
+                  className="absolute z-10 px-[1px] transition-[top,left,width,height] duration-200 ease-out"
                   style={{
                     top,
                     height,
@@ -1058,19 +1205,23 @@ export default function WeeklyCalendar() {
                     width: `${layout.widthPercent}%`,
                   }}
                 >
-                  <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-all duration-200 hover:scale-[1.02] hover:bg-blue-100">
+                  <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:bg-blue-100 hover:shadow-md">
                     <div className="font-semibold text-blue-900">
                       {course.code}
                     </div>
 
-                    <div className="mt-1 text-blue-800">{course.title}</div>
+                    <div className="mt-1 text-blue-800">
+                      {course.title}
+                    </div>
 
                     <div className="mt-1 text-blue-700">
                       {course.startTime} - {course.endTime}
                     </div>
 
                     {course.room && (
-                      <div className="mt-1 text-blue-700">{course.room}</div>
+                      <div className="mt-1 text-blue-700">
+                        {course.room}
+                      </div>
                     )}
 
                     {course.instructor && (
