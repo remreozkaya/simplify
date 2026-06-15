@@ -21,7 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
-import { mockCourseCatalog } from "@/data/mockCourseCatalog";
+import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import {
   days,
   type CourseBlock,
@@ -767,9 +767,13 @@ function DraggedCourseRow({
 }
 
 export default function WeeklyCalendar() {
-  const [courseCatalog] = useState<
-    FacultyOption[]
-  >(mockCourseCatalog);
+const {
+  courseCatalog,
+  isLoadingBranches,
+  isBranchLoading,
+  loadBranch,
+  error: courseCatalogError,
+} = useItuCourseCatalog();
 
   const [
     weeklyPrograms,
