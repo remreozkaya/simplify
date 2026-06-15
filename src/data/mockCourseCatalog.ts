@@ -60,7 +60,7 @@ export const mockCourseCatalog: FacultyOption[] = [
             id: "mat-271e-1",
             day: "Tuesday",
             startTime: "10:00",
-            endTime: "12:00",
+            endTime: "12:18",
             room: "FEB B-04",
           },
           {
