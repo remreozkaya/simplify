@@ -81,6 +81,7 @@ export const ITU_WEEKDAY_ALIASES: Readonly<
   perşembe: "Thursday",
   persembe: "Thursday",
   per: "Thursday",
+  pers: "Thursday",
 
   friday: "Friday",
   fri: "Friday",
