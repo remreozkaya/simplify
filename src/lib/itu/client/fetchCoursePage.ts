@@ -7,6 +7,7 @@ import {
   ITU_REQUEST_HEADERS,
   ITU_REQUEST_TIMEOUT_MS,
 } from "@/lib/itu/constants";
+import { ItuObsUpstreamError } from "@/lib/itu/errors";
 
 export async function fetchCoursePage(
   branchId: number,
@@ -32,20 +33,29 @@ export async function fetchCoursePage(
     branchId.toString(),
   );
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: ITU_REQUEST_HEADERS,
-    next: {
-      revalidate:
-        ITU_CACHE_REVALIDATE_SECONDS,
-    },
-    signal: AbortSignal.timeout(
-      ITU_REQUEST_TIMEOUT_MS,
-    ),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: ITU_REQUEST_HEADERS,
+      next: {
+        revalidate:
+          ITU_CACHE_REVALIDATE_SECONDS,
+      },
+      signal: AbortSignal.timeout(
+        ITU_REQUEST_TIMEOUT_MS,
+      ),
+    });
+  } catch (error: unknown) {
+    throw new ItuObsUpstreamError(
+      "İTÜ OBS course schedules could not be reached.",
+      { cause: error },
+    );
+  }
 
   if (!response.ok) {
-    throw new Error(
+    throw new ItuObsUpstreamError(
       `İTÜ OBS course request failed with status ${response.status}.`,
     );
   }

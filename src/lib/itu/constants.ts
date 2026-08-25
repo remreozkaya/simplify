@@ -8,6 +8,8 @@ export const ITU_OBS_ORIGIN =
 
 export const ITU_OBS_PATHS = {
   courseSchedule: "/public/DersProgram",
+  branchesSearch:
+    "/public/DersProgram/SearchBransKoduByProgramSeviye",
   courseSearch:
     "/public/DersProgram/DersProgramSearch",
 } as const;

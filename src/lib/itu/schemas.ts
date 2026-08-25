@@ -41,7 +41,7 @@ function normalizeBranchCode(value: unknown): unknown {
   return value
     .replace(/\s+/g, "")
     .trim()
-    .toLocaleUpperCase("tr-TR");
+    .toUpperCase();
 }
 
 function normalizeCourseCode(value: unknown): unknown {
@@ -52,7 +52,7 @@ function normalizeCourseCode(value: unknown): unknown {
   return value
     .replace(/\s+/g, " ")
     .trim()
-    .toLocaleUpperCase("tr-TR");
+    .toUpperCase();
 }
 
 function normalizeCrn(value: unknown): unknown {
@@ -111,6 +111,12 @@ export const optionalTextSchema = z.preprocess(
   normalizeOptionalText,
   nonEmptyTextSchema.optional(),
 );
+
+const optionalScheduleTextSchema = z
+  .string()
+  .trim()
+  .max(1_000)
+  .optional();
 
 export const branchCodeSchema = z.preprocess(
   normalizeBranchCode,
@@ -195,10 +201,10 @@ export const ituCourseTableRowSchema: z.ZodType<ItuCourseTableRow> =
     courseTitle: nonEmptyTextSchema,
     teachingMethod: optionalTextSchema,
     instructor: optionalTextSchema,
-    building: optionalTextSchema,
-    day: optionalTextSchema,
-    time: optionalTextSchema,
-    room: optionalTextSchema,
+    building: optionalScheduleTextSchema,
+    day: optionalScheduleTextSchema,
+    time: optionalScheduleTextSchema,
+    room: optionalScheduleTextSchema,
     capacity: optionalTextSchema,
     enrolled: optionalTextSchema,
     reserved: optionalTextSchema,
