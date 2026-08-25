@@ -12,29 +12,39 @@ export type Day = (typeof days)[number];
 
 export type CourseBlock = {
   id: string;
+  selectionId?: string;
   code: string;
   title: string;
+  crn?: string;
   day: Day;
   startTime: string;
   endTime: string;
+  building?: string;
   room?: string;
   instructor?: string;
 };
 
-export type CourseSession = {
+export type CourseMeetingOption = {
   id: string;
   day: Day;
   startTime: string;
   endTime: string;
+  building?: string;
   room?: string;
+};
+
+export type CourseSectionOption = {
+  id: string;
+  crn: string;
   instructor?: string;
+  meetings: CourseMeetingOption[];
 };
 
 export type CourseOption = {
   id: string;
   code: string;
   title: string;
-  sessions: CourseSession[];
+  sections: CourseSectionOption[];
 };
 
 export type FacultyOption = {
@@ -46,8 +56,8 @@ export type CourseSelection = {
   id: string;
   facultyCode: string;
   courseId: string;
-  sessionId: string;
-  courseBlockId?: string;
+  sectionId: string;
+  courseBlockIds: string[];
 };
 
 export type WeeklyProgram = {
