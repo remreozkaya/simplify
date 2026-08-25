@@ -25,8 +25,14 @@ async function main() {
   const courseHtml = await fetchCoursePage(branch.id);
   const rows = parseCoursePage(courseHtml);
   const catalog = normalizeCoursePage(rows, branch.id, branch.code);
+  const scheduledSections = catalog.courses.flatMap(
+    (course) => course.sections,
+  );
   const multiMeetingSections = catalog.courses.flatMap((course) =>
     course.sections.filter((section) => section.meetings.length > 1),
+  );
+  const sectionsWithInstructor = scheduledSections.filter(
+    (section) => Boolean(section.instructor),
   );
 
   console.log({
@@ -35,8 +41,14 @@ async function main() {
       courseHtml.trimStart().startsWith("<"),
     parsedRows: rows.length,
     scheduledCourses: catalog.courses.length,
+    scheduledSections: scheduledSections.length,
+    sectionsWithInstructor: sectionsWithInstructor.length,
     multiMeetingSections: multiMeetingSections.length,
   });
+
+  if (scheduledSections.length > 0 && sectionsWithInstructor.length === 0) {
+    throw new Error("Live course sections did not include instructor data.");
+  }
 
   console.log("Live İTÜ OBS smoke test passed.");
 }

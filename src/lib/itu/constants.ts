@@ -129,6 +129,10 @@ export const ITU_COURSE_TABLE_HEADER_ALIASES = {
   instructor: [
     "öğretim elemanı",
     "ogretim elemani",
+    "öğretim üyesi",
+    "ogretim uyesi",
+    "öğretim görevlisi",
+    "ogretim gorevlisi",
     "instructor",
   ],
 

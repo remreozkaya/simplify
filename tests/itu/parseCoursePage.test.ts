@@ -44,6 +44,22 @@ describe("parseCoursePage", () => {
     });
   });
 
+  it("recognizes the live OBS Öğretim Üyesi instructor header", () => {
+    const rows = parseCoursePage(`
+      <table><thead><tr>
+        <td>CRN</td><td>Ders Kodu</td><td>Ders Adı</td>
+        <td>Öğretim Yöntemi</td><td>Öğretim Üyesi</td>
+        <td>Gün</td><td>Saat</td>
+      </tr></thead><tbody><tr>
+        <td>12478</td><td>BLG 231E</td><td>Digital Circuits</td>
+        <td>Fiziksel</td><td>Mustafa Ersel Kamaşak</td>
+        <td>Cuma</td><td>08:30/11:29</td>
+      </tr></tbody></table>
+    `);
+
+    expect(rows[0].instructor).toBe("Mustafa Ersel Kamaşak");
+  });
+
   it("rejects an unrecognizable page instead of silently returning no courses", () => {
     expect(() => parseCoursePage("<html><p>maintenance</p></html>")).toThrow(
       /schedule table/i,
