@@ -508,32 +508,19 @@ const shortDays: Record<Day, string> = {
   Sunday: "Sun",
 };
 
-function formatMeetingLocation(
-  building: string | undefined,
-  room: string | undefined,
-) {
-  return [building, room].filter(Boolean).join(" ");
-}
-
 function formatSectionLabel(section: CourseSectionOption) {
   const meetings = section.meetings
-    .map((meeting) => {
-      const location = formatMeetingLocation(
-        meeting.building,
-        meeting.room,
-      );
-
-      return `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}${
-        location ? ` ${location}` : ""
-      }`;
-    })
+    .map(
+      (meeting) =>
+        `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}`,
+    )
     .join(", ");
 
   const instructor = section.instructor
     ? `Instructor: ${section.instructor}`
     : "Instructor: TBA";
 
-  return [section.crn, instructor, meetings]
+  return [section.crn, meetings, instructor]
     .filter(Boolean)
     .join(" · ");
 }
