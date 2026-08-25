@@ -22,11 +22,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
+import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
 import {
   days,
   type CourseBlock,
   type CourseOption,
   type CourseSelection,
+  type CourseSectionOption,
   type Day,
   type FacultyOption,
   type WeeklyProgram,
@@ -75,6 +77,8 @@ type CourseLayout = {
 type SortableCourseRowProps = {
   selection: CourseSelection;
   courseCatalog: FacultyOption[];
+  isLoadingBranches: boolean;
+  isBranchLoading: (branchCode: string) => boolean;
   onFacultyChange: (
     selectionId: string,
     facultyCode: string,
@@ -83,9 +87,9 @@ type SortableCourseRowProps = {
     selectionId: string,
     courseId: string,
   ) => void;
-  onSessionChange: (
+  onSectionChange: (
     selectionId: string,
-    sessionId: string,
+    sectionId: string,
   ) => void;
   onDelete: (selection: CourseSelection) => void;
 };
@@ -257,14 +261,9 @@ function reorderCourseBlocksBySelections(
     ]),
   );
 
-  const orderedCourseBlockIds = courseSelections
-    .map((selection) => selection.courseBlockId)
-    .filter(
-      (
-        courseBlockId,
-      ): courseBlockId is string =>
-        Boolean(courseBlockId),
-    );
+  const orderedCourseBlockIds = courseSelections.flatMap(
+    (selection) => selection.courseBlockIds,
+  );
 
   const orderedCourseBlocks = orderedCourseBlockIds
     .map((courseBlockId) =>
@@ -489,13 +488,49 @@ function getCourseById(
   ).find((course) => course.id === courseId);
 }
 
-function getSessionById(
+function getSectionById(
   course: CourseOption | undefined,
-  sessionId: string,
+  sectionId: string,
 ) {
-  return course?.sessions.find(
-    (session) => session.id === sessionId,
+  return course?.sections.find(
+    (section) => section.id === sectionId,
   );
+}
+
+const shortDays: Record<Day, string> = {
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
+};
+
+function formatMeetingLocation(
+  building: string | undefined,
+  room: string | undefined,
+) {
+  return [building, room].filter(Boolean).join(" ");
+}
+
+function formatSectionLabel(section: CourseSectionOption) {
+  const meetings = section.meetings
+    .map((meeting) => {
+      const location = formatMeetingLocation(
+        meeting.building,
+        meeting.room,
+      );
+
+      return `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}${
+        location ? ` ${location}` : ""
+      }`;
+    })
+    .join(", ");
+
+  return [section.crn, section.instructor, meetings]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function formatUpdatedAt(updatedAt: string) {
@@ -514,17 +549,18 @@ function formatUpdatedAt(updatedAt: string) {
   });
 }
 
-function removeCourseBlock(
+function removeCourseBlocks(
   courseBlocks: CourseBlock[],
-  courseBlockId: string | undefined,
+  courseBlockIds: string[],
 ) {
-  if (!courseBlockId) {
+  if (courseBlockIds.length === 0) {
     return courseBlocks;
   }
 
+  const removedIds = new Set(courseBlockIds);
+
   return courseBlocks.filter(
-    (courseBlock) =>
-      courseBlock.id !== courseBlockId,
+    (courseBlock) => !removedIds.has(courseBlock.id),
   );
 }
 
@@ -549,9 +585,11 @@ function DragHandleIcon() {
 function SortableCourseRow({
   selection,
   courseCatalog,
+  isLoadingBranches,
+  isBranchLoading,
   onFacultyChange,
   onCourseChange,
-  onSessionChange,
+  onSectionChange,
   onDelete,
 }: SortableCourseRowProps) {
   const {
@@ -577,6 +615,8 @@ function SortableCourseRow({
     selection.facultyCode,
     selection.courseId,
   );
+
+  const branchIsLoading = isBranchLoading(selection.facultyCode);
 
   return (
     <div
@@ -617,10 +657,11 @@ function SortableCourseRow({
             event.target.value,
           )
         }
+        disabled={isLoadingBranches}
         className={selectClassName}
       >
         <option value="">
-          Faculty Code
+          {isLoadingBranches ? "Loading prefixes…" : "Course Prefix"}
         </option>
 
         {courseCatalog.map((faculty) => (
@@ -641,11 +682,11 @@ function SortableCourseRow({
             event.target.value,
           )
         }
-        disabled={!selection.facultyCode}
+        disabled={!selection.facultyCode || branchIsLoading}
         className={selectClassName}
       >
         <option value="">
-          Course Code and Name
+          {branchIsLoading ? "Loading courses…" : "Course Code and Name"}
         </option>
 
         {availableCourses.map((course) => (
@@ -659,30 +700,25 @@ function SortableCourseRow({
       </select>
 
       <select
-        value={selection.sessionId}
+        value={selection.sectionId}
         onChange={(event) =>
-          onSessionChange(
+          onSectionChange(
             selection.id,
             event.target.value,
           )
         }
-        disabled={!selection.courseId}
+        disabled={!selection.courseId || branchIsLoading}
         className={selectClassName}
       >
-        <option value="">Session</option>
+        <option value="">CRN / Section</option>
 
-        {selectedCourse?.sessions.map(
-          (session) => (
+        {selectedCourse?.sections.map(
+          (section) => (
             <option
-              key={session.id}
-              value={session.id}
+              key={section.id}
+              value={section.id}
             >
-              {session.day},{" "}
-              {session.startTime} -{" "}
-              {session.endTime}
-              {session.room
-                ? `, ${session.room}`
-                : ""}
+              {formatSectionLabel(section)}
             </option>
           ),
         )}
@@ -712,9 +748,9 @@ function DraggedCourseRow({
     selection.courseId,
   );
 
-  const selectedSession = getSessionById(
+  const selectedSection = getSectionById(
     selectedCourse,
-    selection.sessionId,
+    selection.sectionId,
   );
 
   const facultyText =
@@ -725,13 +761,9 @@ function DraggedCourseRow({
     ? `${selectedCourse.code} - ${selectedCourse.title}`
     : "Course Code and Name";
 
-  const sessionText = selectedSession
-    ? `${selectedSession.day}, ${selectedSession.startTime} - ${selectedSession.endTime}${
-        selectedSession.room
-          ? `, ${selectedSession.room}`
-          : ""
-      }`
-    : "Session";
+  const sectionText = selectedSection
+    ? formatSectionLabel(selectedSection)
+    : "CRN / Section";
 
   return (
     <div
@@ -755,7 +787,7 @@ function DraggedCourseRow({
 
       <div className={overlayFieldClassName}>
         <span className="truncate">
-          {sessionText}
+          {sectionText}
         </span>
       </div>
 
@@ -767,13 +799,16 @@ function DraggedCourseRow({
 }
 
 export default function WeeklyCalendar() {
-const {
-  courseCatalog,
-  isLoadingBranches,
-  isBranchLoading,
-  loadBranch,
-  error: courseCatalogError,
-} = useItuCourseCatalog();
+  const {
+    courseCatalog,
+    isLoadingBranches,
+    isBranchLoading,
+    loadBranch,
+    retryBranches,
+    retryFailedBranch,
+    failedBranchCode,
+    error: courseCatalogError,
+  } = useItuCourseCatalog();
 
   const [
     weeklyPrograms,
@@ -823,11 +858,15 @@ const {
     [weeklyPrograms, selectedProgramId],
   );
 
-  const courseBlocks =
-    selectedProgram?.courseBlocks ?? [];
+  const courseBlocks = useMemo(
+    () => selectedProgram?.courseBlocks ?? [],
+    [selectedProgram],
+  );
 
-  const courseSelections =
-    selectedProgram?.courseSelections ?? [];
+  const courseSelections = useMemo(
+    () => selectedProgram?.courseSelections ?? [],
+    [selectedProgram],
+  );
 
   const savedProgramName =
     selectedProgram?.name ?? "";
@@ -853,6 +892,19 @@ const {
     [courseBlocks],
   );
 
+  const hasScheduleConflicts = useMemo(
+    () =>
+      courseBlocks.some((course, index) =>
+        courseBlocks
+          .slice(index + 1)
+          .some((otherCourse) => coursesOverlap(course, otherCourse)),
+      ),
+    [courseBlocks],
+  );
+
+  /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
+   * hydration intentionally synchronizes React state with localStorage after
+   * SSR, preventing stored user schedules from causing a hydration mismatch. */
   useEffect(() => {
     let savedPrograms: WeeklyProgram[] = [];
 
@@ -867,8 +919,7 @@ const {
           JSON.parse(storedPrograms);
 
         if (Array.isArray(parsedPrograms)) {
-          savedPrograms =
-            parsedPrograms as WeeklyProgram[];
+          savedPrograms = parseStoredWeeklyPrograms(parsedPrograms);
         }
       }
     } catch {
@@ -890,6 +941,23 @@ const {
     setProgramName(firstProgram.name);
     setHasLoadedPrograms(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (isLoadingBranches) {
+      return;
+    }
+
+    const savedBranchCodes = new Set(
+      courseSelections
+        .map((selection) => selection.facultyCode)
+        .filter(Boolean),
+    );
+
+    savedBranchCodes.forEach((branchCode) => {
+      void loadBranch(branchCode);
+    });
+  }, [courseSelections, isLoadingBranches, loadBranch]);
 
   useEffect(() => {
     if (!hasLoadedPrograms) {
@@ -1086,7 +1154,8 @@ const {
       id: createId("selection"),
       facultyCode: "",
       courseId: "",
-      sessionId: "",
+      sectionId: "",
+      courseBlockIds: [],
     };
 
     updateSelectedProgram(
@@ -1113,9 +1182,9 @@ const {
         ...program,
 
         courseBlocks:
-          removeCourseBlock(
+          removeCourseBlocks(
             program.courseBlocks ?? [],
-            selection.courseBlockId,
+            selection.courseBlockIds,
           ),
 
         courseSelections: (
@@ -1136,6 +1205,10 @@ const {
     selectionId: string,
     facultyCode: string,
   ) {
+    if (facultyCode) {
+      void loadBranch(facultyCode);
+    }
+
     updateSelectedProgram(
       (program) => {
         const currentSelections =
@@ -1152,9 +1225,9 @@ const {
           ...program,
 
           courseBlocks:
-            removeCourseBlock(
+            removeCourseBlocks(
               program.courseBlocks ?? [],
-              currentSelection?.courseBlockId,
+              currentSelection?.courseBlockIds ?? [],
             ),
 
           courseSelections:
@@ -1166,9 +1239,8 @@ const {
                       ...selection,
                       facultyCode,
                       courseId: "",
-                      sessionId: "",
-                      courseBlockId:
-                        undefined,
+                      sectionId: "",
+                      courseBlockIds: [],
                     }
                   : selection,
             ),
@@ -1200,9 +1272,9 @@ const {
           ...program,
 
           courseBlocks:
-            removeCourseBlock(
+            removeCourseBlocks(
               program.courseBlocks ?? [],
-              currentSelection?.courseBlockId,
+              currentSelection?.courseBlockIds ?? [],
             ),
 
           courseSelections:
@@ -1213,9 +1285,8 @@ const {
                   ? {
                       ...selection,
                       courseId,
-                      sessionId: "",
-                      courseBlockId:
-                        undefined,
+                      sectionId: "",
+                      courseBlockIds: [],
                     }
                   : selection,
             ),
@@ -1227,9 +1298,9 @@ const {
     );
   }
 
-  function handleSessionChange(
+  function handleSectionChange(
     selectionId: string,
-    sessionId: string,
+    sectionId: string,
   ) {
     updateSelectedProgram(
       (program) => {
@@ -1254,18 +1325,25 @@ const {
             currentSelection.courseId,
           );
 
-        const selectedSession =
-          getSessionById(
+        const selectedSection =
+          getSectionById(
             selectedCourse,
-            sessionId,
+            sectionId,
           );
+
+        const currentCourseBlocks = removeCourseBlocks(
+          program.courseBlocks ?? [],
+          currentSelection.courseBlockIds,
+        );
 
         if (
           !selectedCourse ||
-          !selectedSession
+          !selectedSection
         ) {
           return {
             ...program,
+
+            courseBlocks: currentCourseBlocks,
 
             courseSelections:
               currentSelections.map(
@@ -1274,7 +1352,8 @@ const {
                   selectionId
                     ? {
                         ...selection,
-                        sessionId,
+                        sectionId,
+                        courseBlockIds: [],
                       }
                     : selection,
               ),
@@ -1284,59 +1363,28 @@ const {
           };
         }
 
-        const courseBlockId =
-          currentSelection.courseBlockId ??
-          createId("course");
-
-        const newCourseBlock: CourseBlock =
-          {
-            id: courseBlockId,
+        const newCourseBlocks: CourseBlock[] =
+          selectedSection.meetings.map((meeting, index) => ({
+            id: `course-${selectionId}-${index}`,
+            selectionId,
             code: selectedCourse.code,
             title: selectedCourse.title,
-            day: selectedSession.day,
+            crn: selectedSection.crn,
+            day: meeting.day,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            building: meeting.building,
+            room: meeting.room,
+            instructor: selectedSection.instructor,
+          }));
 
-            startTime:
-              selectedSession.startTime,
-
-            endTime:
-              selectedSession.endTime,
-
-            room:
-              selectedSession.room,
-
-            instructor:
-              selectedSession.instructor,
-          };
-
-        const currentCourseBlocks =
-          program.courseBlocks ?? [];
-
-        const courseBlockAlreadyExists =
-          currentCourseBlocks.some(
-            (courseBlock) =>
-              courseBlock.id ===
-              courseBlockId,
-          );
-
-        const updatedCourseBlocks =
-          courseBlockAlreadyExists
-            ? currentCourseBlocks.map(
-                (courseBlock) =>
-                  courseBlock.id ===
-                  courseBlockId
-                    ? newCourseBlock
-                    : courseBlock,
-              )
-            : [
-                ...currentCourseBlocks,
-                newCourseBlock,
-              ];
+        const courseBlockIds = newCourseBlocks.map((block) => block.id);
 
         return {
           ...program,
 
           courseBlocks:
-            updatedCourseBlocks,
+            [...currentCourseBlocks, ...newCourseBlocks],
 
           courseSelections:
             currentSelections.map(
@@ -1345,8 +1393,8 @@ const {
                 selectionId
                   ? {
                       ...selection,
-                      sessionId,
-                      courseBlockId,
+                      sectionId,
+                      courseBlockIds,
                     }
                   : selection,
             ),
@@ -1565,6 +1613,42 @@ const {
           Add Course
         </button>
 
+        {(isLoadingBranches || courseCatalogError) && (
+          <div
+            className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+              courseCatalogError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-blue-200 bg-blue-50 text-blue-700"
+            }`}
+            role={courseCatalogError ? "alert" : "status"}
+          >
+            <span>
+              {courseCatalogError ?? "Loading İTÜ course prefixes…"}
+            </span>
+
+            {courseCatalogError && (
+              <button
+                type="button"
+                onClick={
+                  failedBranchCode ? retryFailedBranch : retryBranches
+                }
+                className="rounded-md border border-current px-2 py-1 text-xs font-semibold"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+
+        {hasScheduleConflicts && (
+          <div
+            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            role="status"
+          >
+            Schedule conflict: at least two selected meetings overlap.
+          </div>
+        )}
+
         {courseSelections.length >
           0 && (
           <div className="mt-4 space-y-3">
@@ -1614,14 +1698,20 @@ const {
                         courseCatalog={
                           courseCatalog
                         }
+                        isLoadingBranches={
+                          isLoadingBranches
+                        }
+                        isBranchLoading={
+                          isBranchLoading
+                        }
                         onFacultyChange={
                           handleFacultyChange
                         }
                         onCourseChange={
                           handleCourseChange
                         }
-                        onSessionChange={
-                          handleSessionChange
+                        onSectionChange={
+                          handleSectionChange
                         }
                         onDelete={
                           handleDeleteSelection
@@ -1752,6 +1842,7 @@ const {
                     <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:bg-blue-100 hover:shadow-md">
                       <div className="font-semibold text-blue-900">
                         {course.code}
+                        {course.crn ? ` · ${course.crn}` : ""}
                       </div>
 
                       <div className="mt-1 text-blue-800">
@@ -1770,11 +1861,12 @@ const {
                         }
                       </div>
 
-                      {course.room && (
+                      {(course.building || course.room) && (
                         <div className="mt-1 text-blue-700">
-                          {
-                            course.room
-                          }
+                          {formatMeetingLocation(
+                            course.building,
+                            course.room,
+                          )}
                         </div>
                       )}
 
