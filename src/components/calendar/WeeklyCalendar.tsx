@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
+import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
 import {
   days,
@@ -528,7 +529,11 @@ function formatSectionLabel(section: CourseSectionOption) {
     })
     .join(", ");
 
-  return [section.crn, section.instructor, meetings]
+  const instructor = section.instructor
+    ? `Instructor: ${section.instructor}`
+    : "Instructor: TBA";
+
+  return [section.crn, instructor, meetings]
     .filter(Boolean)
     .join(" · ");
 }
@@ -902,6 +907,11 @@ export default function WeeklyCalendar() {
     [courseBlocks],
   );
 
+  const orderedSelectionIds = useMemo(
+    () => courseSelections.map((selection) => selection.id),
+    [courseSelections],
+  );
+
   /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
    * hydration intentionally synchronizes React state with localStorage after
    * SSR, preventing stored user schedules from causing a hydration mismatch. */
@@ -1163,9 +1173,9 @@ export default function WeeklyCalendar() {
         ...program,
 
         courseSelections: [
-          newSelection,
           ...(program.courseSelections ??
             []),
+          newSelection,
         ],
 
         updatedAt:
@@ -1819,6 +1829,11 @@ export default function WeeklyCalendar() {
                     course.id
                   ];
 
+                const colorStyle = getCourseColorStyle(
+                  course.selectionId ?? course.id,
+                  orderedSelectionIds,
+                );
+
                 if (
                   !layout ||
                   height <= 0
@@ -1839,19 +1854,21 @@ export default function WeeklyCalendar() {
                       width: `${layout.widthPercent}%`,
                     }}
                   >
-                    <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:bg-blue-100 hover:shadow-md">
-                      <div className="font-semibold text-blue-900">
+                    <div
+                      className={`h-full overflow-hidden rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
+                    >
+                      <div className={`font-semibold ${colorStyle.heading}`}>
                         {course.code}
                         {course.crn ? ` · ${course.crn}` : ""}
                       </div>
 
-                      <div className="mt-1 text-blue-800">
+                      <div className={`mt-1 ${colorStyle.body}`}>
                         {
                           course.title
                         }
                       </div>
 
-                      <div className="mt-1 text-blue-700">
+                      <div className={`mt-1 ${colorStyle.body}`}>
                         {
                           course.startTime
                         }{" "}
@@ -1861,22 +1878,9 @@ export default function WeeklyCalendar() {
                         }
                       </div>
 
-                      {(course.building || course.room) && (
-                        <div className="mt-1 text-blue-700">
-                          {formatMeetingLocation(
-                            course.building,
-                            course.room,
-                          )}
-                        </div>
-                      )}
-
-                      {course.instructor && (
-                        <div className="mt-1 text-blue-700">
-                          {
-                            course.instructor
-                          }
-                        </div>
-                      )}
+                      <div className={`mt-1 font-medium ${colorStyle.body}`}>
+                        Instructor: {course.instructor ?? "TBA"}
+                      </div>
                     </div>
                   </div>
                 );
