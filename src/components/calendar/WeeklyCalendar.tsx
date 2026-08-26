@@ -21,9 +21,17 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
+import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
+import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
+import {
+  hasMeetingConflicts,
+  meetingsOverlap,
+} from "@/lib/schedule/conflicts";
+import { minutesToTime, timeToMinutes } from "@/lib/schedule/time";
+import type { GeneratedSchedule } from "@/lib/schedule/types";
 import {
   days,
   type CourseBlock,
@@ -111,49 +119,6 @@ function createEmptyProgram(name: string): WeeklyProgram {
   };
 }
 
-/**
- * Converts a valid 24-hour HH:MM value into minutes after midnight.
- *
- * Accepted examples:
- * 08:00
- * 09:09
- * 11:19
- * 12:29
- * 14:30
- * 16:39
- * 17:49
- * 18:59
- *
- * Every minute between 00 and 59 is accepted.
- */
-function timeToMinutes(time: string): number {
-  const normalizedTime = time.trim();
-
-  const match = normalizedTime.match(
-    /^([01]?\d|2[0-3]):([0-5]\d)$/,
-  );
-
-  if (!match) {
-    throw new Error(
-      `Invalid time value "${time}". Expected a valid HH:MM value.`,
-    );
-  }
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-
-  return hour * 60 + minute;
-}
-
-function minutesToTime(totalMinutes: number): string {
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-
-  return `${hour.toString().padStart(2, "0")}:${minute
-    .toString()
-    .padStart(2, "0")}`;
-}
-
 function generateTimeLabels(): string[] {
   const labels: string[] = [];
 
@@ -226,29 +191,6 @@ function getGridLineTop(time: string): number {
 
 function getDayIndex(day: Day) {
   return days.indexOf(day);
-}
-
-function coursesOverlap(
-  firstCourse: CourseBlock,
-  secondCourse: CourseBlock,
-) {
-  if (firstCourse.day !== secondCourse.day) {
-    return false;
-  }
-
-  const firstStart =
-    timeToMinutes(firstCourse.startTime);
-
-  const firstEnd =
-    timeToMinutes(firstCourse.endTime);
-
-  const secondStart =
-    timeToMinutes(secondCourse.startTime);
-
-  const secondEnd =
-    timeToMinutes(secondCourse.endTime);
-
-  return firstStart < secondEnd && firstEnd > secondStart;
 }
 
 function reorderCourseBlocksBySelections(
@@ -351,14 +293,14 @@ function getCourseLayoutMap(
 
             const overlapsWithGroup =
               overlapGroup.some((groupCourse) =>
-                coursesOverlap(
+                meetingsOverlap(
                   groupCourse,
                   possibleOverlappingCourse,
                 ),
               );
 
             const overlapsWithCurrentCourse =
-              coursesOverlap(
+              meetingsOverlap(
                 currentCourse,
                 possibleOverlappingCourse,
               );
@@ -412,7 +354,7 @@ function getCourseLayoutMap(
             }
 
             if (
-              coursesOverlap(
+              meetingsOverlap(
                 course,
                 otherCourse,
               )
@@ -827,6 +769,13 @@ export default function WeeklyCalendar() {
     setActiveSelectionId,
   ] = useState<string | null>(null);
 
+  const [plannerMode, setPlannerMode] = useState<"manual" | "generator">(
+    "manual",
+  );
+
+  const [generatedPreview, setGeneratedPreview] =
+    useState<GeneratedSchedule | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -877,26 +826,44 @@ export default function WeeklyCalendar() {
         selection.id === activeSelectionId,
     ) ?? null;
 
+  const displayedCourseBlocks = useMemo(
+    () =>
+      plannerMode === "generator"
+        ? generatedPreview
+          ? generatedScheduleToWeeklyProgram(generatedPreview, {
+              id: "generated-preview",
+              name: "Generated preview",
+              updatedAt: "",
+            }).courseBlocks
+          : []
+        : courseBlocks,
+    [courseBlocks, generatedPreview, plannerMode],
+  );
+
   const courseLayoutMap = useMemo(
     () =>
-      getCourseLayoutMap(courseBlocks),
+      getCourseLayoutMap(displayedCourseBlocks),
 
-    [courseBlocks],
+    [displayedCourseBlocks],
   );
 
   const hasScheduleConflicts = useMemo(
-    () =>
-      courseBlocks.some((course, index) =>
-        courseBlocks
-          .slice(index + 1)
-          .some((otherCourse) => coursesOverlap(course, otherCourse)),
-      ),
+    () => hasMeetingConflicts(courseBlocks),
     [courseBlocks],
   );
 
   const orderedSelectionIds = useMemo(
-    () => courseSelections.map((selection) => selection.id),
-    [courseSelections],
+    () =>
+      plannerMode === "generator"
+        ? [
+            ...new Set(
+              displayedCourseBlocks.flatMap((block) =>
+                block.selectionId ? [block.selectionId] : [],
+              ),
+            ),
+          ]
+        : courseSelections.map((selection) => selection.id),
+    [courseSelections, displayedCourseBlocks, plannerMode],
   );
 
   /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
@@ -1477,8 +1444,56 @@ export default function WeeklyCalendar() {
     );
   }
 
+  function handleSaveGeneratedSchedule(schedule: GeneratedSchedule) {
+    const programId = createId("program");
+    const generatedProgramCount = weeklyPrograms.filter((program) =>
+      program.name.startsWith("Generated Program"),
+    ).length;
+    const program = generatedScheduleToWeeklyProgram(schedule, {
+      id: programId,
+      name: `Generated Program ${generatedProgramCount + 1}`,
+    });
+
+    setWeeklyPrograms((currentPrograms) => [...currentPrograms, program]);
+    setSelectedProgramId(program.id);
+    setProgramName(program.name);
+    setActiveSelectionId(null);
+    setPlannerMode("manual");
+  }
+
   return (
     <div className="w-full space-y-4">
+      <div
+        className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+        aria-label="Weekly program mode"
+      >
+        <button
+          type="button"
+          onClick={() => setPlannerMode("manual")}
+          aria-pressed={plannerMode === "manual"}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            plannerMode === "manual"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Weekly Program
+        </button>
+        <button
+          type="button"
+          onClick={() => setPlannerMode("generator")}
+          aria-pressed={plannerMode === "generator"}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            plannerMode === "generator"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Generate Schedule
+        </button>
+      </div>
+
+      {plannerMode === "manual" ? (
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
           <div className="min-w-0">
@@ -1740,6 +1755,17 @@ export default function WeeklyCalendar() {
           </div>
         )}
       </div>
+      ) : (
+        <ScheduleGeneratorPanel
+          courseCatalog={courseCatalog}
+          isLoadingBranches={isLoadingBranches}
+          isBranchLoading={isBranchLoading}
+          loadBranch={loadBranch}
+          catalogError={courseCatalogError}
+          onPreviewChange={setGeneratedPreview}
+          onSave={handleSaveGeneratedSchedule}
+        />
+      )}
 
       <div className="w-full rounded-xl border border-gray-200 bg-transparent shadow-sm">
         <div className="w-full">
@@ -1798,7 +1824,7 @@ export default function WeeklyCalendar() {
               ))}
             </div>
 
-            {courseBlocks.map(
+            {displayedCourseBlocks.map(
               (course) => {
                 const top =
                   getCourseTop(
@@ -1868,6 +1894,14 @@ export default function WeeklyCalendar() {
                       <div className={`mt-1 font-medium ${colorStyle.body}`}>
                         Instructor: {course.instructor ?? "TBA"}
                       </div>
+
+                      {(course.building || course.room) && (
+                        <div className={`mt-1 ${colorStyle.body}`}>
+                          {[course.building, course.room]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
