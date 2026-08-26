@@ -225,6 +225,20 @@ describe("schedule generator", () => {
     expect(result.schedules[0].conflictCount).toBe(0);
   });
 
+  it("uses only a pinned CRN for a desired course", () => {
+    const pinnedCourse = course("BLG 101", [
+      section("100", [["Monday", "09:00", "10:00"]]),
+      section("101", [["Tuesday", "09:00", "10:00"]]),
+    ]);
+    pinnedCourse.pinnedSectionId = "BLG:101";
+
+    const result = generateSchedules([pinnedCourse]);
+
+    expect(calculateCombinationCount([pinnedCourse])).toBe(1);
+    expect(result.schedules).toHaveLength(1);
+    expect(result.schedules[0].selections[0].crn).toBe("101");
+  });
+
   it("keeps hard constraints mandatory during fallback search", () => {
     const result = generateSchedules(
       [

@@ -31,6 +31,7 @@ type DesiredCourseRow = {
   id: string;
   branchCode: string;
   courseId: string;
+  pinnedSectionId: string;
 };
 
 type GeneratorStatus =
@@ -80,7 +81,7 @@ function resolveGeneratorCourses(
   rows: DesiredCourseRow[],
   courseCatalog: FacultyOption[],
 ): GeneratorCourse[] | null {
-  const resolved = rows.map((row) => {
+  const resolved: Array<GeneratorCourse | null> = rows.map((row) => {
     const course = coursesForBranch(courseCatalog, row.branchCode).find(
       (candidate) => candidate.id === row.courseId,
     );
@@ -92,6 +93,7 @@ function resolveGeneratorCourses(
           courseCode: course.code,
           courseTitle: course.title,
           sections: course.sections,
+          pinnedSectionId: row.pinnedSectionId || undefined,
         }
       : null;
   });
@@ -164,7 +166,12 @@ export default function ScheduleGeneratorPanel({
   function handleAddCourse() {
     setRows((current) => [
       ...current,
-      { id: createRowId(), branchCode: "", courseId: "" },
+      {
+        id: createRowId(),
+        branchCode: "",
+        courseId: "",
+        pinnedSectionId: "",
+      },
     ]);
     invalidateResults("idle");
   }
@@ -172,7 +179,9 @@ export default function ScheduleGeneratorPanel({
   function handleBranchChange(rowId: string, branchCode: string) {
     setRows((current) =>
       current.map((row) =>
-        row.id === rowId ? { ...row, branchCode, courseId: "" } : row,
+        row.id === rowId
+          ? { ...row, branchCode, courseId: "", pinnedSectionId: "" }
+          : row,
       ),
     );
     invalidateResults("idle");
@@ -200,10 +209,24 @@ export default function ScheduleGeneratorPanel({
 
     setRows((current) =>
       current.map((candidate) =>
-        candidate.id === rowId ? { ...candidate, courseId } : candidate,
+        candidate.id === rowId
+          ? { ...candidate, courseId, pinnedSectionId: "" }
+          : candidate,
       ),
     );
     invalidateResults(courseId ? "ready" : "idle");
+  }
+
+  function handlePinnedSectionChange(
+    rowId: string,
+    pinnedSectionId: string,
+  ) {
+    setRows((current) =>
+      current.map((row) =>
+        row.id === rowId ? { ...row, pinnedSectionId } : row,
+      ),
+    );
+    invalidateResults(isReady ? "ready" : "idle");
   }
 
   function handleRemoveCourse(rowId: string) {
@@ -360,11 +383,14 @@ export default function ScheduleGeneratorPanel({
           {rows.map((row) => {
             const branchIsLoading = isBranchLoading(row.branchCode);
             const courses = coursesForBranch(courseCatalog, row.branchCode);
+            const selectedCourse = courses.find(
+              (course) => course.id === row.courseId,
+            );
 
             return (
               <div
                 key={row.id}
-                className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_auto]"
+                className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_auto]"
               >
                 <label className="min-w-0">
                   <span className="sr-only">Course prefix</span>
@@ -409,6 +435,34 @@ export default function ScheduleGeneratorPanel({
                       <option key={course.id} value={course.id}>
                         {course.code} - {course.title} ({course.sections.length}{" "}
                         CRNs)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="min-w-0">
+                  <span className="sr-only">Pinned CRN</span>
+                  <select
+                    aria-label="Pinned CRN"
+                    value={row.pinnedSectionId}
+                    onChange={(event) =>
+                      handlePinnedSectionChange(row.id, event.target.value)
+                    }
+                    disabled={!selectedCourse || branchIsLoading}
+                    className={selectClassName}
+                  >
+                    <option value="">Any CRN</option>
+                    {selectedCourse?.sections.map((section) => (
+                      <option key={section.id} value={section.id}>
+                        Pin {section.crn} · {section.meetings
+                          .map(
+                            (meeting) =>
+                              `${meeting.day.slice(0, 3)} ${meeting.startTime}–${meeting.endTime}`,
+                          )
+                          .join(", ")}
+                        {section.instructor
+                          ? ` · ${section.instructor}`
+                          : ""}
                       </option>
                     ))}
                   </select>

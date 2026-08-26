@@ -31,11 +31,17 @@ export function calculateCombinationCount(
   courses: readonly GeneratorCourse[],
 ): number {
   return courses.reduce((count, course) => {
-    if (count > Number.MAX_SAFE_INTEGER / Math.max(1, course.sections.length)) {
+    const sectionCount = course.pinnedSectionId
+      ? course.sections.some((section) => section.id === course.pinnedSectionId)
+        ? 1
+        : 0
+      : course.sections.length;
+
+    if (count > Number.MAX_SAFE_INTEGER / Math.max(1, sectionCount)) {
       return Number.MAX_SAFE_INTEGER;
     }
 
-    return count * course.sections.length;
+    return count * sectionCount;
   }, 1);
 }
 
@@ -70,6 +76,8 @@ export function generateConflictFreeSchedules(
       sections: [...course.sections]
         .filter(
           (section) =>
+            (!course.pinnedSectionId ||
+              section.id === course.pinnedSectionId) &&
             section.meetings.length > 0 &&
             satisfiesConstraints(section.meetings, constraints),
         )
@@ -236,6 +244,8 @@ export function generateLeastConflictSchedules(
       sections: [...course.sections]
         .filter(
           (section) =>
+            (!course.pinnedSectionId ||
+              section.id === course.pinnedSectionId) &&
             section.meetings.length > 0 &&
             satisfiesConstraints(section.meetings, constraints),
         )

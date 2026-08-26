@@ -30,6 +30,7 @@ export type GeneratorCourse = {
   courseCode: string;
   courseTitle: string;
   sections: CourseSectionOption[];
+  pinnedSectionId?: string;
 };
 
 export type GeneratedCourseSelection = {
