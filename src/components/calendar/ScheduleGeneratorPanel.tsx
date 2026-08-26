@@ -15,6 +15,11 @@ import {
   generateSchedules,
 } from "@/lib/schedule/generator";
 import { calculateScheduleRating } from "@/lib/schedule/scoring";
+import {
+  GENERATOR_SESSION_STORAGE_KEY,
+  parseGeneratorSession,
+  type GeneratorSessionCourse,
+} from "@/lib/schedule/session";
 import { minutesToTime } from "@/lib/schedule/time";
 import type {
   GeneratedSchedule,
@@ -28,12 +33,7 @@ import {
   type FacultyOption,
 } from "@/types/calendar";
 
-type DesiredCourseRow = {
-  id: string;
-  branchCode: string;
-  courseId: string;
-  pinnedSectionId: string;
-};
+type DesiredCourseRow = GeneratorSessionCourse;
 
 type GeneratorStatus =
   | "idle"
@@ -151,6 +151,7 @@ export default function ScheduleGeneratorPanel({
   const [schedules, setSchedules] = useState<GeneratedSchedule[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [truncated, setTruncated] = useState(false);
+  const [hasLoadedSession, setHasLoadedSession] = useState(false);
   const generationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resolvedCourses = useMemo(
@@ -176,6 +177,70 @@ export default function ScheduleGeneratorPanel({
   useEffect(() => {
     onPreviewChange(currentSchedule);
   }, [currentSchedule, onPreviewChange]);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- The generator session is
+   * restored only after hydration so localStorage never affects server HTML. */
+  useEffect(() => {
+    try {
+      const storedSession = localStorage.getItem(
+        GENERATOR_SESSION_STORAGE_KEY,
+      );
+      const session = storedSession
+        ? parseGeneratorSession(JSON.parse(storedSession) as unknown)
+        : null;
+
+      if (session) {
+        setRows(session.courses);
+        setEarliestStartTime(session.earliestStartTime);
+        setLatestEndTime(session.latestEndTime);
+        setExcludedDays(session.excludedDays);
+      }
+    } catch {
+      // Ignore malformed or unavailable browser storage.
+    } finally {
+      setHasLoadedSession(true);
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!hasLoadedSession) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        GENERATOR_SESSION_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          courses: rows,
+          earliestStartTime,
+          latestEndTime,
+          excludedDays,
+        }),
+      );
+    } catch {
+      // Generation remains usable when storage is blocked or full.
+    }
+  }, [
+    earliestStartTime,
+    excludedDays,
+    hasLoadedSession,
+    latestEndTime,
+    rows,
+  ]);
+
+  useEffect(() => {
+    if (!hasLoadedSession || isLoadingBranches) {
+      return;
+    }
+
+    new Set(rows.map((row) => row.branchCode).filter(Boolean)).forEach(
+      (branchCode) => {
+        void loadBranch(branchCode);
+      },
+    );
+  }, [hasLoadedSession, isLoadingBranches, loadBranch, rows]);
 
   useEffect(
     () => () => {
@@ -392,6 +457,9 @@ export default function ScheduleGeneratorPanel({
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             Choose courses; Simplify will select and rank conflict-free CRNs.
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            Your latest generator session is saved automatically in this browser.
           </p>
         </div>
 
