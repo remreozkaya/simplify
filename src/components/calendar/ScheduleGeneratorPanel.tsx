@@ -14,6 +14,7 @@ import {
   calculateCombinationCount,
   generateSchedules,
 } from "@/lib/schedule/generator";
+import { calculateScheduleRating } from "@/lib/schedule/scoring";
 import { minutesToTime } from "@/lib/schedule/time";
 import type {
   GeneratedSchedule,
@@ -62,6 +63,33 @@ const inputClassName =
 const TIME_OPTIONS = Array.from({ length: 25 }, (_value, index) =>
   minutesToTime(8 * 60 + index * 30),
 );
+
+function ScheduleStarRating({ rating }: { rating: number }) {
+  const filledWidth = `${(rating / 5) * 100}%`;
+
+  return (
+    <span
+      className="inline-flex items-center gap-2"
+      aria-label={`${rating.toFixed(1)} out of 5 stars`}
+    >
+      <span className="relative inline-block text-lg leading-none tracking-wide">
+        <span className="text-gray-300" aria-hidden="true">
+          ★★★★★
+        </span>
+        <span
+          className="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap text-amber-400"
+          style={{ width: filledWidth }}
+          aria-hidden="true"
+        >
+          ★★★★★
+        </span>
+      </span>
+      <span className="font-semibold text-gray-900">
+        {rating.toFixed(1)}/5
+      </span>
+    </span>
+  );
+}
 
 function createRowId(): string {
   return `desired-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -141,6 +169,9 @@ export default function ScheduleGeneratorPanel({
     ? calculateCombinationCount(resolvedCourses)
     : 0;
   const currentSchedule = schedules[currentIndex] ?? null;
+  const currentRating = currentSchedule
+    ? calculateScheduleRating(currentSchedule, schedules[0])
+    : 0;
 
   useEffect(() => {
     onPreviewChange(currentSchedule);
@@ -636,9 +667,9 @@ export default function ScheduleGeneratorPanel({
 
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
             <div>
-              <dt className="text-gray-500">Score</dt>
-              <dd className="font-semibold text-gray-900">
-                {currentSchedule.score}
+              <dt className="text-gray-500">Rating</dt>
+              <dd className="mt-1">
+                <ScheduleStarRating rating={currentRating} />
               </dd>
             </div>
             <div>

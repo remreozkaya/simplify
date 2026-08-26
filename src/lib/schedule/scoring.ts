@@ -13,6 +13,11 @@ export const DEFAULT_SCHEDULE_WEIGHTS: ScheduleWeights = {
 
 const PREFERRED_EARLIEST_START = 10 * 60;
 const PREFERRED_LATEST_END = 17 * 60 + 30;
+const MIN_SCHEDULE_RATING = 1;
+const MAX_SCHEDULE_RATING = 5;
+const RELATIVE_SCORE_RATING_FACTOR = 2.5;
+const CONFLICT_PAIR_RATING_PENALTY = 0.35;
+const CONFLICT_MINUTE_RATING_PENALTY = 1 / 900;
 
 export function scoreSchedule(
   metrics: ScheduleMetrics,
@@ -33,6 +38,34 @@ export function scoreSchedule(
     earlyMinutes * weights.earlyMinute +
     lateMinutes * weights.lateMinute
   );
+}
+
+/**
+ * Converts the internal lower-is-better penalty into a user-facing 1–5
+ * rating. Ratings are relative to the best generated schedule so small score
+ * differences remain visible as values such as 4.7 instead of exposing the
+ * implementation-specific weighted score.
+ */
+export function calculateScheduleRating(
+  schedule: GeneratedSchedule,
+  bestSchedule: GeneratedSchedule,
+): number {
+  const bestScore = Math.max(1, bestSchedule.score);
+  const relativeScorePenalty =
+    (Math.max(0, schedule.score - bestSchedule.score) / bestScore) *
+    RELATIVE_SCORE_RATING_FACTOR;
+  const conflictPenalty =
+    schedule.conflictCount * CONFLICT_PAIR_RATING_PENALTY +
+    schedule.totalConflictMinutes * CONFLICT_MINUTE_RATING_PENALTY;
+  const rating = Math.min(
+    MAX_SCHEDULE_RATING,
+    Math.max(
+      MIN_SCHEDULE_RATING,
+      MAX_SCHEDULE_RATING - relativeScorePenalty - conflictPenalty,
+    ),
+  );
+
+  return Math.round(rating * 10) / 10;
 }
 
 function compareStableCrns(
