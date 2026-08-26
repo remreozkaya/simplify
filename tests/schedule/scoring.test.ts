@@ -19,6 +19,8 @@ function generated(
       },
     ],
     meetings: [],
+    conflictCount: 0,
+    totalConflictMinutes: 0,
     metrics,
     score: scoreSchedule(metrics),
   };

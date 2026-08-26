@@ -21,12 +21,76 @@ export function meetingsOverlap(
   );
 }
 
+export function meetingConflictMinutes(
+  first: MeetingTime,
+  second: MeetingTime,
+): number {
+  if (!meetingsOverlap(first, second)) {
+    return 0;
+  }
+
+  return Math.min(
+    timeToMinutes(first.endTime),
+    timeToMinutes(second.endTime),
+  ) - Math.max(
+    timeToMinutes(first.startTime),
+    timeToMinutes(second.startTime),
+  );
+}
+
+export type ConflictStats = {
+  conflictCount: number;
+  totalConflictMinutes: number;
+};
+
+export function calculateCrossConflictStats(
+  firstMeetings: readonly MeetingTime[],
+  secondMeetings: readonly MeetingTime[],
+): ConflictStats {
+  let conflictCount = 0;
+  let totalConflictMinutes = 0;
+
+  firstMeetings.forEach((first) => {
+    secondMeetings.forEach((second) => {
+      const conflictMinutes = meetingConflictMinutes(first, second);
+
+      if (conflictMinutes > 0) {
+        conflictCount += 1;
+        totalConflictMinutes += conflictMinutes;
+      }
+    });
+  });
+
+  return { conflictCount, totalConflictMinutes };
+}
+
+export function calculateConflictStats(
+  meetings: readonly MeetingTime[],
+): ConflictStats {
+  let conflictCount = 0;
+  let totalConflictMinutes = 0;
+
+  meetings.forEach((meeting, index) => {
+    const stats = calculateCrossConflictStats(
+      [meeting],
+      meetings.slice(index + 1),
+    );
+    conflictCount += stats.conflictCount;
+    totalConflictMinutes += stats.totalConflictMinutes;
+  });
+
+  return { conflictCount, totalConflictMinutes };
+}
+
 export function sectionConflicts(
   sectionMeetings: readonly MeetingTime[],
   selectedMeetings: readonly MeetingTime[],
 ): boolean {
-  return sectionMeetings.some((meeting) =>
-    selectedMeetings.some((selected) => meetingsOverlap(meeting, selected)),
+  return (
+    hasMeetingConflicts(sectionMeetings) ||
+    sectionMeetings.some((meeting) =>
+      selectedMeetings.some((selected) => meetingsOverlap(meeting, selected)),
+    )
   );
 }
 

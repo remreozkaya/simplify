@@ -54,6 +54,8 @@ export function compareSchedules(
   second: GeneratedSchedule,
 ): number {
   return (
+    first.conflictCount - second.conflictCount ||
+    first.totalConflictMinutes - second.totalConflictMinutes ||
     first.score - second.score ||
     first.metrics.campusDays - second.metrics.campusDays ||
     first.metrics.totalGapMinutes - second.metrics.totalGapMinutes ||

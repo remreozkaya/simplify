@@ -12,7 +12,7 @@ import {
   LARGE_SEARCH_SPACE_THRESHOLD,
   MAX_GENERATED_SCHEDULES,
   calculateCombinationCount,
-  generateConflictFreeSchedules,
+  generateSchedules,
 } from "@/lib/schedule/generator";
 import { minutesToTime } from "@/lib/schedule/time";
 import type {
@@ -38,6 +38,7 @@ type GeneratorStatus =
   | "ready"
   | "generating"
   | "success"
+  | "fallback"
   | "no-results"
   | "error";
 
@@ -259,7 +260,7 @@ export default function ScheduleGeneratorPanel({
 
     generationTimer.current = setTimeout(() => {
       try {
-        const result = generateConflictFreeSchedules(resolvedCourses, {
+        const result = generateSchedules(resolvedCourses, {
           constraints,
           maxResults: MAX_GENERATED_SCHEDULES,
         });
@@ -271,7 +272,21 @@ export default function ScheduleGeneratorPanel({
         if (result.schedules.length === 0) {
           setStatus("no-results");
           setMessage(
-            "No conflict-free schedule satisfies the selected constraints.",
+            result.searchLimitReached
+              ? "No schedule was found before the safe search limit was reached. Try fewer courses or stricter preferences."
+              : "No schedule satisfies the selected hard constraints.",
+          );
+        } else if (result.usedConflictFallback) {
+          const minimumConflicts = result.schedules[0].conflictCount;
+          setStatus("fallback");
+          setMessage(
+            `No conflict-free schedule exists. Showing ${
+              result.schedules.length
+            } schedule${result.schedules.length === 1 ? "" : "s"} with the minimum of ${
+              minimumConflicts
+            } overlapping meeting pair${minimumConflicts === 1 ? "" : "s"}${
+              result.searchLimitReached ? " found within the safe search limit" : ""
+            }.`,
           );
         } else {
           setStatus("success");
@@ -502,6 +517,8 @@ export default function ScheduleGeneratorPanel({
           className={`text-sm ${
             status === "error" || status === "no-results"
               ? "text-red-700"
+              : status === "fallback"
+                ? "font-medium text-amber-700"
               : status === "success"
                 ? "font-medium text-green-700"
                 : "text-gray-500"
@@ -553,6 +570,15 @@ export default function ScheduleGeneratorPanel({
               Next →
             </button>
           </div>
+
+          {currentSchedule.conflictCount > 0 && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Best available fallback: {currentSchedule.conflictCount}{" "}
+              overlapping meeting pair
+              {currentSchedule.conflictCount === 1 ? "" : "s"},{" "}
+              {currentSchedule.totalConflictMinutes} overlapping minutes.
+            </div>
+          )}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
             <div>

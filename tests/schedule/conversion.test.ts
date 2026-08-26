@@ -8,6 +8,8 @@ describe("generated schedule conversion", () => {
     const schedule: GeneratedSchedule = {
       id: "generated",
       score: 600,
+      conflictCount: 0,
+      totalConflictMinutes: 0,
       metrics: {
         campusDays: 2,
         totalGapMinutes: 0,

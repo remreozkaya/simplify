@@ -54,6 +54,8 @@ export type GeneratedSchedule = {
   id: string;
   selections: GeneratedCourseSelection[];
   meetings: GeneratedMeeting[];
+  conflictCount: number;
+  totalConflictMinutes: number;
   score: number;
   metrics: ScheduleMetrics;
 };
@@ -61,6 +63,7 @@ export type GeneratedSchedule = {
 export type GenerateScheduleOptions = {
   constraints?: ScheduleConstraints;
   maxResults?: number;
+  maxVisitedNodes?: number;
   weights?: ScheduleWeights;
 };
 
@@ -68,4 +71,6 @@ export type GenerateScheduleResult = {
   schedules: GeneratedSchedule[];
   truncated: boolean;
   visitedNodes: number;
+  usedConflictFallback?: boolean;
+  searchLimitReached?: boolean;
 };

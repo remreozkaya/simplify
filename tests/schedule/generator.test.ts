@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateCombinationCount,
   generateConflictFreeSchedules,
+  generateSchedules,
 } from "@/lib/schedule/generator";
 import type { GeneratorCourse } from "@/lib/schedule/types";
 import type { CourseSectionOption, Day } from "@/types/calendar";
@@ -164,5 +165,76 @@ describe("schedule generator", () => {
         ]),
       ]),
     ).toBe(2);
+  });
+
+  it("falls back to the schedule with the fewest conflict pairs", () => {
+    const result = generateSchedules([
+      course("BLG 101", [
+        section("100", [["Monday", "09:00", "12:00"]]),
+      ]),
+      course("MAT 101", [
+        section("200", [["Monday", "09:30", "10:30"]]),
+      ]),
+      course("FIZ 101", [
+        section("300", [["Monday", "10:00", "11:00"]]),
+        section("301", [["Monday", "11:00", "13:00"]]),
+      ]),
+    ]);
+
+    expect(result.usedConflictFallback).toBe(true);
+    expect(result.schedules).toHaveLength(1);
+    expect(result.schedules[0].conflictCount).toBe(2);
+    expect(result.schedules[0].selections.map((item) => item.crn)).toEqual([
+      "100",
+      "200",
+      "301",
+    ]);
+  });
+
+  it("uses fewer overlap minutes to break equal conflict-count ties", () => {
+    const result = generateSchedules([
+      course("BLG 101", [
+        section("100", [["Monday", "09:00", "11:00"]]),
+      ]),
+      course("MAT 101", [
+        section("200", [["Monday", "10:00", "12:00"]]),
+        section("201", [["Monday", "10:30", "12:30"]]),
+      ]),
+    ]);
+
+    expect(result.usedConflictFallback).toBe(true);
+    expect(result.schedules).toHaveLength(1);
+    expect(result.schedules[0]).toMatchObject({
+      conflictCount: 1,
+      totalConflictMinutes: 30,
+    });
+    expect(result.schedules[0].selections[1].crn).toBe("201");
+  });
+
+  it("does not use conflict fallback when valid schedules exist", () => {
+    const result = generateSchedules([
+      course("BLG 101", [
+        section("100", [["Monday", "09:00", "10:00"]]),
+      ]),
+      course("MAT 101", [
+        section("200", [["Tuesday", "09:00", "10:00"]]),
+      ]),
+    ]);
+
+    expect(result.usedConflictFallback).toBe(false);
+    expect(result.schedules[0].conflictCount).toBe(0);
+  });
+
+  it("keeps hard constraints mandatory during fallback search", () => {
+    const result = generateSchedules(
+      [
+        course("BLG 101", [
+          section("100", [["Friday", "09:00", "10:00"]]),
+        ]),
+      ],
+      { constraints: { excludedDays: ["Friday"] } },
+    );
+
+    expect(result.schedules).toEqual([]);
   });
 });
