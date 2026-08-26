@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
+import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
 import {
@@ -776,6 +777,11 @@ export default function WeeklyCalendar() {
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedSchedule | null>(null);
 
+  const [jpegExportStatus, setJpegExportStatus] = useState<{
+    message: string;
+    isError: boolean;
+  } | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -1461,6 +1467,31 @@ export default function WeeklyCalendar() {
     setPlannerMode("manual");
   }
 
+  function handleExportJpeg() {
+    if (!selectedProgram) {
+      return;
+    }
+
+    try {
+      const filename = exportWeeklyProgramAsJpeg({
+        ...selectedProgram,
+        name: programName.trim() || selectedProgram.name,
+      });
+      setJpegExportStatus({
+        message: `${filename} downloaded.`,
+        isError: false,
+      });
+    } catch (error: unknown) {
+      setJpegExportStatus({
+        message:
+          error instanceof Error
+            ? error.message
+            : "The Weekly Program could not be exported as JPEG.",
+        isError: true,
+      });
+    }
+  }
+
   return (
     <div className="w-full space-y-4">
       <div
@@ -1495,7 +1526,7 @@ export default function WeeklyCalendar() {
 
       {plannerMode === "manual" ? (
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
+        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-semibold text-gray-600">
               Weekly Program
@@ -1561,6 +1592,15 @@ export default function WeeklyCalendar() {
 
           <button
             type="button"
+            onClick={handleExportJpeg}
+            disabled={!selectedProgram}
+            className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Export JPEG
+          </button>
+
+          <button
+            type="button"
             onClick={
               handleSaveProgramName
             }
@@ -1586,6 +1626,20 @@ export default function WeeklyCalendar() {
             Delete Program
           </button>
         </div>
+
+        {jpegExportStatus && (
+          <div
+            className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
+              jpegExportStatus.isError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-green-200 bg-green-50 text-green-700"
+            }`}
+            role={jpegExportStatus.isError ? "alert" : "status"}
+            aria-live="polite"
+          >
+            {jpegExportStatus.message}
+          </div>
+        )}
 
         <div
           className="mb-4 text-xs text-gray-500"
