@@ -21,12 +21,24 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
+import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
+import { getCourseColorStyle } from "@/lib/calendar/courseColors";
+import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
+import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
+import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
+import {
+  hasMeetingConflicts,
+  meetingsOverlap,
+} from "@/lib/schedule/conflicts";
+import { minutesToTime, timeToMinutes } from "@/lib/schedule/time";
+import type { GeneratedSchedule } from "@/lib/schedule/types";
 import {
   days,
   type CourseBlock,
   type CourseOption,
   type CourseSelection,
+  type CourseSectionOption,
   type Day,
   type FacultyOption,
   type WeeklyProgram,
@@ -75,6 +87,8 @@ type CourseLayout = {
 type SortableCourseRowProps = {
   selection: CourseSelection;
   courseCatalog: FacultyOption[];
+  isLoadingBranches: boolean;
+  isBranchLoading: (branchCode: string) => boolean;
   onFacultyChange: (
     selectionId: string,
     facultyCode: string,
@@ -83,9 +97,9 @@ type SortableCourseRowProps = {
     selectionId: string,
     courseId: string,
   ) => void;
-  onSessionChange: (
+  onSectionChange: (
     selectionId: string,
-    sessionId: string,
+    sectionId: string,
   ) => void;
   onDelete: (selection: CourseSelection) => void;
 };
@@ -104,49 +118,6 @@ function createEmptyProgram(name: string): WeeklyProgram {
     courseSelections: [],
     updatedAt: new Date().toISOString(),
   };
-}
-
-/**
- * Converts a valid 24-hour HH:MM value into minutes after midnight.
- *
- * Accepted examples:
- * 08:00
- * 09:09
- * 11:19
- * 12:29
- * 14:30
- * 16:39
- * 17:49
- * 18:59
- *
- * Every minute between 00 and 59 is accepted.
- */
-function timeToMinutes(time: string): number {
-  const normalizedTime = time.trim();
-
-  const match = normalizedTime.match(
-    /^([01]?\d|2[0-3]):([0-5]\d)$/,
-  );
-
-  if (!match) {
-    throw new Error(
-      `Invalid time value "${time}". Expected a valid HH:MM value.`,
-    );
-  }
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-
-  return hour * 60 + minute;
-}
-
-function minutesToTime(totalMinutes: number): string {
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-
-  return `${hour.toString().padStart(2, "0")}:${minute
-    .toString()
-    .padStart(2, "0")}`;
 }
 
 function generateTimeLabels(): string[] {
@@ -223,29 +194,6 @@ function getDayIndex(day: Day) {
   return days.indexOf(day);
 }
 
-function coursesOverlap(
-  firstCourse: CourseBlock,
-  secondCourse: CourseBlock,
-) {
-  if (firstCourse.day !== secondCourse.day) {
-    return false;
-  }
-
-  const firstStart =
-    timeToMinutes(firstCourse.startTime);
-
-  const firstEnd =
-    timeToMinutes(firstCourse.endTime);
-
-  const secondStart =
-    timeToMinutes(secondCourse.startTime);
-
-  const secondEnd =
-    timeToMinutes(secondCourse.endTime);
-
-  return firstStart < secondEnd && firstEnd > secondStart;
-}
-
 function reorderCourseBlocksBySelections(
   courseBlocks: CourseBlock[],
   courseSelections: CourseSelection[],
@@ -257,14 +205,9 @@ function reorderCourseBlocksBySelections(
     ]),
   );
 
-  const orderedCourseBlockIds = courseSelections
-    .map((selection) => selection.courseBlockId)
-    .filter(
-      (
-        courseBlockId,
-      ): courseBlockId is string =>
-        Boolean(courseBlockId),
-    );
+  const orderedCourseBlockIds = courseSelections.flatMap(
+    (selection) => selection.courseBlockIds,
+  );
 
   const orderedCourseBlocks = orderedCourseBlockIds
     .map((courseBlockId) =>
@@ -351,14 +294,14 @@ function getCourseLayoutMap(
 
             const overlapsWithGroup =
               overlapGroup.some((groupCourse) =>
-                coursesOverlap(
+                meetingsOverlap(
                   groupCourse,
                   possibleOverlappingCourse,
                 ),
               );
 
             const overlapsWithCurrentCourse =
-              coursesOverlap(
+              meetingsOverlap(
                 currentCourse,
                 possibleOverlappingCourse,
               );
@@ -412,7 +355,7 @@ function getCourseLayoutMap(
             }
 
             if (
-              coursesOverlap(
+              meetingsOverlap(
                 course,
                 otherCourse,
               )
@@ -489,13 +432,40 @@ function getCourseById(
   ).find((course) => course.id === courseId);
 }
 
-function getSessionById(
+function getSectionById(
   course: CourseOption | undefined,
-  sessionId: string,
+  sectionId: string,
 ) {
-  return course?.sessions.find(
-    (session) => session.id === sessionId,
+  return course?.sections.find(
+    (section) => section.id === sectionId,
   );
+}
+
+const shortDays: Record<Day, string> = {
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
+};
+
+function formatSectionLabel(section: CourseSectionOption) {
+  const meetings = section.meetings
+    .map(
+      (meeting) =>
+        `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}`,
+    )
+    .join(", ");
+
+  const instructor = section.instructor
+    ? `Instructor: ${section.instructor}`
+    : "Instructor: TBA";
+
+  return [section.crn, meetings, instructor]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function formatUpdatedAt(updatedAt: string) {
@@ -514,17 +484,18 @@ function formatUpdatedAt(updatedAt: string) {
   });
 }
 
-function removeCourseBlock(
+function removeCourseBlocks(
   courseBlocks: CourseBlock[],
-  courseBlockId: string | undefined,
+  courseBlockIds: string[],
 ) {
-  if (!courseBlockId) {
+  if (courseBlockIds.length === 0) {
     return courseBlocks;
   }
 
+  const removedIds = new Set(courseBlockIds);
+
   return courseBlocks.filter(
-    (courseBlock) =>
-      courseBlock.id !== courseBlockId,
+    (courseBlock) => !removedIds.has(courseBlock.id),
   );
 }
 
@@ -549,9 +520,11 @@ function DragHandleIcon() {
 function SortableCourseRow({
   selection,
   courseCatalog,
+  isLoadingBranches,
+  isBranchLoading,
   onFacultyChange,
   onCourseChange,
-  onSessionChange,
+  onSectionChange,
   onDelete,
 }: SortableCourseRowProps) {
   const {
@@ -577,6 +550,8 @@ function SortableCourseRow({
     selection.facultyCode,
     selection.courseId,
   );
+
+  const branchIsLoading = isBranchLoading(selection.facultyCode);
 
   return (
     <div
@@ -617,10 +592,11 @@ function SortableCourseRow({
             event.target.value,
           )
         }
+        disabled={isLoadingBranches}
         className={selectClassName}
       >
         <option value="">
-          Faculty Code
+          {isLoadingBranches ? "Loading prefixes…" : "Course Prefix"}
         </option>
 
         {courseCatalog.map((faculty) => (
@@ -641,11 +617,11 @@ function SortableCourseRow({
             event.target.value,
           )
         }
-        disabled={!selection.facultyCode}
+        disabled={!selection.facultyCode || branchIsLoading}
         className={selectClassName}
       >
         <option value="">
-          Course Code and Name
+          {branchIsLoading ? "Loading courses…" : "Course Code and Name"}
         </option>
 
         {availableCourses.map((course) => (
@@ -659,30 +635,25 @@ function SortableCourseRow({
       </select>
 
       <select
-        value={selection.sessionId}
+        value={selection.sectionId}
         onChange={(event) =>
-          onSessionChange(
+          onSectionChange(
             selection.id,
             event.target.value,
           )
         }
-        disabled={!selection.courseId}
+        disabled={!selection.courseId || branchIsLoading}
         className={selectClassName}
       >
-        <option value="">Session</option>
+        <option value="">CRN / Section</option>
 
-        {selectedCourse?.sessions.map(
-          (session) => (
+        {selectedCourse?.sections.map(
+          (section) => (
             <option
-              key={session.id}
-              value={session.id}
+              key={section.id}
+              value={section.id}
             >
-              {session.day},{" "}
-              {session.startTime} -{" "}
-              {session.endTime}
-              {session.room
-                ? `, ${session.room}`
-                : ""}
+              {formatSectionLabel(section)}
             </option>
           ),
         )}
@@ -712,9 +683,9 @@ function DraggedCourseRow({
     selection.courseId,
   );
 
-  const selectedSession = getSessionById(
+  const selectedSection = getSectionById(
     selectedCourse,
-    selection.sessionId,
+    selection.sectionId,
   );
 
   const facultyText =
@@ -725,13 +696,9 @@ function DraggedCourseRow({
     ? `${selectedCourse.code} - ${selectedCourse.title}`
     : "Course Code and Name";
 
-  const sessionText = selectedSession
-    ? `${selectedSession.day}, ${selectedSession.startTime} - ${selectedSession.endTime}${
-        selectedSession.room
-          ? `, ${selectedSession.room}`
-          : ""
-      }`
-    : "Session";
+  const sectionText = selectedSection
+    ? formatSectionLabel(selectedSection)
+    : "CRN / Section";
 
   return (
     <div
@@ -755,7 +722,7 @@ function DraggedCourseRow({
 
       <div className={overlayFieldClassName}>
         <span className="truncate">
-          {sessionText}
+          {sectionText}
         </span>
       </div>
 
@@ -767,13 +734,16 @@ function DraggedCourseRow({
 }
 
 export default function WeeklyCalendar() {
-const {
-  courseCatalog,
-  isLoadingBranches,
-  isBranchLoading,
-  loadBranch,
-  error: courseCatalogError,
-} = useItuCourseCatalog();
+  const {
+    courseCatalog,
+    isLoadingBranches,
+    isBranchLoading,
+    loadBranch,
+    retryBranches,
+    retryFailedBranch,
+    failedBranchCode,
+    error: courseCatalogError,
+  } = useItuCourseCatalog();
 
   const [
     weeklyPrograms,
@@ -800,6 +770,18 @@ const {
     setActiveSelectionId,
   ] = useState<string | null>(null);
 
+  const [plannerMode, setPlannerMode] = useState<"manual" | "generator">(
+    "manual",
+  );
+
+  const [generatedPreview, setGeneratedPreview] =
+    useState<GeneratedSchedule | null>(null);
+
+  const [jpegExportStatus, setJpegExportStatus] = useState<{
+    message: string;
+    isError: boolean;
+  } | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -823,11 +805,15 @@ const {
     [weeklyPrograms, selectedProgramId],
   );
 
-  const courseBlocks =
-    selectedProgram?.courseBlocks ?? [];
+  const courseBlocks = useMemo(
+    () => selectedProgram?.courseBlocks ?? [],
+    [selectedProgram],
+  );
 
-  const courseSelections =
-    selectedProgram?.courseSelections ?? [];
+  const courseSelections = useMemo(
+    () => selectedProgram?.courseSelections ?? [],
+    [selectedProgram],
+  );
 
   const savedProgramName =
     selectedProgram?.name ?? "";
@@ -846,13 +832,49 @@ const {
         selection.id === activeSelectionId,
     ) ?? null;
 
+  const displayedCourseBlocks = useMemo(
+    () =>
+      plannerMode === "generator"
+        ? generatedPreview
+          ? generatedScheduleToWeeklyProgram(generatedPreview, {
+              id: "generated-preview",
+              name: "Generated preview",
+              updatedAt: "",
+            }).courseBlocks
+          : []
+        : courseBlocks,
+    [courseBlocks, generatedPreview, plannerMode],
+  );
+
   const courseLayoutMap = useMemo(
     () =>
-      getCourseLayoutMap(courseBlocks),
+      getCourseLayoutMap(displayedCourseBlocks),
 
+    [displayedCourseBlocks],
+  );
+
+  const hasScheduleConflicts = useMemo(
+    () => hasMeetingConflicts(courseBlocks),
     [courseBlocks],
   );
 
+  const orderedSelectionIds = useMemo(
+    () =>
+      plannerMode === "generator"
+        ? [
+            ...new Set(
+              displayedCourseBlocks.flatMap((block) =>
+                block.selectionId ? [block.selectionId] : [],
+              ),
+            ),
+          ]
+        : courseSelections.map((selection) => selection.id),
+    [courseSelections, displayedCourseBlocks, plannerMode],
+  );
+
+  /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
+   * hydration intentionally synchronizes React state with localStorage after
+   * SSR, preventing stored user schedules from causing a hydration mismatch. */
   useEffect(() => {
     let savedPrograms: WeeklyProgram[] = [];
 
@@ -867,8 +889,7 @@ const {
           JSON.parse(storedPrograms);
 
         if (Array.isArray(parsedPrograms)) {
-          savedPrograms =
-            parsedPrograms as WeeklyProgram[];
+          savedPrograms = parseStoredWeeklyPrograms(parsedPrograms);
         }
       }
     } catch {
@@ -890,6 +911,23 @@ const {
     setProgramName(firstProgram.name);
     setHasLoadedPrograms(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (isLoadingBranches) {
+      return;
+    }
+
+    const savedBranchCodes = new Set(
+      courseSelections
+        .map((selection) => selection.facultyCode)
+        .filter(Boolean),
+    );
+
+    savedBranchCodes.forEach((branchCode) => {
+      void loadBranch(branchCode);
+    });
+  }, [courseSelections, isLoadingBranches, loadBranch]);
 
   useEffect(() => {
     if (!hasLoadedPrograms) {
@@ -1086,7 +1124,8 @@ const {
       id: createId("selection"),
       facultyCode: "",
       courseId: "",
-      sessionId: "",
+      sectionId: "",
+      courseBlockIds: [],
     };
 
     updateSelectedProgram(
@@ -1094,9 +1133,9 @@ const {
         ...program,
 
         courseSelections: [
-          newSelection,
           ...(program.courseSelections ??
             []),
+          newSelection,
         ],
 
         updatedAt:
@@ -1113,9 +1152,9 @@ const {
         ...program,
 
         courseBlocks:
-          removeCourseBlock(
+          removeCourseBlocks(
             program.courseBlocks ?? [],
-            selection.courseBlockId,
+            selection.courseBlockIds,
           ),
 
         courseSelections: (
@@ -1136,6 +1175,10 @@ const {
     selectionId: string,
     facultyCode: string,
   ) {
+    if (facultyCode) {
+      void loadBranch(facultyCode);
+    }
+
     updateSelectedProgram(
       (program) => {
         const currentSelections =
@@ -1152,9 +1195,9 @@ const {
           ...program,
 
           courseBlocks:
-            removeCourseBlock(
+            removeCourseBlocks(
               program.courseBlocks ?? [],
-              currentSelection?.courseBlockId,
+              currentSelection?.courseBlockIds ?? [],
             ),
 
           courseSelections:
@@ -1166,9 +1209,8 @@ const {
                       ...selection,
                       facultyCode,
                       courseId: "",
-                      sessionId: "",
-                      courseBlockId:
-                        undefined,
+                      sectionId: "",
+                      courseBlockIds: [],
                     }
                   : selection,
             ),
@@ -1200,9 +1242,9 @@ const {
           ...program,
 
           courseBlocks:
-            removeCourseBlock(
+            removeCourseBlocks(
               program.courseBlocks ?? [],
-              currentSelection?.courseBlockId,
+              currentSelection?.courseBlockIds ?? [],
             ),
 
           courseSelections:
@@ -1213,9 +1255,8 @@ const {
                   ? {
                       ...selection,
                       courseId,
-                      sessionId: "",
-                      courseBlockId:
-                        undefined,
+                      sectionId: "",
+                      courseBlockIds: [],
                     }
                   : selection,
             ),
@@ -1227,9 +1268,9 @@ const {
     );
   }
 
-  function handleSessionChange(
+  function handleSectionChange(
     selectionId: string,
-    sessionId: string,
+    sectionId: string,
   ) {
     updateSelectedProgram(
       (program) => {
@@ -1254,18 +1295,25 @@ const {
             currentSelection.courseId,
           );
 
-        const selectedSession =
-          getSessionById(
+        const selectedSection =
+          getSectionById(
             selectedCourse,
-            sessionId,
+            sectionId,
           );
+
+        const currentCourseBlocks = removeCourseBlocks(
+          program.courseBlocks ?? [],
+          currentSelection.courseBlockIds,
+        );
 
         if (
           !selectedCourse ||
-          !selectedSession
+          !selectedSection
         ) {
           return {
             ...program,
+
+            courseBlocks: currentCourseBlocks,
 
             courseSelections:
               currentSelections.map(
@@ -1274,7 +1322,8 @@ const {
                   selectionId
                     ? {
                         ...selection,
-                        sessionId,
+                        sectionId,
+                        courseBlockIds: [],
                       }
                     : selection,
               ),
@@ -1284,59 +1333,28 @@ const {
           };
         }
 
-        const courseBlockId =
-          currentSelection.courseBlockId ??
-          createId("course");
-
-        const newCourseBlock: CourseBlock =
-          {
-            id: courseBlockId,
+        const newCourseBlocks: CourseBlock[] =
+          selectedSection.meetings.map((meeting, index) => ({
+            id: `course-${selectionId}-${index}`,
+            selectionId,
             code: selectedCourse.code,
             title: selectedCourse.title,
-            day: selectedSession.day,
+            crn: selectedSection.crn,
+            day: meeting.day,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            building: meeting.building,
+            room: meeting.room,
+            instructor: selectedSection.instructor,
+          }));
 
-            startTime:
-              selectedSession.startTime,
-
-            endTime:
-              selectedSession.endTime,
-
-            room:
-              selectedSession.room,
-
-            instructor:
-              selectedSession.instructor,
-          };
-
-        const currentCourseBlocks =
-          program.courseBlocks ?? [];
-
-        const courseBlockAlreadyExists =
-          currentCourseBlocks.some(
-            (courseBlock) =>
-              courseBlock.id ===
-              courseBlockId,
-          );
-
-        const updatedCourseBlocks =
-          courseBlockAlreadyExists
-            ? currentCourseBlocks.map(
-                (courseBlock) =>
-                  courseBlock.id ===
-                  courseBlockId
-                    ? newCourseBlock
-                    : courseBlock,
-              )
-            : [
-                ...currentCourseBlocks,
-                newCourseBlock,
-              ];
+        const courseBlockIds = newCourseBlocks.map((block) => block.id);
 
         return {
           ...program,
 
           courseBlocks:
-            updatedCourseBlocks,
+            [...currentCourseBlocks, ...newCourseBlocks],
 
           courseSelections:
             currentSelections.map(
@@ -1345,8 +1363,8 @@ const {
                 selectionId
                   ? {
                       ...selection,
-                      sessionId,
-                      courseBlockId,
+                      sectionId,
+                      courseBlockIds,
                     }
                   : selection,
             ),
@@ -1432,10 +1450,83 @@ const {
     );
   }
 
+  function handleSaveGeneratedSchedule(schedule: GeneratedSchedule) {
+    const programId = createId("program");
+    const generatedProgramCount = weeklyPrograms.filter((program) =>
+      program.name.startsWith("Generated Program"),
+    ).length;
+    const program = generatedScheduleToWeeklyProgram(schedule, {
+      id: programId,
+      name: `Generated Program ${generatedProgramCount + 1}`,
+    });
+
+    setWeeklyPrograms((currentPrograms) => [...currentPrograms, program]);
+    setSelectedProgramId(program.id);
+    setProgramName(program.name);
+    setActiveSelectionId(null);
+    setPlannerMode("manual");
+  }
+
+  function handleExportJpeg() {
+    if (!selectedProgram) {
+      return;
+    }
+
+    try {
+      const filename = exportWeeklyProgramAsJpeg({
+        ...selectedProgram,
+        name: programName.trim() || selectedProgram.name,
+      });
+      setJpegExportStatus({
+        message: `${filename} downloaded.`,
+        isError: false,
+      });
+    } catch (error: unknown) {
+      setJpegExportStatus({
+        message:
+          error instanceof Error
+            ? error.message
+            : "The Weekly Program could not be exported as JPEG.",
+        isError: true,
+      });
+    }
+  }
+
   return (
     <div className="w-full space-y-4">
+      <div
+        className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+        aria-label="Weekly program mode"
+      >
+        <button
+          type="button"
+          onClick={() => setPlannerMode("manual")}
+          aria-pressed={plannerMode === "manual"}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            plannerMode === "manual"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Weekly Program
+        </button>
+        <button
+          type="button"
+          onClick={() => setPlannerMode("generator")}
+          aria-pressed={plannerMode === "generator"}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            plannerMode === "generator"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Generate Schedule
+        </button>
+      </div>
+
+      {plannerMode === "manual" ? (
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto] md:items-end">
+        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-semibold text-gray-600">
               Weekly Program
@@ -1501,6 +1592,15 @@ const {
 
           <button
             type="button"
+            onClick={handleExportJpeg}
+            disabled={!selectedProgram}
+            className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Export JPEG
+          </button>
+
+          <button
+            type="button"
             onClick={
               handleSaveProgramName
             }
@@ -1526,6 +1626,20 @@ const {
             Delete Program
           </button>
         </div>
+
+        {jpegExportStatus && (
+          <div
+            className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
+              jpegExportStatus.isError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-green-200 bg-green-50 text-green-700"
+            }`}
+            role={jpegExportStatus.isError ? "alert" : "status"}
+            aria-live="polite"
+          >
+            {jpegExportStatus.message}
+          </div>
+        )}
 
         <div
           className="mb-4 text-xs text-gray-500"
@@ -1564,6 +1678,42 @@ const {
         >
           Add Course
         </button>
+
+        {(isLoadingBranches || courseCatalogError) && (
+          <div
+            className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+              courseCatalogError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-blue-200 bg-blue-50 text-blue-700"
+            }`}
+            role={courseCatalogError ? "alert" : "status"}
+          >
+            <span>
+              {courseCatalogError ?? "Loading İTÜ course prefixes…"}
+            </span>
+
+            {courseCatalogError && (
+              <button
+                type="button"
+                onClick={
+                  failedBranchCode ? retryFailedBranch : retryBranches
+                }
+                className="rounded-md border border-current px-2 py-1 text-xs font-semibold"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+
+        {hasScheduleConflicts && (
+          <div
+            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            role="status"
+          >
+            Schedule conflict: at least two selected meetings overlap.
+          </div>
+        )}
 
         {courseSelections.length >
           0 && (
@@ -1614,14 +1764,20 @@ const {
                         courseCatalog={
                           courseCatalog
                         }
+                        isLoadingBranches={
+                          isLoadingBranches
+                        }
+                        isBranchLoading={
+                          isBranchLoading
+                        }
                         onFacultyChange={
                           handleFacultyChange
                         }
                         onCourseChange={
                           handleCourseChange
                         }
-                        onSessionChange={
-                          handleSessionChange
+                        onSectionChange={
+                          handleSectionChange
                         }
                         onDelete={
                           handleDeleteSelection
@@ -1653,6 +1809,17 @@ const {
           </div>
         )}
       </div>
+      ) : (
+        <ScheduleGeneratorPanel
+          courseCatalog={courseCatalog}
+          isLoadingBranches={isLoadingBranches}
+          isBranchLoading={isBranchLoading}
+          loadBranch={loadBranch}
+          catalogError={courseCatalogError}
+          onPreviewChange={setGeneratedPreview}
+          onSave={handleSaveGeneratedSchedule}
+        />
+      )}
 
       <div className="w-full rounded-xl border border-gray-200 bg-transparent shadow-sm">
         <div className="w-full">
@@ -1711,7 +1878,7 @@ const {
               ))}
             </div>
 
-            {courseBlocks.map(
+            {displayedCourseBlocks.map(
               (course) => {
                 const top =
                   getCourseTop(
@@ -1728,6 +1895,11 @@ const {
                   courseLayoutMap[
                     course.id
                   ];
+
+                const colorStyle = getCourseColorStyle(
+                  course.selectionId ?? course.id,
+                  orderedSelectionIds,
+                );
 
                 if (
                   !layout ||
@@ -1749,18 +1921,21 @@ const {
                       width: `${layout.widthPercent}%`,
                     }}
                   >
-                    <div className="h-full overflow-hidden rounded-lg border border-blue-300 bg-blue-100/85 p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:bg-blue-100 hover:shadow-md">
-                      <div className="font-semibold text-blue-900">
+                    <div
+                      className={`h-full overflow-hidden rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
+                    >
+                      <div className={`font-semibold ${colorStyle.heading}`}>
                         {course.code}
+                        {course.crn ? ` · ${course.crn}` : ""}
                       </div>
 
-                      <div className="mt-1 text-blue-800">
+                      <div className={`mt-1 ${colorStyle.body}`}>
                         {
                           course.title
                         }
                       </div>
 
-                      <div className="mt-1 text-blue-700">
+                      <div className={`mt-1 ${colorStyle.body}`}>
                         {
                           course.startTime
                         }{" "}
@@ -1770,19 +1945,15 @@ const {
                         }
                       </div>
 
-                      {course.room && (
-                        <div className="mt-1 text-blue-700">
-                          {
-                            course.room
-                          }
-                        </div>
-                      )}
+                      <div className={`mt-1 font-medium ${colorStyle.body}`}>
+                        Instructor: {course.instructor ?? "TBA"}
+                      </div>
 
-                      {course.instructor && (
-                        <div className="mt-1 text-blue-700">
-                          {
-                            course.instructor
-                          }
+                      {(course.building || course.room) && (
+                        <div className={`mt-1 ${colorStyle.body}`}>
+                          {[course.building, course.room]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </div>
                       )}
                     </div>
