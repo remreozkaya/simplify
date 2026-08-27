@@ -26,6 +26,8 @@ describe("ITU curriculum parsers", () => {
       "ECNE_LS",
     ]);
     expect(programs[0].faculty).toBe("Bilgisayar ve Bilişim Fakültesi");
+    expect(programs[0].major).toBe("Bilgisayar Mühendisliği");
+    expect(programs[1].major).toBe("Bilgisayar Mühendisliği");
   });
 
   it("parses every historical plan and identifies the current plan", () => {

@@ -4,8 +4,9 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto max-w-7xl">
-        <header id="weekly-planner" className="mb-6 scroll-mt-24">
-          <h1 className="text-3xl font-bold text-gray-900">
+        <header className="mb-6">
+          <p className="text-xs font-black uppercase tracking-[.22em] text-blue-700">Build your week</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
             Weekly Lecture Program
           </h1>
 
@@ -14,7 +15,7 @@ export default function Home() {
           </p>
         </header>
 
-        <WeeklyCalendar />
+        <WeeklyCalendar view="planner" />
       </div>
     </main>
   );

@@ -8,6 +8,13 @@ function clean(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+export function deriveMajorName(programName: string): string {
+  return clean(programName)
+    .replace(/\s+Lisans(?:\s+Programı)?$/iu, "")
+    .replace(/\s*\((?:İngilizce|English|%\s*30\s*İngilizce|%\s*100\s*İngilizce)\)\s*$/iu, "")
+    .trim();
+}
+
 export function parseUndergraduatePrograms(html: string): ItuUndergraduateProgram[] {
   const $ = cheerio.load(html);
   const programs: ItuUndergraduateProgram[] = [];
@@ -25,7 +32,7 @@ export function parseUndergraduatePrograms(html: string): ItuUndergraduateProgra
       .toUpperCase();
     const name = clean($(cells[1]).text());
     if (!PROGRAM_CODE_PATTERN.test(code) || !name) return;
-    programs.push({ code, name, ...(faculty ? { faculty } : {}) });
+    programs.push({ code, name, major: deriveMajorName(name), ...(faculty ? { faculty } : {}) });
   });
 
   return [...new Map(programs.map((program) => [program.code, program])).values()].sort(

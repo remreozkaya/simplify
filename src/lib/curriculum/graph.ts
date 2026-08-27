@@ -6,7 +6,7 @@ import type {
 
 export type CurriculumGraphNode = {
   id: string;
-  kind: "course" | "elective-slot" | "external" | "and" | "or";
+  kind: "course" | "elective-slot" | "external" | "and" | "or" | "semester-label";
   label: string;
   courseCode?: string;
   semester?: number;
@@ -30,9 +30,20 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
   const nodes: CurriculumGraphNode[] = [];
   const edges: CurriculumGraphEdge[] = [];
   const courseNodeByCode = new Map<string, string>();
-  let externalIndex = 0;
+
+  const semesterGap = 230;
+  const courseGap = 270;
 
   curriculum.semesters.forEach((semester) => {
+    const semesterY = (semester.semester - 1) * semesterGap;
+    nodes.push({
+      id: `semester:${semester.semester}`,
+      kind: "semester-label",
+      label: `SEMESTER ${semester.semester}`,
+      semester: semester.semester,
+      x: -180,
+      y: semesterY + 24,
+    });
     semester.items.forEach((item, row) => {
       nodes.push({
         id: item.id,
@@ -40,32 +51,14 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
         label: item.kind === "course" ? `${item.code}\n${item.title}` : item.title,
         ...(item.kind === "course" ? { courseCode: item.code } : {}),
         semester: semester.semester,
-        x: (semester.semester - 1) * 310,
-        y: row * 150,
+        x: row * courseGap,
+        y: semesterY,
       });
       if (item.kind === "course" && !courseNodeByCode.has(item.code)) {
         courseNodeByCode.set(item.code, item.id);
       }
     });
   });
-
-  function courseNodeId(code: string): string {
-    const existing = courseNodeByCode.get(code);
-    if (existing) return existing;
-    const id = `external:${code.replace(/\s+/g, "-")}`;
-    if (!nodes.some((node) => node.id === id)) {
-      nodes.push({
-        id,
-        kind: "external",
-        label: `${code}\nExternal prerequisite`,
-        courseCode: code,
-        x: -310,
-        y: externalIndex * 130,
-      });
-      externalIndex += 1;
-    }
-    return id;
-  }
 
   function connectExpression(
     expression: PrerequisiteExpression,
@@ -74,30 +67,38 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
     targetNode: CurriculumGraphNode,
   ): string | null {
     if (expression.kind === "unknown") return null;
-    if (expression.kind === "course") return courseNodeId(expression.courseCode);
+    if (expression.kind === "course") {
+      return courseNodeByCode.get(expression.courseCode) ?? null;
+    }
     const logicId = `logic:${targetId}:${path}:${expression.kind}`;
-    nodes.push({
+    const logicNode: CurriculumGraphNode = {
       id: logicId,
       kind: expression.kind,
       label: expression.kind.toUpperCase(),
-      x: targetNode.x - 130 - path.split(".").length * 45,
-      y: targetNode.y + Number(path.split(".").at(-1) ?? 0) * 34,
-    });
-    expression.operands.forEach((operand, index) => {
-      const source = connectExpression(
+      x: targetNode.x + 84 + Number(path.split(".").at(-1) ?? 0) * 44,
+      y: targetNode.y - 76 - (path.split(".").length - 1) * 42,
+    };
+    const sources = expression.operands.flatMap((operand, index) => {
+      const sourceId = connectExpression(
         operand,
         logicId,
         `${path}.${index}`,
-        nodes.find((node) => node.id === logicId)!,
+        logicNode,
       );
-      if (source) {
-        edges.push({
-          id: `edge:${source}:${logicId}`,
-          source,
-          target: logicId,
-          relationship: expression.kind === "or" ? "alternative" : "required",
-        });
-      }
+      return sourceId ? [sourceId] : [];
+    });
+
+    if (sources.length === 0) return null;
+    if (sources.length === 1) return sources[0];
+
+    nodes.push(logicNode);
+    sources.forEach((source) => {
+      edges.push({
+        id: `edge:${source}:${logicId}`,
+        source,
+        target: logicId,
+        relationship: expression.kind === "or" ? "alternative" : "required",
+      });
     });
     return logicId;
   }

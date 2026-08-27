@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import CurriculumGraph from "@/components/curriculum/CurriculumGraph";
 import {
@@ -106,8 +106,11 @@ export default function CurriculumExplorer() {
   const searchParams = useSearchParams();
   const requestedProgram = searchParams.get("program");
   const requestedPlan = Number(searchParams.get("plan"));
+  const programCodeRef = useRef("");
   const [programs, setPrograms] = useState<ItuUndergraduateProgram[]>([]);
   const [plans, setPlans] = useState<ItuCurriculumPlan[]>([]);
+  const [faculty, setFaculty] = useState("");
+  const [major, setMajor] = useState("");
   const [programCode, setProgramCode] = useState("");
   const [planId, setPlanId] = useState<number | null>(null);
   const [curriculum, setCurriculum] = useState<ItuCurriculum | null>(null);
@@ -135,10 +138,13 @@ export default function CurriculumExplorer() {
       .then(({ programs: loaded }) => {
         setProgramsLoading(false);
         setPrograms(loaded);
-        const restored = loaded.some((program) => program.code === requestedProgram)
-          ? requestedProgram!
-          : loaded[0]?.code ?? "";
-        setPlansLoading(Boolean(restored));
+        const restoredProgram = loaded.find((program) => program.code === requestedProgram) ?? loaded[0];
+        const restored = restoredProgram?.code ?? "";
+        setFaculty(restoredProgram?.faculty ?? "Other Faculty");
+        setMajor(restoredProgram?.major ?? "");
+        const programChanged = programCodeRef.current !== restored;
+        programCodeRef.current = restored;
+        setPlansLoading(Boolean(restored) && programChanged);
         setProgramCode(restored);
         setError(loaded.length ? "" : "No undergraduate programs were returned by İTÜ OBS.");
       })
@@ -212,6 +218,18 @@ export default function CurriculumExplorer() {
   }, [progress]);
 
   const graph = useMemo(() => (curriculum ? buildCurriculumGraph(curriculum) : null), [curriculum]);
+  const faculties = useMemo(
+    () => [...new Set(programs.map((program) => program.faculty ?? "Other Faculty"))].sort((a, b) => a.localeCompare(b, "tr")),
+    [programs],
+  );
+  const majors = useMemo(
+    () => [...new Set(programs.filter((program) => (program.faculty ?? "Other Faculty") === faculty).map((program) => program.major))].sort((a, b) => a.localeCompare(b, "tr")),
+    [faculty, programs],
+  );
+  const degreePrograms = useMemo(
+    () => programs.filter((program) => (program.faculty ?? "Other Faculty") === faculty && program.major === major),
+    [faculty, major, programs],
+  );
   const items = useMemo(
     () => curriculum?.semesters.flatMap((semester) => semester.items) ?? [],
     [curriculum],
@@ -241,7 +259,9 @@ export default function CurriculumExplorer() {
     if (!graph) return new Set<string>();
     const visible = new Set<string>();
     graph.nodes.forEach((node) => {
-      if (node.kind === "elective-slot") {
+      if (node.kind === "semester-label") {
+        visible.add(node.id);
+      } else if (node.kind === "elective-slot") {
         if (filters.elective) visible.add(node.id);
       } else if (node.kind === "and" || node.kind === "or") {
         visible.add(node.id);
@@ -265,6 +285,7 @@ export default function CurriculumExplorer() {
     const query = search.toLocaleLowerCase("tr-TR");
     const results: SearchResult[] = [];
     graph.nodes.forEach((node) => {
+      if (node.kind === "semester-label") return;
       if ((node.courseCode ?? "").toLocaleLowerCase("tr-TR").includes(query) || node.label.toLocaleLowerCase("tr-TR").includes(query)) {
         results.push({ id: node.id, nodeId: node.id, code: node.courseCode, title: node.label.split("\n")[1] ?? node.label, subtitle: node.kind === "external" ? "External prerequisite" : node.semester ? `Semester ${node.semester}` : node.kind.toUpperCase() });
       }
@@ -324,7 +345,27 @@ export default function CurriculumExplorer() {
     setSelectedNodeId(null);
     setPlansLoading(true);
     setCurriculumLoading(false);
+    programCodeRef.current = nextProgramCode;
     setProgramCode(nextProgramCode);
+  }
+
+  function changeFaculty(nextFaculty: string) {
+    const nextPrograms = programs.filter(
+      (program) => (program.faculty ?? "Other Faculty") === nextFaculty,
+    );
+    const nextMajor = [...new Set(nextPrograms.map((program) => program.major))].sort((a, b) => a.localeCompare(b, "tr"))[0] ?? "";
+    const nextProgram = nextPrograms.find((program) => program.major === nextMajor);
+    setFaculty(nextFaculty);
+    setMajor(nextMajor);
+    if (nextProgram) changeProgram(nextProgram.code);
+  }
+
+  function changeMajor(nextMajor: string) {
+    const nextProgram = programs.find(
+      (program) => (program.faculty ?? "Other Faculty") === faculty && program.major === nextMajor,
+    );
+    setMajor(nextMajor);
+    if (nextProgram) changeProgram(nextProgram.code);
   }
 
   function changePlan(nextPlanId: number) {
@@ -346,15 +387,33 @@ export default function CurriculumExplorer() {
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(260px,.9fr)]">
+        <div className="mb-4">
+          <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700">Choose your program</p>
+          <p className="mt-1 text-sm text-slate-500">Selections narrow from faculty to major, then to the exact degree program.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-semibold text-slate-700">
-            Program
-            <select value={programCode} onChange={(event) => changeProgram(event.target.value)} disabled={!programs.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-              {programs.map((program) => <option key={program.code} value={program.code}>{program.name} · {program.code}</option>)}
+            Faculty
+            <select value={faculty} onChange={(event) => changeFaculty(event.target.value)} disabled={!faculties.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+              {faculties.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700">
-            Curriculum
+            Major
+            <select value={major} onChange={(event) => changeMajor(event.target.value)} disabled={!majors.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+              {majors.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-semibold text-slate-700">
+            Degree Program
+            <select value={programCode} onChange={(event) => changeProgram(event.target.value)} disabled={!degreePrograms.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+              {degreePrograms.map((program) => <option key={program.code} value={program.code}>{program.name} · {program.code}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
+          <label className="text-sm font-semibold text-slate-700">
+            Curriculum Version
             <select value={planId ?? ""} onChange={(event) => changePlan(Number(event.target.value))} disabled={!plans.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
               {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.title}{plan.isCurrent ? " · Current" : ""}</option>)}
             </select>
@@ -511,7 +570,7 @@ export default function CurriculumExplorer() {
 
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600" aria-label="Graph legend">
               {(Object.keys(STATUS_LABEL) as CourseDerivedStatus[]).map((status) => <span key={status} className={`rounded-full border px-2 py-1 font-bold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>)}
-              <span>◇ Elective requirement</span><span>□ External prerequisite</span><span>── Required</span><span className="text-violet-700">- - Alternative / OR</span>
+              <span>◇ Elective requirement</span><span>── Required</span><span className="text-violet-700">- - Alternative / OR</span>
             </div>
           </section>
 

@@ -1,6 +1,7 @@
 export type ItuUndergraduateProgram = {
   code: string;
   name: string;
+  major: string;
   faculty?: string;
 };
 

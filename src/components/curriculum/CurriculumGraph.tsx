@@ -5,6 +5,7 @@ import {
   Controls,
   MarkerType,
   MiniMap,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -53,28 +54,33 @@ function Flow({
           const logical = node.kind === "and" || node.kind === "or";
           const elective = node.kind === "elective-slot";
           const external = node.kind === "external";
+          const semesterLabel = node.kind === "semester-label";
           const dimmed = focusedNodeIds && !focusedNodeIds.has(node.id);
           return {
             id: node.id,
             position: { x: node.x, y: node.y },
             data: { label: node.label },
-            selected: selectedNodeId === node.id,
+            selected: !semesterLabel && selectedNodeId === node.id,
+            sourcePosition: Position.Bottom,
+            targetPosition: Position.Top,
+            selectable: !semesterLabel,
             style: {
-              width: logical ? 62 : 230,
-              minHeight: logical ? 48 : 82,
+              width: semesterLabel ? 150 : logical ? 62 : 230,
+              minHeight: semesterLabel ? 40 : logical ? 48 : 82,
               whiteSpace: "pre-line",
-              borderRadius: logical ? 999 : 14,
-              border: `${selectedNodeId === node.id ? 3 : 2}px solid ${
+              borderRadius: semesterLabel ? 10 : logical ? 999 : 14,
+              border: semesterLabel ? "0" : `${selectedNodeId === node.id ? 3 : 2}px solid ${
                 logical ? "#64748b" : elective ? "#8b5cf6" : external ? "#64748b" : semantic.border
               }`,
-              background: logical ? "#f8fafc" : elective ? "#faf5ff" : external ? "#f8fafc" : semantic.background,
-              color: logical ? "#334155" : elective ? "#6b21a8" : external ? "#334155" : semantic.color,
-              fontWeight: logical ? 800 : 650,
-              fontSize: logical ? 12 : 12,
+              background: semesterLabel ? "#0f172a" : logical ? "#f8fafc" : elective ? "#faf5ff" : external ? "#f8fafc" : semantic.background,
+              color: semesterLabel ? "#ffffff" : logical ? "#334155" : elective ? "#6b21a8" : external ? "#334155" : semantic.color,
+              fontWeight: semesterLabel || logical ? 800 : 650,
+              fontSize: semesterLabel ? 11 : 12,
+              letterSpacing: semesterLabel ? ".12em" : undefined,
               lineHeight: 1.35,
-              padding: logical ? 8 : 12,
-              opacity: dimmed ? 0.22 : 1,
-              boxShadow: selectedNodeId === node.id ? "0 0 0 4px rgba(37,99,235,.16)" : "0 6px 18px rgba(15,23,42,.07)",
+              padding: semesterLabel ? 12 : logical ? 8 : 12,
+              opacity: semesterLabel ? 1 : dimmed ? 0.22 : 1,
+              boxShadow: semesterLabel ? "0 8px 20px rgba(15,23,42,.18)" : selectedNodeId === node.id ? "0 0 0 4px rgba(37,99,235,.16)" : "0 6px 18px rgba(15,23,42,.07)",
             },
             ariaLabel: `${node.label.replace("\n", ", ")}${node.courseCode ? `, ${status}` : ""}`,
           };
@@ -94,6 +100,7 @@ function Flow({
             id: edge.id,
             source: edge.source,
             target: edge.target,
+            type: "bezier",
             animated: selectedNodeId ? !dimmed : false,
             style: {
               stroke: alternative ? "#7c3aed" : "#64748b",
@@ -114,23 +121,28 @@ function Flow({
   }, [graph.nodes, selectedNodeId, setCenter]);
 
   return (
-    <div className="relative h-[68vh] min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" aria-label="Interactive prerequisite graph">
+    <div className="relative h-[72vh] min-h-[620px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" aria-label="Interactive prerequisite graph">
+      <div className="absolute left-3 top-3 z-10 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+        Drag to explore · scroll to zoom
+      </div>
       <button
         type="button"
         onClick={() => void fitView({ padding: 0.14, duration: 450 })}
         className="absolute right-3 top-3 z-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
       >
-        Reset view
+        Fit all
       </button>
       <ReactFlow
+        key={graph.nodes.find((node) => node.kind === "course")?.id ?? "curriculum"}
         nodes={nodes}
         edges={edges}
-        fitView
-        fitViewOptions={{ padding: 0.14 }}
+        defaultViewport={{ x: 190, y: 60, zoom: 0.72 }}
         minZoom={0.2}
         maxZoom={1.8}
         nodesDraggable={false}
-        onNodeClick={(_, node) => onSelectNode(node.id)}
+        onNodeClick={(_, node) => {
+          if (!node.id.startsWith("semester:")) onSelectNode(node.id);
+        }}
         onPaneClick={() => onSelectNode(null)}
       >
         <Background color="#cbd5e1" gap={24} size={1} />
