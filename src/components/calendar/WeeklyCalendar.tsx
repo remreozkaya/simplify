@@ -26,6 +26,7 @@ import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
+import { formatSectionLabel } from "@/lib/calendar/sectionLabels";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
 import {
   hasMeetingConflicts,
@@ -38,7 +39,6 @@ import {
   type CourseBlock,
   type CourseOption,
   type CourseSelection,
-  type CourseSectionOption,
   type Day,
   type FacultyOption,
   type WeeklyProgram,
@@ -439,33 +439,6 @@ function getSectionById(
   return course?.sections.find(
     (section) => section.id === sectionId,
   );
-}
-
-const shortDays: Record<Day, string> = {
-  Monday: "Mon",
-  Tuesday: "Tue",
-  Wednesday: "Wed",
-  Thursday: "Thu",
-  Friday: "Fri",
-  Saturday: "Sat",
-  Sunday: "Sun",
-};
-
-function formatSectionLabel(section: CourseSectionOption) {
-  const meetings = section.meetings
-    .map(
-      (meeting) =>
-        `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}`,
-    )
-    .join(", ");
-
-  const instructor = section.instructor
-    ? `Instructor: ${section.instructor}`
-    : "Instructor: TBA";
-
-  return [section.crn, meetings, instructor]
-    .filter(Boolean)
-    .join(" · ");
 }
 
 function formatUpdatedAt(updatedAt: string) {

@@ -4,6 +4,7 @@ import {
   calculateJpegExportRange,
   createWeeklyProgramJpegFilename,
   exportWeeklyProgramAsJpeg,
+  getPositionedBlocks,
 } from "@/lib/calendar/exportJpeg";
 
 afterEach(() => {
@@ -48,6 +49,47 @@ describe("weekly program JPEG export", () => {
         },
       ]),
     ).toEqual({ startMinutes: 7 * 60 + 30, endMinutes: 20 * 60 + 30 });
+  });
+
+  it("keeps non-conflicting meetings full-width on a day with a conflict", () => {
+    const conflictingMeeting = {
+      id: "conflict-1",
+      code: "BLG 101",
+      title: "Course",
+      day: "Monday" as const,
+      startTime: "09:00",
+      endTime: "10:00",
+    };
+    const secondConflictingMeeting = {
+      ...conflictingMeeting,
+      id: "conflict-2",
+      code: "MAT 101",
+      startTime: "09:30",
+      endTime: "10:30",
+    };
+    const nonConflictingMeeting = {
+      ...conflictingMeeting,
+      id: "non-conflict",
+      code: "FIZ 101",
+      startTime: "13:00",
+      endTime: "14:00",
+    };
+
+    const positionedBlocks = getPositionedBlocks([
+      conflictingMeeting,
+      secondConflictingMeeting,
+      nonConflictingMeeting,
+    ]);
+
+    expect(
+      positionedBlocks.find(({ block }) => block.id === "conflict-1"),
+    ).toMatchObject({ columnCount: 2 });
+    expect(
+      positionedBlocks.find(({ block }) => block.id === "conflict-2"),
+    ).toMatchObject({ columnCount: 2 });
+    expect(
+      positionedBlocks.find(({ block }) => block.id === "non-conflict"),
+    ).toMatchObject({ column: 0, columnCount: 1 });
   });
 
   it("renders a local canvas and triggers a JPEG download", () => {
