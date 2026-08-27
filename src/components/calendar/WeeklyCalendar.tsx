@@ -26,6 +26,7 @@ import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
+import { formatSectionLabel } from "@/lib/calendar/sectionLabels";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
 import {
   hasMeetingConflicts,
@@ -38,7 +39,6 @@ import {
   type CourseBlock,
   type CourseOption,
   type CourseSelection,
-  type CourseSectionOption,
   type Day,
   type FacultyOption,
   type WeeklyProgram,
@@ -441,33 +441,6 @@ function getSectionById(
   );
 }
 
-const shortDays: Record<Day, string> = {
-  Monday: "Mon",
-  Tuesday: "Tue",
-  Wednesday: "Wed",
-  Thursday: "Thu",
-  Friday: "Fri",
-  Saturday: "Sat",
-  Sunday: "Sun",
-};
-
-function formatSectionLabel(section: CourseSectionOption) {
-  const meetings = section.meetings
-    .map(
-      (meeting) =>
-        `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}`,
-    )
-    .join(", ");
-
-  const instructor = section.instructor
-    ? `Instructor: ${section.instructor}`
-    : "Instructor: TBA";
-
-  return [section.crn, meetings, instructor]
-    .filter(Boolean)
-    .join(" · ");
-}
-
 function formatUpdatedAt(updatedAt: string) {
   const date = new Date(updatedAt);
 
@@ -733,7 +706,11 @@ function DraggedCourseRow({
   );
 }
 
-export default function WeeklyCalendar() {
+type WeeklyCalendarProps = {
+  view?: "planner" | "generator";
+};
+
+export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps) {
   const {
     courseCatalog,
     isLoadingBranches,
@@ -769,10 +746,6 @@ export default function WeeklyCalendar() {
     activeSelectionId,
     setActiveSelectionId,
   ] = useState<string | null>(null);
-
-  const [plannerMode, setPlannerMode] = useState<"manual" | "generator">(
-    "manual",
-  );
 
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedSchedule | null>(null);
@@ -834,7 +807,7 @@ export default function WeeklyCalendar() {
 
   const displayedCourseBlocks = useMemo(
     () =>
-      plannerMode === "generator"
+      view === "generator"
         ? generatedPreview
           ? generatedScheduleToWeeklyProgram(generatedPreview, {
               id: "generated-preview",
@@ -843,7 +816,7 @@ export default function WeeklyCalendar() {
             }).courseBlocks
           : []
         : courseBlocks,
-    [courseBlocks, generatedPreview, plannerMode],
+    [courseBlocks, generatedPreview, view],
   );
 
   const courseLayoutMap = useMemo(
@@ -860,7 +833,7 @@ export default function WeeklyCalendar() {
 
   const orderedSelectionIds = useMemo(
     () =>
-      plannerMode === "generator"
+      view === "generator"
         ? [
             ...new Set(
               displayedCourseBlocks.flatMap((block) =>
@@ -869,7 +842,7 @@ export default function WeeklyCalendar() {
             ),
           ]
         : courseSelections.map((selection) => selection.id),
-    [courseSelections, displayedCourseBlocks, plannerMode],
+    [courseSelections, displayedCourseBlocks, view],
   );
 
   /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
@@ -1464,7 +1437,6 @@ export default function WeeklyCalendar() {
     setSelectedProgramId(program.id);
     setProgramName(program.name);
     setActiveSelectionId(null);
-    setPlannerMode("manual");
   }
 
   function handleExportJpeg() {
@@ -1494,37 +1466,7 @@ export default function WeeklyCalendar() {
 
   return (
     <div className="w-full space-y-4">
-      <div
-        className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
-        aria-label="Weekly program mode"
-      >
-        <button
-          type="button"
-          onClick={() => setPlannerMode("manual")}
-          aria-pressed={plannerMode === "manual"}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-            plannerMode === "manual"
-              ? "bg-blue-600 text-white"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Weekly Program
-        </button>
-        <button
-          type="button"
-          onClick={() => setPlannerMode("generator")}
-          aria-pressed={plannerMode === "generator"}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-            plannerMode === "generator"
-              ? "bg-blue-600 text-white"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          Generate Schedule
-        </button>
-      </div>
-
-      {plannerMode === "manual" ? (
+      {view === "planner" ? (
       <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
           <div className="min-w-0">

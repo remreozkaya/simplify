@@ -26,7 +26,7 @@ type ExportRange = {
   endMinutes: number;
 };
 
-type PositionedBlock = {
+export type PositionedBlock = {
   block: CourseBlock;
   column: number;
   columnCount: number;
@@ -63,7 +63,7 @@ export function calculateJpegExportRange(
   };
 }
 
-function getPositionedBlocks(
+export function getPositionedBlocks(
   courseBlocks: readonly CourseBlock[],
 ): PositionedBlock[] {
   return days.flatMap((day) => {
@@ -74,26 +74,60 @@ function getPositionedBlocks(
           timeToMinutes(first.startTime) - timeToMinutes(second.startTime) ||
           timeToMinutes(first.endTime) - timeToMinutes(second.endTime),
       );
-    const columns: CourseBlock[][] = [];
-    const assignments = dayBlocks.map((block) => {
-      let column = columns.findIndex((columnBlocks) =>
-        columnBlocks.every((candidate) => !meetingsOverlap(candidate, block)),
-      );
+    const positionedBlocks: PositionedBlock[] = [];
+    const unvisitedBlocks = new Set(dayBlocks);
 
-      if (column === -1) {
-        column = columns.length;
-        columns.push([]);
+    while (unvisitedBlocks.size > 0) {
+      const firstBlock = unvisitedBlocks.values().next().value as CourseBlock;
+      const overlapGroup: CourseBlock[] = [];
+      const queue = [firstBlock];
+
+      unvisitedBlocks.delete(firstBlock);
+
+      while (queue.length > 0) {
+        const currentBlock = queue.shift();
+
+        if (!currentBlock) {
+          continue;
+        }
+
+        overlapGroup.push(currentBlock);
+
+        unvisitedBlocks.forEach((candidate) => {
+          if (meetingsOverlap(currentBlock, candidate)) {
+            unvisitedBlocks.delete(candidate);
+            queue.push(candidate);
+          }
+        });
       }
 
-      columns[column].push(block);
-      return { block, column };
-    });
-    const columnCount = Math.max(1, columns.length);
+      const columns: CourseBlock[][] = [];
+      const assignments = overlapGroup.map((block) => {
+        let column = columns.findIndex((columnBlocks) =>
+          columnBlocks.every(
+            (candidate) => !meetingsOverlap(candidate, block),
+          ),
+        );
 
-    return assignments.map((assignment) => ({
-      ...assignment,
-      columnCount,
-    }));
+        if (column === -1) {
+          column = columns.length;
+          columns.push([]);
+        }
+
+        columns[column].push(block);
+        return { block, column };
+      });
+      const columnCount = Math.max(1, columns.length);
+
+      positionedBlocks.push(
+        ...assignments.map((assignment) => ({
+          ...assignment,
+          columnCount,
+        })),
+      );
+    }
+
+    return positionedBlocks;
   });
 }
 
