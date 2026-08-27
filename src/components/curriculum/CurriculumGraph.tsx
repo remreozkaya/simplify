@@ -100,7 +100,7 @@ function Flow({
             id: edge.id,
             source: edge.source,
             target: edge.target,
-            type: "bezier",
+            type: "default",
             animated: selectedNodeId ? !dimmed : false,
             style: {
               stroke: alternative ? "#7c3aed" : "#64748b",
