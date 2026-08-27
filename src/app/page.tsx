@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6">
+        <header id="weekly-planner" className="mb-6 scroll-mt-24">
           <h1 className="text-3xl font-bold text-gray-900">
             Weekly Lecture Program
           </h1>
