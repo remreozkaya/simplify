@@ -6,7 +6,7 @@ import type {
 
 export type CurriculumGraphNode = {
   id: string;
-  kind: "course" | "elective-slot" | "external" | "and" | "or" | "semester-label";
+  kind: "course" | "elective-slot" | "external" | "and" | "semester-label" | "semester-band";
   label: string;
   courseCode?: string;
   semester?: number;
@@ -18,7 +18,7 @@ export type CurriculumGraphEdge = {
   id: string;
   source: string;
   target: string;
-  relationship: "required" | "alternative" | "logical";
+  relationship: "required" | "logical";
 };
 
 export type CurriculumGraph = {
@@ -33,16 +33,31 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
 
   const semesterGap = 230;
   const courseGap = 270;
+  const courseWidth = 230;
+  const maxItems = Math.max(
+    1,
+    ...curriculum.semesters.map((semester) => semester.items.length),
+  );
+  const graphWidth = (maxItems - 1) * courseGap + courseWidth;
 
   curriculum.semesters.forEach((semester) => {
     const semesterY = (semester.semester - 1) * semesterGap;
+    const rowStartX = ((maxItems - semester.items.length) * courseGap) / 2;
+    nodes.push({
+      id: `semester-band:${semester.semester}`,
+      kind: "semester-band",
+      label: "",
+      semester: semester.semester,
+      x: -50,
+      y: semesterY,
+    });
     nodes.push({
       id: `semester:${semester.semester}`,
       kind: "semester-label",
       label: `SEMESTER ${semester.semester}`,
       semester: semester.semester,
-      x: -180,
-      y: semesterY + 24,
+      x: graphWidth / 2 - 75,
+      y: semesterY + 12,
     });
     semester.items.forEach((item, row) => {
       nodes.push({
@@ -51,8 +66,8 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
         label: item.kind === "course" ? `${item.code}\n${item.title}` : item.title,
         ...(item.kind === "course" ? { courseCode: item.code } : {}),
         semester: semester.semester,
-        x: row * courseGap,
-        y: semesterY,
+        x: rowStartX + row * courseGap,
+        y: semesterY + 64,
       });
       if (item.kind === "course" && !courseNodeByCode.has(item.code)) {
         courseNodeByCode.set(item.code, item.id);
@@ -65,31 +80,31 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
     targetId: string,
     path: string,
     targetNode: CurriculumGraphNode,
-  ): string | null {
-    if (expression.kind === "unknown") return null;
+  ): string[] {
+    if (expression.kind === "unknown") return [];
     if (expression.kind === "course") {
-      return courseNodeByCode.get(expression.courseCode) ?? null;
+      const courseId = courseNodeByCode.get(expression.courseCode);
+      return courseId ? [courseId] : [];
     }
+
+    const sources = [
+      ...new Set(
+        expression.operands.flatMap((operand, index) =>
+          connectExpression(operand, targetId, `${path}.${index}`, targetNode),
+        ),
+      ),
+    ];
+
+    if (expression.kind === "or" || sources.length <= 1) return sources;
+
     const logicId = `logic:${targetId}:${path}:${expression.kind}`;
     const logicNode: CurriculumGraphNode = {
       id: logicId,
       kind: expression.kind,
       label: expression.kind.toUpperCase(),
       x: targetNode.x + 84 + Number(path.split(".").at(-1) ?? 0) * 44,
-      y: targetNode.y - 76 - (path.split(".").length - 1) * 42,
+      y: targetNode.y - 58 - (path.split(".").length - 1) * 42,
     };
-    const sources = expression.operands.flatMap((operand, index) => {
-      const sourceId = connectExpression(
-        operand,
-        logicId,
-        `${path}.${index}`,
-        logicNode,
-      );
-      return sourceId ? [sourceId] : [];
-    });
-
-    if (sources.length === 0) return null;
-    if (sources.length === 1) return sources[0];
 
     nodes.push(logicNode);
     sources.forEach((source) => {
@@ -97,26 +112,26 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
         id: `edge:${source}:${logicId}`,
         source,
         target: logicId,
-        relationship: expression.kind === "or" ? "alternative" : "required",
+        relationship: "required",
       });
     });
-    return logicId;
+    return [logicId];
   }
 
   Object.values(curriculum.prerequisites).forEach((prerequisite) => {
     const targetId = courseNodeByCode.get(prerequisite.courseCode);
     const targetNode = nodes.find((node) => node.id === targetId);
     if (!targetId || !targetNode || !prerequisite.expression) return;
-    const source = connectExpression(prerequisite.expression, targetId, "0", targetNode);
-    if (source) {
+    const expression = prerequisite.expression;
+    const sources = connectExpression(expression, targetId, "0", targetNode);
+    sources.forEach((source) => {
       edges.push({
         id: `edge:${source}:${targetId}`,
         source,
         target: targetId,
-        relationship:
-          prerequisite.expression.kind === "or" ? "alternative" : "logical",
+        relationship: expression.kind === "course" ? "required" : "logical",
       });
-    }
+    });
   });
 
   return { nodes, edges };

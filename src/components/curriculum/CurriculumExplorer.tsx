@@ -259,11 +259,11 @@ export default function CurriculumExplorer() {
     if (!graph) return new Set<string>();
     const visible = new Set<string>();
     graph.nodes.forEach((node) => {
-      if (node.kind === "semester-label") {
+      if (node.kind === "semester-label" || node.kind === "semester-band") {
         visible.add(node.id);
       } else if (node.kind === "elective-slot") {
         if (filters.elective) visible.add(node.id);
-      } else if (node.kind === "and" || node.kind === "or") {
+      } else if (node.kind === "and") {
         visible.add(node.id);
       } else if (filters[nodeStatuses[node.id] ?? "unknown"]) {
         visible.add(node.id);
@@ -285,7 +285,7 @@ export default function CurriculumExplorer() {
     const query = search.toLocaleLowerCase("tr-TR");
     const results: SearchResult[] = [];
     graph.nodes.forEach((node) => {
-      if (node.kind === "semester-label") return;
+      if (node.kind === "semester-label" || node.kind === "semester-band") return;
       if ((node.courseCode ?? "").toLocaleLowerCase("tr-TR").includes(query) || node.label.toLocaleLowerCase("tr-TR").includes(query)) {
         results.push({ id: node.id, nodeId: node.id, code: node.courseCode, title: node.label.split("\n")[1] ?? node.label, subtitle: node.kind === "external" ? "External prerequisite" : node.semester ? `Semester ${node.semester}` : node.kind.toUpperCase() });
       }
@@ -561,8 +561,8 @@ export default function CurriculumExplorer() {
                         {unlocks.length ? <ul className="mt-2 space-y-1 text-sm text-slate-700">{unlocks.map((node) => <li key={node.id}>→ {node.courseCode} · {node.label.split("\n")[1]}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No downstream curriculum course.</p>}
                       </div>
                     </>
-                  ) : selectedNode?.kind === "and" || selectedNode?.kind === "or" ? (
-                    <div><p className="text-xl font-black">{selectedNode.kind.toUpperCase()} requirement</p><p className="mt-2 text-sm text-slate-600">This junction preserves the prerequisite logic reported by OBS. {selectedNode.kind === "and" ? "Every incoming branch is required." : "Any one incoming branch can satisfy this choice."}</p></div>
+                  ) : selectedNode?.kind === "and" ? (
+                    <div><p className="text-xl font-black">AND requirement</p><p className="mt-2 text-sm text-slate-600">Every incoming branch is required.</p></div>
                   ) : null}
                 </aside>
               )}
@@ -570,7 +570,7 @@ export default function CurriculumExplorer() {
 
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600" aria-label="Graph legend">
               {(Object.keys(STATUS_LABEL) as CourseDerivedStatus[]).map((status) => <span key={status} className={`rounded-full border px-2 py-1 font-bold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>)}
-              <span>◇ Elective requirement</span><span>── Required</span><span className="text-violet-700">- - Alternative / OR</span>
+              <span>◇ Elective requirement</span><span>── Prerequisite connection</span>
             </div>
           </section>
 

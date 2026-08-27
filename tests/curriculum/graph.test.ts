@@ -89,11 +89,13 @@ const curriculum: ItuCurriculum = {
 describe("curriculum graph", () => {
   it("builds deterministic semester and elective nodes without external clutter", () => {
     const graph = buildCurriculumGraph(curriculum);
-    expect(graph.nodes.find((node) => node.id === "course:a")?.y).toBe(0);
-    expect(graph.nodes.find((node) => node.id === "course:b")?.y).toBe(230);
+    expect(graph.nodes.find((node) => node.id === "course:a")?.y).toBe(64);
+    expect(graph.nodes.find((node) => node.id === "course:a")?.x).toBe(135);
+    expect(graph.nodes.find((node) => node.id === "course:b")?.y).toBe(294);
     expect(graph.nodes.find((node) => node.id === "slot:1")?.x).toBe(270);
     expect(graph.nodes.filter((node) => node.kind === "semester-label")).toHaveLength(3);
-    expect(graph.edges.some((edge) => edge.relationship === "alternative")).toBe(true);
+    expect(graph.nodes.filter((node) => node.kind === "semester-band")).toHaveLength(3);
+    expect(graph.nodes.some((node) => node.id.includes(":or"))).toBe(false);
     expect(graph.nodes.some((node) => node.kind === "external")).toBe(false);
     expect(graph.nodes.some((node) => node.kind === "elective-slot")).toBe(true);
   });
