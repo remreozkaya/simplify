@@ -15,9 +15,10 @@ Implemented or in progress:
 * Next.js project setup
 * TypeScript support
 * Tailwind CSS styling
-* Weekly calendar layout
-* Monday-Sunday calendar view
-* Time range from 08:00 to 20:00
+* Weekly planner and schedule generator with device-local persistence
+* ITU OBS course and curriculum integrations
+* Curriculum prerequisite graph
+* Verified email/password authentication and password recovery
 
 ## First Main Feature: Weekly Lecture Program
 
@@ -59,18 +60,76 @@ Possible future features:
 
 Current stack:
 
-* Next.js
+* Next.js 16 App Router
 * TypeScript
 * Tailwind CSS
 * React
+* Supabase Auth
 
 Planned future additions:
 
 * Prisma
 * PostgreSQL
-* Authentication
 * Scheduled course-data sync
 * Deployment on Vercel or a similar platform
+
+## Authentication
+
+Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and secure cookie-backed sessions. Application pages and ITU API routes are protected by the Next.js request Proxy; the protected server layout also validates the current verified user before rendering. Existing planner, generator, curriculum, and theme data remains in `localStorage` and is not deleted or uploaded by authentication.
+
+### 1. Create and configure Supabase
+
+Create a Supabase project, then open **Authentication → Providers → Email** and:
+
+* enable email/password sign-in;
+* enable **Confirm email** (required — an unverified user must not access Simplify);
+* configure a production SMTP provider before launch. Supabase's default sender is rate-limited and intended only for initial testing.
+
+No service-role key or application database table is required for this feature.
+
+### 2. Configure environment variables
+
+Copy the placeholder file and add the public values shown by **Supabase Dashboard → Connect**:
+
+```bash
+cp .env.example .env.local
+```
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+`NEXT_PUBLIC_SITE_URL` must be the deployment's public origin without a trailing slash. Local development defaults safely to `http://localhost:3000` when the variable is omitted; production must provide it (or Vercel's `VERCEL_PROJECT_PRODUCTION_URL`). These are public project identifiers, not service-role credentials. Never add a service-role key with a `NEXT_PUBLIC_` prefix.
+
+### 3. Configure authentication URLs
+
+In **Authentication → URL Configuration**, set:
+
+* **Site URL** to the deployed Simplify origin (use `http://localhost:3000` locally);
+* **Redirect URLs** to `http://localhost:3000/auth/callback` and `https://your-domain.example/auth/callback` for the environments you use.
+
+Signup confirmations return through `/auth/callback` and then show `/verify-email`. Password recovery uses the same callback to establish a short-lived, single-purpose recovery session before `/reset-password`. The application constructs these URLs from `NEXT_PUBLIC_SITE_URL`; no production domain is hard-coded.
+
+If you customize Supabase email templates, preserve the provider's confirmation/recovery link or use the documented `TokenHash` server callback format. Do not place access tokens directly in custom application URLs.
+
+### Session behavior
+
+With **Remember me** selected, Supabase refresh-token cookies retain the provider's persistent lifetime. Without it, Simplify removes persistent expiry attributes so the browser receives session-only auth cookies. Some browsers' “restore previous session” feature may restore session cookies; this is the closest secure cross-browser behavior Supabase's cookie-based SSR model supports. Passwords, emails, and session tokens are never copied into `localStorage`.
+
+### Manual authentication smoke test
+
+Use a test inbox or local Supabase/Mailpit environment; automated tests never send email.
+
+1. Sign up at `/signup` and confirm that invalid email, short password, and mismatched passwords are rejected.
+2. Confirm the verification screen appears and protected URLs redirect to `/login` before verification.
+3. Follow the email link, log in, refresh, and open `/`, `/generator`, and `/curriculum`.
+4. Log out and verify a manually entered protected URL redirects to `/login` with its intended path preserved.
+5. Request a reset from `/forgot-password`, follow the link, set a new password, and confirm the old password no longer works.
+6. Exercise expired/used verification and recovery links and the verification resend cooldown.
+
+Provider-dependent email delivery, verification, and old-password invalidation require a configured Supabase project and cannot be completed with placeholder environment values.
 
 ## Project Structure
 
