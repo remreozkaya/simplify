@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { logoutAction } from "@/app/auth/actions";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const links = [
@@ -11,7 +12,7 @@ const links = [
   { href: "/curriculum", label: "Curriculum" },
 ];
 
-export default function AppNavigation() {
+export default function AppNavigation({ email }: { email: string }) {
   const pathname = usePathname();
 
   return (
@@ -21,7 +22,7 @@ export default function AppNavigation() {
           <span className="grid size-8 place-items-center rounded-xl bg-blue-600 text-sm text-white shadow-sm">S</span>
           Simplify
         </Link>
-        <div className="flex flex-wrap items-center gap-1 text-sm font-semibold text-slate-600">
+        <div className="flex flex-wrap items-center justify-end gap-1 text-sm font-semibold text-slate-600">
           {links.map((link) => {
             const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
@@ -36,6 +37,22 @@ export default function AppNavigation() {
             );
           })}
           <ThemeToggle />
+          <div className="ml-1 flex max-w-full items-center gap-2 border-l border-slate-200 pl-3 dark:border-slate-700">
+            <span
+              className="hidden max-w-44 truncate text-xs font-semibold text-slate-500 md:block dark:text-slate-400"
+              title={email}
+            >
+              {email}
+            </span>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                Log out
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </nav>
