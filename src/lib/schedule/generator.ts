@@ -20,7 +20,7 @@ import type {
 } from "@/lib/schedule/types";
 
 export const MAX_GENERATED_SCHEDULES = 500;
-export const MAX_GENERATION_VISITED_NODES = 250_000;
+const MAX_GENERATION_VISITED_NODES = 250_000;
 export const LARGE_SEARCH_SPACE_THRESHOLD = 50_000;
 
 type IndexedSelection = GeneratedCourseSelection & {
@@ -213,7 +213,7 @@ export function generateConflictFreeSchedules(
  * only schedules with the smallest number of overlapping meeting pairs.
  * Overlap minutes are the secondary conflict measure.
  */
-export function generateLeastConflictSchedules(
+function generateLeastConflictSchedules(
   courses: readonly GeneratorCourse[],
   options: GenerateScheduleOptions = {},
 ): GenerateScheduleResult {

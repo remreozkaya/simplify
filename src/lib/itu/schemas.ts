@@ -8,7 +8,6 @@ import type {
   ItuCourseSection,
   ItuCoursesQuery,
   ItuCourseTableRow,
-  ParsedHtmlTable,
 } from "@/lib/itu/types";
 
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -101,13 +100,13 @@ function timeToMinutes(time: string): number {
   return hour * 60 + minute;
 }
 
-export const nonEmptyTextSchema = z
+const nonEmptyTextSchema = z
   .string()
   .trim()
   .min(1)
   .max(500);
 
-export const optionalTextSchema = z.preprocess(
+const optionalTextSchema = z.preprocess(
   normalizeOptionalText,
   nonEmptyTextSchema.optional(),
 );
@@ -118,7 +117,7 @@ const optionalScheduleTextSchema = z
   .max(1_000)
   .optional();
 
-export const branchCodeSchema = z.preprocess(
+const branchCodeSchema = z.preprocess(
   normalizeBranchCode,
   z
     .string()
@@ -130,7 +129,7 @@ export const branchCodeSchema = z.preprocess(
     ),
 );
 
-export const courseCodeSchema = z.preprocess(
+const courseCodeSchema = z.preprocess(
   normalizeCourseCode,
   z
     .string()
@@ -142,7 +141,7 @@ export const courseCodeSchema = z.preprocess(
     ),
 );
 
-export const crnSchema = z.preprocess(
+const crnSchema = z.preprocess(
   normalizeCrn,
   z
     .string()
@@ -152,7 +151,7 @@ export const crnSchema = z.preprocess(
     ),
 );
 
-export const timeSchema = z
+const timeSchema = z
   .string()
   .trim()
   .regex(
@@ -160,7 +159,7 @@ export const timeSchema = z
     "Time must use the 24-hour HH:MM format.",
   );
 
-export const optionalNonNegativeIntegerSchema =
+const optionalNonNegativeIntegerSchema =
   z.preprocess(
     normalizeOptionalInteger,
     z
@@ -171,7 +170,7 @@ export const optionalNonNegativeIntegerSchema =
       .optional(),
   );
 
-export const ituWeekdaySchema = z.enum([
+const ituWeekdaySchema = z.enum([
   "Monday",
   "Tuesday",
   "Wednesday",
@@ -186,12 +185,6 @@ export const ituBranchSchema: z.ZodType<ItuBranch> =
     id: z.coerce.number().int().positive(),
     code: branchCodeSchema,
     name: optionalTextSchema,
-  });
-
-export const parsedHtmlTableSchema: z.ZodType<ParsedHtmlTable> =
-  z.object({
-    headers: z.array(z.string()),
-    rows: z.array(z.array(z.string())),
   });
 
 export const ituCourseTableRowSchema: z.ZodType<ItuCourseTableRow> =
@@ -240,7 +233,7 @@ export const ituCourseMeetingSchema: z.ZodType<ItuCourseMeeting> =
       }
     });
 
-export const ituCourseSectionSchema: z.ZodType<ItuCourseSection> =
+const ituCourseSectionSchema: z.ZodType<ItuCourseSection> =
   z.object({
     id: z.string().trim().min(1).max(150),
     crn: crnSchema,
@@ -262,7 +255,7 @@ export const ituCourseSectionSchema: z.ZodType<ItuCourseSection> =
     prerequisites: optionalTextSchema,
   });
 
-export const ituCourseSchema: z.ZodType<ItuCourse> =
+const ituCourseSchema: z.ZodType<ItuCourse> =
   z
     .object({
       id: z.string().trim().min(1).max(150),

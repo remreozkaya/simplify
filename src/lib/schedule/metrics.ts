@@ -2,6 +2,10 @@ import { timeToMinutes } from "@/lib/schedule/time";
 import type { MeetingTime } from "@/lib/schedule/conflicts";
 import type { ScheduleMetrics } from "@/lib/schedule/types";
 
+export function normalizeGapMinutes(gapMinutes: number): number {
+  return Math.floor(Math.max(0, gapMinutes) / 30) * 30;
+}
+
 export function calculateScheduleMetrics(
   meetings: readonly MeetingTime[],
 ): ScheduleMetrics {
@@ -35,7 +39,7 @@ export function calculateScheduleMetrics(
     sorted.slice(1).forEach((meeting) => {
       const start = timeToMinutes(meeting.startTime);
       const end = timeToMinutes(meeting.endTime);
-      totalGapMinutes += Math.max(0, start - latestEnd);
+      totalGapMinutes += normalizeGapMinutes(start - latestEnd);
       latestEnd = Math.max(latestEnd, end);
     });
   });

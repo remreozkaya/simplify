@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateScheduleMetrics } from "@/lib/schedule/metrics";
+import {
+  calculateScheduleMetrics,
+  normalizeGapMinutes,
+} from "@/lib/schedule/metrics";
 
 describe("schedule metrics", () => {
   it("counts unique campus days and earliest/latest times", () => {
@@ -33,6 +36,22 @@ describe("schedule metrics", () => {
         { day: "Monday", startTime: "13:30", endTime: "15:30" },
       ]).totalGapMinutes,
     ).toBe(120);
+  });
+
+  it("rounds each gap down to a complete 30-minute interval", () => {
+    expect(normalizeGapMinutes(1)).toBe(0);
+    expect(normalizeGapMinutes(29)).toBe(0);
+    expect(normalizeGapMinutes(30)).toBe(30);
+    expect(normalizeGapMinutes(31)).toBe(30);
+    expect(normalizeGapMinutes(59)).toBe(30);
+
+    expect(
+      calculateScheduleMetrics([
+        { day: "Monday", startTime: "09:00", endTime: "10:00" },
+        { day: "Monday", startTime: "10:31", endTime: "11:30" },
+        { day: "Monday", startTime: "11:31", endTime: "12:30" },
+      ]).totalGapMinutes,
+    ).toBe(30);
   });
 
   it("sums multiple gaps on one day", () => {

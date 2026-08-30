@@ -28,14 +28,6 @@ export type ItuBranch = {
 };
 
 /**
- * Generic representation of an HTML table before its columns are interpreted.
- */
-export type ParsedHtmlTable = {
-  headers: string[];
-  rows: string[][];
-};
-
-/**
  * One raw schedule-table row after header names have been mapped, but before
  * values such as days, time ranges, and numeric capacities are normalized.
  *
