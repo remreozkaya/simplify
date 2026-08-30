@@ -1,10 +1,9 @@
 import type {
   ItuCurriculum,
-  ItuCurriculumCourse,
   PrerequisiteExpression,
 } from "@/lib/itu/curriculum/types";
 
-export type CurriculumGraphNode = {
+type CurriculumGraphNode = {
   id: string;
   kind: "course" | "elective-slot" | "external" | "and" | "semester-label" | "semester-band";
   label: string;
@@ -14,7 +13,7 @@ export type CurriculumGraphNode = {
   y: number;
 };
 
-export type CurriculumGraphEdge = {
+type CurriculumGraphEdge = {
   id: string;
   source: string;
   target: string;
@@ -201,16 +200,4 @@ export function getVisibleCourseConnections(
         target: target.id,
       })),
     );
-}
-
-export function getCourseByCode(
-  curriculum: ItuCurriculum,
-  code: string,
-): ItuCurriculumCourse | undefined {
-  for (const semester of curriculum.semesters) {
-    const course = semester.items.find(
-      (item): item is ItuCurriculumCourse => item.kind === "course" && item.code === code,
-    );
-    if (course) return course;
-  }
 }

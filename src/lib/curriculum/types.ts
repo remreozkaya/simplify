@@ -1,6 +1,6 @@
 import type { Grade } from "@/lib/itu/curriculum/types";
 
-export type CourseProgressState = "passed" | "failed" | "none";
+type CourseProgressState = "passed" | "failed" | "none";
 export type CourseProgress = { state: CourseProgressState; grade?: Grade };
 export type CurriculumProgress = {
   version: 1;

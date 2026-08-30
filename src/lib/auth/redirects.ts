@@ -39,7 +39,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
 ];
 
-export function isPublicAuthPath(pathname: string) {
+function isPublicAuthPath(pathname: string) {
   return PUBLIC_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );

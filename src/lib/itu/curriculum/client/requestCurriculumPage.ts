@@ -5,7 +5,7 @@ import {
 } from "@/lib/itu/constants";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
 
-export const CURRICULUM_REVALIDATE_SECONDS = 6 * 60 * 60;
+const CURRICULUM_REVALIDATE_SECONDS = 6 * 60 * 60;
 
 export async function requestCurriculumPage(
   pathname: string,

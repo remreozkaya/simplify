@@ -2,11 +2,7 @@ import { timeToMinutes } from "@/lib/schedule/time";
 import type { MeetingTime } from "@/lib/schedule/conflicts";
 import type { ScheduleConstraints } from "@/lib/schedule/types";
 
-export const EMPTY_SCHEDULE_CONSTRAINTS: ScheduleConstraints = {
-  excludedDays: [],
-};
-
-export function meetingSatisfiesConstraints(
+function meetingSatisfiesConstraints(
   meeting: MeetingTime,
   constraints: ScheduleConstraints,
 ): boolean {
