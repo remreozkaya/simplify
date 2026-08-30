@@ -1,5 +1,4 @@
-import { load, type Cheerio } from "cheerio";
-import type { AnyNode } from "domhandler";
+import { load } from "cheerio";
 
 import { ITU_COURSE_TABLE_HEADER_ALIASES } from "@/lib/itu/constants";
 import { ituCourseTableRowSchema } from "@/lib/itu/schemas";
@@ -7,6 +6,7 @@ import type { ItuCourseTableRow } from "@/lib/itu/types";
 
 type RowField = keyof ItuCourseTableRow;
 type ColumnMap = Partial<Record<RowField, number>>;
+type CheerioSelection = ReturnType<ReturnType<typeof load>>;
 
 const REQUIRED_FIELDS: RowField[] = [
   "crn",
@@ -22,7 +22,7 @@ function normalizeHeader(value: string): string {
     .toLowerCase();
 }
 
-function getCellText(cell: Cheerio<AnyNode>): string {
+function getCellText(cell: CheerioSelection): string {
   const clone = cell.clone();
 
   clone.find("br").replaceWith("\n");
