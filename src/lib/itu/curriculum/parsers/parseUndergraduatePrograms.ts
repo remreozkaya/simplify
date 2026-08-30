@@ -8,7 +8,7 @@ function clean(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-export function deriveMajorName(programName: string): string {
+function deriveMajorName(programName: string): string {
   return clean(programName)
     .replace(/\s+Lisans(?:\s+Programı)?$/iu, "")
     .replace(/\s*\((?:İngilizce|English|%\s*30\s*İngilizce|%\s*100\s*İngilizce)\)\s*$/iu, "")

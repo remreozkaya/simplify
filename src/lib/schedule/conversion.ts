@@ -64,13 +64,3 @@ export function generatedScheduleToWeeklyProgram(
     updatedAt: identity.updatedAt ?? new Date().toISOString(),
   };
 }
-
-export function generatedScheduleToCourseBlocks(
-  schedule: GeneratedSchedule,
-): CourseBlock[] {
-  return generatedScheduleToWeeklyProgram(schedule, {
-    id: "generated-preview",
-    name: "Generated preview",
-    updatedAt: "",
-  }).courseBlocks;
-}

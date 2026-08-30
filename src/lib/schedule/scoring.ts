@@ -82,7 +82,7 @@ function compareStableCrns(
   return firstKey.localeCompare(secondKey, undefined, { numeric: true });
 }
 
-export function compareSchedules(
+function compareSchedules(
   first: GeneratedSchedule,
   second: GeneratedSchedule,
 ): number {

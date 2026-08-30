@@ -12,9 +12,9 @@ export type ItuCurriculumPlan = {
   isCurrent: boolean;
 };
 
-export type NumericOptions = number[];
+type NumericOptions = number[];
 
-export type ItuCurriculumCourse = {
+type ItuCurriculumCourse = {
   kind: "course";
   id: string;
   semester: number;
@@ -55,7 +55,7 @@ export type ItuElectiveSlot = {
 
 export type ItuCurriculumItem = ItuCurriculumCourse | ItuElectiveSlot;
 
-export type ItuCurriculumSemester = {
+type ItuCurriculumSemester = {
   semester: number;
   items: ItuCurriculumItem[];
 };

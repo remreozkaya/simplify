@@ -5,11 +5,11 @@ import { isSupabaseConfigured } from "@/lib/auth/config";
 import { getSafeNextPath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
 
-export function isVerifiedUser(user: User | null): user is User {
+function isVerifiedUser(user: User | null): user is User {
   return Boolean(user?.email && user.email_confirmed_at);
 }
 
-export async function getCurrentUser() {
+async function getCurrentUser() {
   if (!isSupabaseConfigured()) return null;
 
   const supabase = await createClient();
