@@ -16,13 +16,33 @@ describe("curriculum progress persistence", () => {
     const both = updateStoredCurriculumProgress(first, {
       version: 1,
       planId: 1562,
-      courses: { "BLG 102E": { state: "planned" } },
+      courses: { "BLG 102E": { state: "failed" } },
     });
     expect(parseCurriculumProgress(both, 2340).courses).toEqual({
       "MAT 103E": { state: "passed", grade: "AA" },
     });
     expect(parseCurriculumProgress(both, 1562).courses).toEqual({
-      "BLG 102E": { state: "planned" },
+      "BLG 102E": { state: "failed" },
+    });
+  });
+
+  it("migrates legacy planned courses to not taken", () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      plans: {
+        "2340": {
+          version: 1,
+          planId: 2340,
+          courses: {
+            "BLG 102E": { state: "planned" },
+            "MAT 103E": { state: "passed", grade: "AA" },
+          },
+        },
+      },
+    });
+
+    expect(parseCurriculumProgress(legacy, 2340).courses).toEqual({
+      "MAT 103E": { state: "passed", grade: "AA" },
     });
   });
 });

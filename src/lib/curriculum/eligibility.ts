@@ -74,25 +74,26 @@ export function getCourseStatus(
     prerequisiteDataKnown,
   );
   if (manualState === "passed") {
-    return { status: "passed", eligibility, plannedWarning: false };
+    return { status: "passed", eligibility };
   }
-  if (manualState === "planned") {
-    return {
-      status: "planned",
-      eligibility,
-      plannedWarning: eligibility !== "satisfied",
-    };
+  if (manualState === "failed") {
+    return { status: "failed", eligibility };
   }
-  return {
-    status:
-      eligibility === "satisfied"
-        ? "eligible"
-        : eligibility === "unsatisfied"
-          ? "blocked"
-          : "unknown",
-    eligibility,
-    plannedWarning: false,
-  };
+  return { status: "not-taken", eligibility };
+}
+
+export function isCourseTakeableThisSemester(
+  courseCode: string,
+  prerequisite: ItuCoursePrerequisite | undefined,
+  progress: Record<string, CourseProgress>,
+  offeredCourseCodes: ReadonlySet<string>,
+  prerequisiteDataKnown = true,
+): boolean {
+  return (
+    progress[courseCode]?.state !== "passed" &&
+    offeredCourseCodes.has(courseCode) &&
+    evaluateCourseEligibility(prerequisite, progress, prerequisiteDataKnown) === "satisfied"
+  );
 }
 
 export function getMissingPrerequisites(

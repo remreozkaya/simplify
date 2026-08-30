@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluatePrerequisiteExpression,
   getCourseStatus,
+  isCourseTakeableThisSemester,
 } from "@/lib/curriculum/eligibility";
 import { parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteExpression";
 
@@ -65,24 +66,48 @@ describe("curriculum eligibility", () => {
     ).toBe("unsatisfied");
   });
 
-  it("keeps planned status while reporting blocked prerequisites", () => {
+  it("keeps failed status while reporting prerequisite eligibility separately", () => {
     expect(
       getCourseStatus(
         "BBF 301E",
         { courseCode: "BBF 301E", expression: andExpression },
-        { "BBF 301E": { state: "planned" } },
+        { "BBF 301E": { state: "failed" } },
       ),
     ).toEqual({
-      status: "planned",
+      status: "failed",
       eligibility: "unsatisfied",
-      plannedWarning: true,
     });
   });
 
-  it("uses passed and planned precedence", () => {
+  it("uses the three user-facing progress categories", () => {
     expect(getCourseStatus("A", undefined, { A: { state: "passed" } }).status).toBe("passed");
-    expect(getCourseStatus("A", undefined, { A: { state: "planned" } }).status).toBe("planned");
-    expect(getCourseStatus("A", undefined, {}).status).toBe("eligible");
-    expect(getCourseStatus("A", undefined, {}, false).status).toBe("unknown");
+    expect(getCourseStatus("A", undefined, { A: { state: "failed" } }).status).toBe("failed");
+    expect(getCourseStatus("A", undefined, {}).status).toBe("not-taken");
+    expect(getCourseStatus("A", undefined, {}, false).status).toBe("not-taken");
+  });
+
+  it("only recommends offered, unpassed courses with completed prerequisites", () => {
+    const prerequisite = { courseCode: "BBF 301E", expression: andExpression };
+    const offered = new Set(["BBF 301E"]);
+    const completed = {
+      "MAT 103E": { state: "passed" as const },
+      "BLG 102E": { state: "passed" as const },
+    };
+
+    expect(isCourseTakeableThisSemester("BBF 301E", prerequisite, completed, offered)).toBe(true);
+    expect(isCourseTakeableThisSemester("BBF 301E", prerequisite, {}, offered)).toBe(false);
+    expect(isCourseTakeableThisSemester("BBF 301E", prerequisite, completed, new Set())).toBe(false);
+    expect(isCourseTakeableThisSemester(
+      "BBF 301E",
+      prerequisite,
+      { ...completed, "BBF 301E": { state: "passed" as const } },
+      offered,
+    )).toBe(false);
+    expect(isCourseTakeableThisSemester(
+      "BBF 301E",
+      prerequisite,
+      { ...completed, "BBF 301E": { state: "failed" as const } },
+      offered,
+    )).toBe(true);
   });
 });

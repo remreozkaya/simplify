@@ -1,175 +1,246 @@
 "use client";
 
-import {
-  Controls,
-  MarkerType,
-  MiniMap,
-  Position,
-  ReactFlow,
-  ReactFlowProvider,
-  useReactFlow,
-  type Edge,
-  type Node,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { CurriculumGraph as CurriculumGraphData } from "@/lib/curriculum/graph";
+import {
+  getVisibleCourseConnections,
+  type CurriculumCourseConnection,
+  type CurriculumGraph as CurriculumGraphData,
+} from "@/lib/curriculum/graph";
 import type { CourseDerivedStatus } from "@/lib/curriculum/types";
 
-const STATUS_STYLE: Record<CourseDerivedStatus, { background: string; border: string; color: string }> = {
-  passed: { background: "#ecfdf5", border: "#34d399", color: "#065f46" },
-  eligible: { background: "#ecfeff", border: "#22d3ee", color: "#155e75" },
-  planned: { background: "#f5f3ff", border: "#a78bfa", color: "#5b21b6" },
-  blocked: { background: "#fff7ed", border: "#fdba74", color: "#9a3412" },
-  unknown: { background: "#fffbeb", border: "#fbbf24", color: "#92400e" },
+const STATUS_LABEL: Record<CourseDerivedStatus, string> = {
+  "not-taken": "Not Taken",
+  passed: "Passed",
+  failed: "Failed",
+};
+
+const STATUS_STYLE: Record<CourseDerivedStatus, string> = {
+  "not-taken": "border-slate-500 bg-slate-200/80 text-black hover:bg-slate-300/85",
+  passed: "border-emerald-700 bg-emerald-200/80 text-emerald-950 hover:bg-emerald-300/85",
+  failed: "border-red-700 bg-red-200/80 text-red-950 hover:bg-red-300/85",
 };
 
 type Props = {
   graph: CurriculumGraphData;
   statuses: Record<string, CourseDerivedStatus>;
   visibleNodeIds: Set<string>;
-  focusedNodeIds?: Set<string>;
   selectedNodeId?: string;
+  prerequisiteNodeIds?: Set<string>;
+  dependentNodeIds?: Set<string>;
+  takeableNodeIds?: Set<string>;
   onSelectNode: (nodeId: string | null) => void;
 };
 
-function Flow({
+type Curve = CurriculumCourseConnection & {
+  path: string;
+  highlighted: boolean;
+};
+
+export default function CurriculumGraph({
   graph,
   statuses,
   visibleNodeIds,
-  focusedNodeIds,
   selectedNodeId,
+  prerequisiteNodeIds,
+  dependentNodeIds,
+  takeableNodeIds,
   onSelectNode,
 }: Props) {
-  const { fitView, setCenter } = useReactFlow();
-  const bandWidth = useMemo(
-    () =>
-      Math.max(
-        ...graph.nodes
-          .filter(
-            (node) => node.kind === "course" || node.kind === "elective-slot",
-          )
-          .map((node) => node.x),
-        0,
-      ) + 330,
-    [graph.nodes],
-  );
-  const nodes = useMemo<Node[]>(
-    () =>
-      graph.nodes
-        .filter((node) => visibleNodeIds.has(node.id))
-        .map((node) => {
-          const status = statuses[node.id] ?? "unknown";
-          const semantic = STATUS_STYLE[status];
-          const logical = node.kind === "and";
-          const elective = node.kind === "elective-slot";
-          const external = node.kind === "external";
-          const semesterLabel = node.kind === "semester-label";
-          const semesterBand = node.kind === "semester-band";
-          const dimmed = focusedNodeIds && !focusedNodeIds.has(node.id);
-          return {
-            id: node.id,
-            position: { x: node.x, y: node.y },
-            data: { label: node.label },
-            selected: !semesterLabel && !semesterBand && selectedNodeId === node.id,
-            sourcePosition: Position.Bottom,
-            targetPosition: Position.Top,
-            selectable: !semesterLabel && !semesterBand,
-            connectable: false,
-            focusable: !semesterBand,
-            zIndex: semesterBand ? -2 : semesterLabel ? 3 : 2,
-            style: {
-              width: semesterBand ? bandWidth : semesterLabel ? 150 : logical ? 62 : 230,
-              minHeight: semesterBand ? 166 : semesterLabel ? 36 : logical ? 48 : 82,
-              whiteSpace: "pre-line",
-              borderRadius: semesterBand ? 36 : semesterLabel ? 999 : logical ? 999 : 14,
-              border: semesterBand ? "1px solid rgba(148,163,184,.16)" : semesterLabel ? "0" : `${selectedNodeId === node.id ? 3 : 2}px solid ${
-                logical ? "#64748b" : elective ? "#8b5cf6" : external ? "#64748b" : semantic.border
-              }`,
-              background: semesterBand ? "rgba(148,163,184,.09)" : semesterLabel ? "#0f172a" : logical ? "#f8fafc" : elective ? "#faf5ff" : external ? "#f8fafc" : semantic.background,
-              color: semesterBand ? "transparent" : semesterLabel ? "#ffffff" : logical ? "#334155" : elective ? "#6b21a8" : external ? "#334155" : semantic.color,
-              fontWeight: semesterLabel || logical ? 800 : 650,
-              fontSize: semesterLabel ? 11 : 12,
-              letterSpacing: semesterLabel ? ".12em" : undefined,
-              lineHeight: 1.35,
-              padding: semesterBand ? 0 : semesterLabel ? 10 : logical ? 8 : 12,
-              opacity: semesterBand || semesterLabel ? 1 : dimmed ? 0.22 : 1,
-              pointerEvents: semesterBand ? "none" : undefined,
-              boxShadow: semesterBand ? "none" : semesterLabel ? "0 8px 20px rgba(15,23,42,.18)" : selectedNodeId === node.id ? "0 0 0 4px rgba(37,99,235,.16)" : "0 6px 18px rgba(15,23,42,.07)",
-            },
-            ariaLabel: `${node.label.replace("\n", ", ")}${node.courseCode ? `, ${status}` : ""}`,
-          };
-        }),
-    [bandWidth, focusedNodeIds, graph.nodes, selectedNodeId, statuses, visibleNodeIds],
-  );
-  const visibleIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
-  const edges = useMemo<Edge[]>(
-    () =>
-      graph.edges
-        .filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target))
-        .map((edge) => {
-          const dimmed = focusedNodeIds &&
-            (!focusedNodeIds.has(edge.source) || !focusedNodeIds.has(edge.target));
-          return {
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: "default",
-            animated: false,
-            style: {
-              stroke: "#64748b",
-              strokeWidth: 2,
-              opacity: dimmed ? 0.12 : 0.75,
-            },
-            markerEnd: { type: MarkerType.ArrowClosed, color: "#64748b" },
-          };
-        }),
-    [focusedNodeIds, graph.edges, visibleIds],
+  const boardRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [curves, setCurves] = useState<Curve[]>([]);
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 });
+
+  const semesters = useMemo(() => {
+    const semesterNumbers = [
+      ...new Set(
+        graph.nodes
+          .filter((node) => node.semester !== undefined)
+          .map((node) => node.semester as number),
+      ),
+    ].sort((first, second) => first - second);
+
+    return semesterNumbers.map((semester) => ({
+      semester,
+      nodes: graph.nodes.filter(
+        (node) =>
+          node.semester === semester &&
+          (node.kind === "course" || node.kind === "elective-slot") &&
+          visibleNodeIds.has(node.id),
+      ),
+    }));
+  }, [graph.nodes, visibleNodeIds]);
+
+  const connections = useMemo(
+    () => getVisibleCourseConnections(graph, visibleNodeIds),
+    [graph, visibleNodeIds],
   );
 
-  useEffect(() => {
-    if (!selectedNodeId) return;
-    const node = graph.nodes.find((candidate) => candidate.id === selectedNodeId);
-    if (node) void setCenter(node.x + 115, node.y + 40, { zoom: 1.15, duration: 450 });
-  }, [graph.nodes, selectedNodeId, setCenter]);
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    function measure() {
+      const currentBoard = boardRef.current;
+      if (!currentBoard) return;
+      const boardRect = currentBoard.getBoundingClientRect();
+      const nextCurves = connections.flatMap((connection): Curve[] => {
+        const source = cardRefs.current.get(connection.source);
+        const target = cardRefs.current.get(connection.target);
+        if (!source || !target) return [];
+
+        const sourceRect = source.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const sourceX = sourceRect.left - boardRect.left + sourceRect.width / 2;
+        const sourceY = sourceRect.bottom - boardRect.top - 2;
+        const targetX = targetRect.left - boardRect.left + targetRect.width / 2;
+        const targetY = targetRect.top - boardRect.top + 2;
+        const distance = Math.max(64, Math.abs(targetY - sourceY) * 0.48);
+
+        return [{
+          ...connection,
+          path: `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + distance}, ${targetX} ${targetY - distance}, ${targetX} ${targetY}`,
+          highlighted:
+            Boolean(selectedNodeId) && (
+              connection.source === selectedNodeId ||
+              connection.target === selectedNodeId ||
+              (Boolean(prerequisiteNodeIds?.has(connection.source)) &&
+                Boolean(prerequisiteNodeIds?.has(connection.target))) ||
+              (Boolean(dependentNodeIds?.has(connection.source)) &&
+                Boolean(dependentNodeIds?.has(connection.target)))
+            ),
+        }];
+      });
+
+      setBoardSize({
+        width: currentBoard.scrollWidth,
+        height: currentBoard.scrollHeight,
+      });
+      setCurves(nextCurves);
+    }
+
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [connections, dependentNodeIds, prerequisiteNodeIds, selectedNodeId]);
 
   return (
-    <div className="curriculum-flow relative h-[72vh] min-h-[620px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" aria-label="Interactive prerequisite graph">
-      <div className="absolute left-3 top-3 z-10 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
-        Drag to explore · scroll to zoom
+    <div className="w-full overflow-hidden pb-2" aria-label="Curriculum courses and prerequisite connections by semester">
+      <div
+        ref={boardRef}
+        className="relative space-y-8 py-1"
+      >
+        <svg
+          className="pointer-events-none absolute left-0 top-0 z-10 overflow-visible"
+          width={boardSize.width}
+          height={boardSize.height}
+          viewBox={`0 0 ${boardSize.width} ${boardSize.height}`}
+          fill="none"
+          aria-hidden="true"
+        >
+          {curves.map((curve) => (
+            <g key={curve.id}>
+              <path
+                d={curve.path}
+                stroke="rgba(255,255,255,.92)"
+                strokeWidth={curve.highlighted ? 7 : 5}
+                strokeLinecap="round"
+              />
+              <path
+                d={curve.path}
+                stroke={curve.highlighted ? "#1d4ed8" : "#64748b"}
+                strokeWidth={curve.highlighted ? 3.5 : 2.25}
+                strokeLinecap="round"
+                opacity={curve.highlighted ? 1 : 0.78}
+              />
+            </g>
+          ))}
+        </svg>
+
+        {semesters.map(({ semester, nodes }) => (
+          <section
+            key={semester}
+            className="relative min-h-[184px] rounded-[28px] bg-slate-100 px-3 pb-4 pt-10 sm:px-4"
+            aria-labelledby={`semester-heading-${semester}`}
+          >
+            <h3
+              id={`semester-heading-${semester}`}
+              className="absolute left-4 top-3 z-20 text-[10px] font-black uppercase tracking-[.16em] text-slate-600 sm:left-5 sm:text-xs"
+            >
+              Semester {semester}
+            </h3>
+            {nodes.length ? (
+              <div
+                className="grid items-stretch gap-1.5 sm:gap-2 lg:gap-3"
+                style={{
+                  gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {nodes.map((node) => {
+                  const status = statuses[node.id] ?? "not-taken";
+                  const elective = node.kind === "elective-slot";
+                  const prerequisiteRelated = prerequisiteNodeIds?.has(node.id);
+                  const dependentRelated = dependentNodeIds?.has(node.id);
+                  const [code, ...titleParts] = node.label.split("\n");
+                  const title = titleParts.join(" ") || code;
+
+                  return (
+                    <button
+                      key={node.id}
+                      ref={(element) => {
+                        if (element) cardRefs.current.set(node.id, element);
+                        else cardRefs.current.delete(node.id);
+                      }}
+                      type="button"
+                      onClick={() => onSelectNode(node.id)}
+                      aria-pressed={selectedNodeId === node.id}
+                      className={`relative z-20 flex min-h-[136px] min-w-0 flex-col items-center justify-center rounded-[20px] border-2 p-2 text-center shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-300 sm:min-h-[144px] sm:p-3 ${
+                        elective
+                          ? "border-dashed border-violet-600 bg-violet-100/80 text-violet-950 hover:bg-violet-200/85"
+                          : STATUS_STYLE[status]
+                      } ${
+                        selectedNodeId === node.id
+                          ? "ring-4 ring-blue-500"
+                          : prerequisiteRelated
+                            ? "ring-2 ring-amber-500 ring-offset-1"
+                            : dependentRelated
+                              ? "ring-2 ring-sky-500 ring-offset-1"
+                              : ""
+                      }`}
+                    >
+                      <span className="max-w-full break-words text-[11px] font-black leading-tight sm:text-xs lg:text-sm">
+                        {elective ? title : code}
+                      </span>
+                      {!elective && (
+                        <p className="mt-2 max-w-full break-words text-[10px] font-bold leading-snug sm:text-[11px] lg:text-xs">{title}</p>
+                      )}
+                      <span className="mt-2 max-w-full rounded-full border border-current bg-white/75 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide sm:mt-3 sm:px-2 sm:text-[8px]">
+                        {elective ? "Elective requirement" : STATUS_LABEL[status]}
+                      </span>
+                      {takeableNodeIds?.has(node.id) && (
+                        <span className="absolute -right-1 -top-2 rounded-full bg-blue-700 px-2 py-1 text-[7px] font-black uppercase tracking-wide text-white shadow-md sm:text-[8px]">
+                          Available
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="relative z-20 py-12 text-sm font-semibold text-slate-500">
+                No courses in this semester match the selected filters.
+              </p>
+            )}
+          </section>
+        ))}
       </div>
-      <button
-        type="button"
-        onClick={() => void fitView({ padding: 0.14, duration: 450 })}
-        className="absolute right-3 top-3 z-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-      >
-        Fit all
-      </button>
-      <ReactFlow
-        key={graph.nodes.find((node) => node.kind === "course")?.id ?? "curriculum"}
-        nodes={nodes}
-        edges={edges}
-        defaultViewport={{ x: 190, y: 60, zoom: 0.72 }}
-        minZoom={0.2}
-        maxZoom={1.8}
-        nodesDraggable={false}
-        onNodeClick={(_, node) => {
-          if (!node.id.startsWith("semester")) onSelectNode(node.id);
-        }}
-        onPaneClick={() => onSelectNode(null)}
-      >
-        <Controls position="bottom-left" />
-        <MiniMap pannable zoomable position="bottom-right" nodeStrokeWidth={2} />
-      </ReactFlow>
     </div>
-  );
-}
-
-export default function CurriculumGraph(props: Props) {
-  return (
-    <ReactFlowProvider>
-      <Flow {...props} />
-    </ReactFlowProvider>
   );
 }

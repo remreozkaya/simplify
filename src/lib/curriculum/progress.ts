@@ -4,24 +4,38 @@ import type { CurriculumProgress } from "@/lib/curriculum/types";
 
 export const CURRICULUM_PROGRESS_STORAGE_KEY = "simplify-curriculum-progress-v1";
 
-const courseProgressSchema = z.object({
-  state: z.enum(["passed", "planned", "none"]),
+const storedCourseProgressSchema = z.object({
+  // `planned` is accepted only to migrate progress saved by the previous UI.
+  state: z.enum(["passed", "failed", "planned", "none"]),
   grade: z.enum(["AA", "BA", "BB", "CB", "CC", "DC", "DD", "FD", "FF"]).optional(),
 });
 const planProgressSchema = z.object({
   version: z.literal(1),
   planId: z.number().int().positive(),
-  courses: z.record(z.string(), courseProgressSchema),
+  courses: z.record(z.string(), storedCourseProgressSchema),
 });
 const storeSchema = z.object({
   version: z.literal(1),
   plans: z.record(z.string(), planProgressSchema),
 });
 
-type ProgressStore = z.infer<typeof storeSchema>;
-
 function emptyProgress(planId: number): CurriculumProgress {
   return { version: 1, planId, courses: {} };
+}
+
+function normalizeProgress(value: z.infer<typeof planProgressSchema>): CurriculumProgress {
+  const courses: CurriculumProgress["courses"] = {};
+  Object.entries(value.courses).forEach(([code, course]) => {
+    if (course.state === "passed") {
+      courses[code] = {
+        state: "passed",
+        ...(course.grade ? { grade: course.grade } : {}),
+      };
+    } else if (course.state === "failed") {
+      courses[code] = { state: "failed" };
+    }
+  });
+  return { version: 1, planId: value.planId, courses };
 }
 
 export function parseCurriculumProgress(
@@ -31,7 +45,8 @@ export function parseCurriculumProgress(
   if (!storedValue) return emptyProgress(planId);
   try {
     const parsed = storeSchema.safeParse(JSON.parse(storedValue));
-    return parsed.success ? parsed.data.plans[String(planId)] ?? emptyProgress(planId) : emptyProgress(planId);
+    const storedPlan = parsed.success ? parsed.data.plans[String(planId)] : undefined;
+    return storedPlan ? normalizeProgress(storedPlan) : emptyProgress(planId);
   } catch {
     return emptyProgress(planId);
   }
@@ -41,17 +56,21 @@ export function updateStoredCurriculumProgress(
   storedValue: string | null,
   progress: CurriculumProgress,
 ): string {
-  let store: ProgressStore = { version: 1, plans: {} };
+  let plans: Record<string, CurriculumProgress> = {};
   if (storedValue) {
     try {
       const parsed = storeSchema.safeParse(JSON.parse(storedValue));
-      if (parsed.success) store = parsed.data;
+      if (parsed.success) {
+        plans = Object.fromEntries(
+          Object.entries(parsed.data.plans).map(([id, plan]) => [id, normalizeProgress(plan)]),
+        );
+      }
     } catch {
       // Replace malformed local data with a validated store.
     }
   }
   return JSON.stringify({
     version: 1,
-    plans: { ...store.plans, [String(progress.planId)]: progress },
+    plans: { ...plans, [String(progress.planId)]: progress },
   });
 }

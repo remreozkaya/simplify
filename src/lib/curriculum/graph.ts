@@ -26,6 +26,12 @@ export type CurriculumGraph = {
   edges: CurriculumGraphEdge[];
 };
 
+export type CurriculumCourseConnection = {
+  id: string;
+  source: string;
+  target: string;
+};
+
 export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph {
   const nodes: CurriculumGraphNode[] = [];
   const edges: CurriculumGraphEdge[] = [];
@@ -161,6 +167,40 @@ export function getAncestorNodeIds(graph: CurriculumGraph, nodeId: string): Set<
 
 export function getDependentNodeIds(graph: CurriculumGraph, nodeId: string): Set<string> {
   return traverse(nodeId, graph.edges, "down");
+}
+
+export function getVisibleCourseConnections(
+  graph: CurriculumGraph,
+  visibleNodeIds: ReadonlySet<string>,
+): CurriculumCourseConnection[] {
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+  const incoming = new Map<string, string[]>();
+  graph.edges.forEach((edge) => {
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
+  });
+
+  function findCourseSources(nodeId: string, visited = new Set<string>()): string[] {
+    if (visited.has(nodeId)) return [];
+    visited.add(nodeId);
+
+    return (incoming.get(nodeId) ?? []).flatMap((sourceId) => {
+      const source = nodeById.get(sourceId);
+      if (!source) return [];
+      if (source.kind === "course" && visibleNodeIds.has(sourceId)) return [sourceId];
+      if (source.kind === "and") return findCourseSources(sourceId, visited);
+      return [];
+    });
+  }
+
+  return graph.nodes
+    .filter((node) => node.kind === "course" && visibleNodeIds.has(node.id))
+    .flatMap((target) =>
+      [...new Set(findCourseSources(target.id))].map((source) => ({
+        id: `curve:${source}:${target.id}`,
+        source,
+        target: target.id,
+      })),
+    );
 }
 
 export function getCourseByCode(

@@ -246,6 +246,10 @@ export function useItuCourseCatalog() {
       ),
     [branches, catalogByCode],
   );
+  const loadedBranchCodes = useMemo(
+    () => new Set(Object.keys(catalogByCode)),
+    [catalogByCode],
+  );
 
   const isBranchLoading = useCallback(
     (branchCode: string) => loadingBranchCodes.has(branchCode),
@@ -255,6 +259,7 @@ export function useItuCourseCatalog() {
   return {
     branches,
     courseCatalog,
+    loadedBranchCodes,
     isLoadingBranches,
     isBranchLoading,
     loadBranch,

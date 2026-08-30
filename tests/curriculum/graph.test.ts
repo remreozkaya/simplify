@@ -4,6 +4,7 @@ import {
   buildCurriculumGraph,
   getAncestorNodeIds,
   getDependentNodeIds,
+  getVisibleCourseConnections,
 } from "@/lib/curriculum/graph";
 import { parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteExpression";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
@@ -106,5 +107,16 @@ describe("curriculum graph", () => {
     expect(getDependentNodeIds(graph, "course:a").has("course:c")).toBe(true);
     graph.edges.push({ id: "cycle", source: "course:c", target: "course:a", relationship: "required" });
     expect(getAncestorNodeIds(graph, "course:c").size).toBeLessThanOrEqual(graph.nodes.length);
+  });
+
+  it("resolves the prerequisite relationships used by the visible curve layer", () => {
+    const graph = buildCurriculumGraph(curriculum);
+    const allCourses = new Set(["course:a", "course:b", "course:c"]);
+
+    expect(getVisibleCourseConnections(graph, allCourses)).toEqual([
+      { id: "curve:course:a:course:b", source: "course:a", target: "course:b" },
+      { id: "curve:course:b:course:c", source: "course:b", target: "course:c" },
+    ]);
+    expect(getVisibleCourseConnections(graph, new Set(["course:a", "course:c"]))).toEqual([]);
   });
 });
