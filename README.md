@@ -2,7 +2,7 @@
 
 Simplify is a web application designed to make university life easier by bringing different student-planning tools into one place.
 
-The project began as a weekly lecture planner for İTÜ students and has grown into a full academic-planning workspace. Students can audit multiple programs, import their transcript, receive semester recommendations, generate conflict-aware schedules, and keep visual weekly plans in one application.
+The project began as a weekly lecture planner for İTÜ students and has grown into a full academic-planning workspace. Students can audit multiple programs, accumulate transcript data semester by semester, compare program-specific progress and GPA, receive semester recommendations, generate conflict-aware schedules, and keep visual weekly plans in one application.
 
 ## Current Status
 
@@ -14,7 +14,7 @@ Implemented:
 * Weekly planner and schedule generator with device-local persistence
 * ITU OBS course and curriculum integrations
 * Curriculum prerequisite graph
-* Transcript import, course equivalencies, and graduation audits
+* Cumulative transcript imports, course equivalencies, graduation audits, and program-specific GPA
 * Correct undergraduate, ÇAP, and Yandal profile/curriculum support
 * Smart Semester Planner with explainable, editable recommendations
 * Verified email/password authentication and password recovery
@@ -36,6 +36,21 @@ Students can set a local-credit target, maximum course count, program priority, 
 The planner counts an identical shared compulsory course once in semester workload while showing its contribution to each applicable program. It does not infer equivalence from similar course names or assume that elective overlap can be shared without an explicit rule. Recommendations can be locked, removed, replaced, and sent directly to the Schedule Generator. Existing generator time/day preferences are preserved during handoff; academically suitable alternatives remain available if the selected courses cannot produce a conflict-free timetable.
 
 Current data boundaries are shown in the interface instead of being silently guessed: future-semester availability remains unknown until offerings are published, official per-semester registration limits are not present in the source data, and İTÜ's public data does not expose corequisites as a separate structured rule. All recommendations remain provisional and should be verified in OBS before registration.
+
+## Graduation Calculator and Curriculum Audit
+
+The Graduation Calculator at `/graduation-calculator` imports İTÜ transcript text into one shared academic record. Imports are cumulative: students can paste only the courses from a newly completed semester without losing previously stored main-major, double-major, or minor progress. Reimporting the same course does not create a duplicate; the newest attempt is retained, and an older pasted attempt cannot overwrite a newer stored result.
+
+Every active profile enrollment is evaluated independently against its exact curriculum type and version:
+
+* the main program uses its selected undergraduate plan;
+* a double major uses its associated ÇAP plan;
+* a minor uses its associated Yandal plan;
+* exact course matches, Turkish/English counterparts, verified directional equivalencies, and elective assignments follow the same deterministic resolution order in every audit.
+
+The selected program summary displays completed requirements, counted local credits, English credits, and a program-specific GPA. Program GPA includes only graded courses matched to that curriculum, uses transcript credits as weights, and counts a course once if it appears through more than one matched requirement. Courses without a numeric grade do not affect the calculation; the interface displays `—` when no numeric program GPA is available.
+
+The Curriculum page at `/curriculum` consumes the same accumulated transcript and stored progress, so switching between program views does not discard another program's data.
 
 ## Weekly Lecture Program
 
@@ -65,7 +80,7 @@ Possible future features:
 * Automatic data sync from ITU OBS
 * Exam calendar
 * Assignment and deadline tracker
-* GPA calculator
+* What-if GPA and target-grade simulator
 * PDF and calendar (`.ics`) export
 * Cloud-saved schedules and academic progress
 
@@ -137,7 +152,7 @@ Use a test inbox or local Supabase/Mailpit environment; automated tests never se
 
 1. Sign up at `/signup` and confirm that invalid email, short password, and mismatched passwords are rejected.
 2. Confirm the verification screen appears and protected URLs redirect to `/login` before verification.
-3. Follow the email link, log in, refresh, and open `/`, `/generator`, and `/curriculum`.
+3. Follow the email link, log in, refresh, and open `/`, `/generator`, `/curriculum`, `/graduation-calculator`, and `/semester-planner`.
 4. Log out and verify a manually entered protected URL redirects to `/login` with its intended path preserved.
 5. Request a reset from `/forgot-password`, follow the link, set a new password, and confirm the old password no longer works.
 6. Exercise expired/used verification and recovery links and the verification resend cooldown.
@@ -146,7 +161,7 @@ Provider-dependent email delivery, verification, and old-password invalidation r
 
 ## Project Structure
 
-Planned structure:
+Current structure:
 
 ```txt
 src/
@@ -226,7 +241,7 @@ npm run curricula:prerequisites
 
 ## Git Workflow
 
-The project currently uses a simple branch workflow.
+`main` is the stable branch and currently contains the complete application described above. New work should be developed on a short-lived branch and merged only after tests, lint, and a production build pass.
 
 ```txt
 main
@@ -235,17 +250,17 @@ main
 Stable version of the project.
 
 ```txt
-feature/weekly-calendar
+codex/feature-name
 ```
 
-Development branch for the weekly calendar feature.
+Example development branch.
 
 Typical workflow:
 
 ```bash
-git checkout main
+git switch main
 git pull
-git checkout -b feature/name-of-feature
+git switch -c codex/feature-name
 ```
 
 After making changes:
@@ -253,7 +268,7 @@ After making changes:
 ```bash
 git add .
 git commit -m "Describe the change"
-git push -u origin feature/name-of-feature
+git push -u origin codex/feature-name
 ```
 
 ## Roadmap
@@ -311,14 +326,16 @@ git push -u origin feature/name-of-feature
 * [x] Add authenticated academic profiles
 * [x] Support exact undergraduate, ÇAP, and Yandal curricula
 * [x] Import and reconcile transcript progress and verified equivalencies
+* [x] Preserve accumulated transcript data across semester imports
 * [x] Add independent multi-program graduation audits
+* [x] Calculate GPA separately for each selected program
 * [x] Recommend editable semester workloads across all active programs
 * [x] Transfer semester recommendations into the schedule generator
 * [ ] Persist academic planning data to the authenticated user's cloud account
 
 ### Phase 9 — Deployment
 
-* [ ] Prepare production build
+* [x] Validate the production build
 * [ ] Deploy first public version
 * [ ] Add environment variables if needed
 * [ ] Document deployment process
