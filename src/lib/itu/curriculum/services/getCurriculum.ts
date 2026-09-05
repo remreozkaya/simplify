@@ -16,6 +16,7 @@ import type {
   ParsedCurriculum,
 } from "@/lib/itu/curriculum/types";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
+import { getStoredEquivalenceRules } from "@/lib/curriculum/equivalenceStore";
 
 export function collectElectiveGroupIds(curriculum: ParsedCurriculum): number[] {
   return [
@@ -29,9 +30,24 @@ export function collectElectiveGroupIds(curriculum: ParsedCurriculum): number[] 
   ];
 }
 
+export function collectPrerequisiteBranchCodes(curriculum: ParsedCurriculum): string[] {
+  return [
+    ...new Set(
+      curriculum.semesters.flatMap((semester) =>
+        semester.items.flatMap((item) =>
+          item.kind === "course"
+            ? [item.code.split(" ")[0]]
+            : item.courses.map((course) => course.code.split(" ")[0]),
+        ),
+      ),
+    ),
+  ].sort();
+}
+
 export async function getCurriculum(
   planId: number,
   programCode: string,
+  planType: import("@/lib/itu/curriculum/types").ItuPlanType = "undergraduate",
 ): Promise<ItuCurriculum> {
   let parsed;
   try {
@@ -47,7 +63,7 @@ export async function getCurriculum(
     });
   }
   if (parsed.semesters.length === 0) {
-    throw new ItuObsUpstreamError("İTÜ OBS returned a curriculum without semester data.");
+    throw new ItuObsUpstreamError("İTÜ OBS returned a curriculum without course data.");
   }
   const warnings: string[] = [];
   const groupIds = collectElectiveGroupIds(parsed);
@@ -79,9 +95,7 @@ export async function getCurriculum(
     ),
   );
   const allKnownCourseCodes = new Set([...courseCodes, ...electiveCourseCodes]);
-  const neededBranches = [
-    ...new Set(courseCodes.map((code) => code.split(" ")[0])),
-  ];
+  const neededBranches = collectPrerequisiteBranchCodes(parsed);
   const prerequisites: Record<string, ItuCoursePrerequisite> = {};
   const prerequisiteBranchesLoaded: string[] = [];
   let prerequisiteDataAvailable = true;
@@ -113,6 +127,8 @@ export async function getCurriculum(
 
   return {
     ...parsed,
+    planType,
+    equivalenceRules: getStoredEquivalenceRules(programCode, planId),
     prerequisites,
     prerequisiteBranchesLoaded: prerequisiteBranchesLoaded.sort(),
     prerequisiteDataAvailable,

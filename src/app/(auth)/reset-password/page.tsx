@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthMessage from "@/components/auth/AuthMessage";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import LocalizedText from "@/components/LocalizedText";
 import { RECOVERY_COOKIE } from "@/lib/auth/cookies";
 
 type ResetPasswordPageProps = {
@@ -20,7 +21,7 @@ export default async function ResetPasswordPage({
 
   if (params.updated === "1") {
     return (
-      <AuthCard title="Your password has been updated">
+      <AuthCard title="Your password has been updated" titleKey="authentication.passwordUpdated">
         <div className="space-y-5">
           <AuthMessage
             tone="success"
@@ -30,7 +31,7 @@ export default async function ResetPasswordPage({
             href="/login"
             className="flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
           >
-            Return to Login
+            <LocalizedText translationKey="authentication.returnLogin" />
           </Link>
         </div>
       </AuthCard>
@@ -44,21 +45,21 @@ export default async function ResetPasswordPage({
 
   if (invalid) {
     return (
-      <AuthCard title="Reset link unavailable">
+      <AuthCard title="Reset link unavailable" titleKey="authentication.resetUnavailable">
         <div className="space-y-5">
           <AuthMessage message="This password reset link is invalid or has expired." />
           <Link
             href="/forgot-password"
             className="flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
           >
-            Request another reset link
+            <LocalizedText translationKey="authentication.requestAnother" />
           </Link>
           <p className="text-center text-sm">
             <Link
               href="/login"
               className="font-bold text-slate-600 hover:underline dark:text-slate-300"
             >
-              Return to login
+              <LocalizedText translationKey="authentication.backLogin" />
             </Link>
           </p>
         </div>
@@ -70,6 +71,8 @@ export default async function ResetPasswordPage({
     <AuthCard
       title="Choose a new password"
       description="Your reset link is single-use and expires automatically."
+      titleKey="authentication.choosePassword"
+      descriptionKey="authentication.choosePasswordDescription"
     >
       <ResetPasswordForm />
     </AuthCard>

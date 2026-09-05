@@ -6,6 +6,7 @@ import {
   isCourseTakeableThisSemester,
 } from "@/lib/curriculum/eligibility";
 import { parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { sharedCourseProgress } from "@/lib/curriculum/transcriptStore";
 
 describe("curriculum eligibility", () => {
   const andExpression = parsePrerequisiteExpression("MAT 103E AND BLG 102E");
@@ -47,6 +48,11 @@ describe("curriculum eligibility", () => {
         "BLG 102": { state: "passed" },
       }),
     ).toBe("satisfied");
+  });
+
+  it("satisfies an external prerequisite from the shared main-program transcript", () => {
+    const shared = sharedCourseProgress([{ term: "202510", crn: "1", courseCode: "MAT103E", courseName: "Math", grade: "BA", countedCredit: 4, transcriptCredit: 4, completionStatus: "passed", source: "transcript", calculated: true }]);
+    expect(evaluatePrerequisiteExpression(parsePrerequisiteExpression("MAT 103E MIN. BB"), shared)).toBe("satisfied");
   });
 
   it("requires a grade when OBS specifies a minimum", () => {
@@ -108,6 +114,24 @@ describe("curriculum eligibility", () => {
       prerequisite,
       { ...completed, "BBF 301E": { state: "failed" as const } },
       offered,
+    )).toBe(true);
+  });
+
+  it("does not recommend a course when its Turkish/English counterpart is passed", () => {
+    expect(isCourseTakeableThisSemester(
+      "ITB 201E",
+      undefined,
+      { "ITB 201": { state: "passed" } },
+      new Set(["ITB 201E"]),
+    )).toBe(false);
+  });
+
+  it("recommends a curriculum course when its Turkish/English counterpart is offered", () => {
+    expect(isCourseTakeableThisSemester(
+      "YZV 411E",
+      undefined,
+      {},
+      new Set(["YZV 411"]),
     )).toBe(true);
   });
 });

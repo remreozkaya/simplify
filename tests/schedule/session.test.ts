@@ -56,4 +56,40 @@ describe("generator session persistence", () => {
       }),
     ).toBeNull();
   });
+
+  it("restores Smart Semester Planner handoff metadata", () => {
+    expect(parseGeneratorSession({
+      version: 2,
+      courses: [{
+        id: "semester-plan-1",
+        branchCode: "BLG",
+        courseId: "",
+        courseCode: "BLG 335E",
+        pinnedSectionId: "",
+      }],
+      earliestStartTime: "",
+      latestEndTime: "",
+      excludedDays: [],
+      source: "semester-planner",
+      targetSemester: "published",
+      plannerLockedCourseCodes: ["BLG 335E"],
+      plannerAlternatives: ["BLG 411E"],
+    })).toEqual({
+      version: 2,
+      courses: [{
+        id: "semester-plan-1",
+        branchCode: "BLG",
+        courseId: "",
+        courseCode: "BLG 335E",
+        pinnedSectionId: "",
+      }],
+      earliestStartTime: "",
+      latestEndTime: "",
+      excludedDays: [],
+      source: "semester-planner",
+      targetSemester: "published",
+      plannerLockedCourseCodes: ["BLG 335E"],
+      plannerAlternatives: ["BLG 411E"],
+    });
+  });
 });

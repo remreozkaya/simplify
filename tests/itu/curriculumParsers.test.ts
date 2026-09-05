@@ -10,7 +10,10 @@ import {
   parsePrerequisites,
 } from "@/lib/itu/curriculum/parsers/parsePrerequisites";
 import { parseUndergraduatePrograms } from "@/lib/itu/curriculum/parsers/parseUndergraduatePrograms";
-import { collectElectiveGroupIds } from "@/lib/itu/curriculum/services/getCurriculum";
+import {
+  collectElectiveGroupIds,
+  collectPrerequisiteBranchCodes,
+} from "@/lib/itu/curriculum/services/getCurriculum";
 
 function fixture(name: string) {
   return readFileSync(join(process.cwd(), "tests/fixtures/itu/curriculum", name), "utf8");
@@ -35,6 +38,15 @@ describe("ITU curriculum parsers", () => {
     expect(plans.map((plan) => plan.id)).toEqual([2340, 1562, 1194]);
     expect(plans[0].isCurrent).toBe(true);
     expect(plans[1].isCurrent).toBe(false);
+  });
+
+  it("preserves non-undergraduate plan types, versions, sources, and associated programs", () => {
+    const plans = parseCurriculumPlans(fixture("plans.html"), "END_LS", "cap");
+    expect(plans).toHaveLength(3);
+    expect(plans[0]).toMatchObject({ planType: "cap", sourceUrl: "https://obs.itu.edu.tr/public/DersPlan/DersPlanDetay/2340" });
+    const detail = parseCurriculumDetail(`<div class="content-area"><h1>Target</h1><h2>MAT_END ÇAP Programı</h2><table class="datalist"><tbody><tr><td><a>END 112E</a></td><td>Course</td><td>English</td><td>Z</td><td>3</td><td>5</td><td>3</td><td>0</td><td>0</td><td>TM</td></tr></tbody></table><h2>İlişkili Programlar</h2><table id="dersPlanProgramList" class="datalist"><tbody><tr><td>MAT_LS</td><td>Matematik</td><td>today</td></tr></tbody></table></div>`, 77, "END_LS");
+    expect(detail.semesters[0].items).toHaveLength(1);
+    expect(detail.associatedPrimaryProgramCodes).toEqual(["MAT_LS"]);
   });
 
   it("parses semesters, courses, elective slots, decimal commas, alternatives, totals, and notes", () => {
@@ -79,6 +91,18 @@ describe("ITU curriculum parsers", () => {
     if (slot.kind !== "elective-slot") throw new Error("Fixture elective slot is missing.");
     curriculum.semesters[1].items.push({ ...slot, id: `${slot.id}:copy` });
     expect(collectElectiveGroupIds(curriculum)).toEqual([11778]);
+  });
+
+  it("loads prerequisite branches used only by elective pools", () => {
+    const curriculum = parseCurriculumDetail(fixture("detail.html"), 2340, "BLGE_LS");
+    const slot = curriculum.semesters[1].items[0];
+    if (slot.kind !== "elective-slot") throw new Error("Fixture elective slot is missing.");
+    slot.courses = [
+      { code: "YZV 411E", title: "AI elective", creditOptions: [3], ectsOptions: [5] },
+      { code: "ITB 201", title: "Humanities elective", creditOptions: [3], ectsOptions: [5] },
+    ];
+
+    expect(collectPrerequisiteBranchCodes(curriculum)).toEqual(["BLG", "ITB", "MAT", "YZV"]);
   });
 
   it("parses branch IDs, prerequisite logic, grades, and earned-credit conditions", () => {

@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "equivalences:import": "node scripts/import-course-equivalences.mjs",
+    "equivalences:report": "node scripts/import-course-equivalences.mjs --report",
+    "curricula:import": "node scripts/import-itu-curricula.mjs",
+    "curricula:prerequisites": "node scripts/import-itu-curricula.mjs --prerequisites-only"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

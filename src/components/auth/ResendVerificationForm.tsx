@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { resendVerificationAction } from "@/app/auth/actions";
 import AuthMessage from "@/components/auth/AuthMessage";
 import { INITIAL_AUTH_STATE } from "@/lib/auth/types";
+import { useLanguage } from "@/lib/i18n/client";
 
 type ResendVerificationFormProps = {
   email?: string;
@@ -20,6 +21,7 @@ function ResendButton({
   initialSeconds: number;
   disabled: boolean;
 }) {
+  const { t } = useLanguage();
   const [remaining, setRemaining] = useState(initialSeconds);
 
   useEffect(() => {
@@ -37,10 +39,10 @@ function ResendButton({
       className="h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200 dark:hover:bg-blue-950"
     >
       {pending
-        ? "Sending…"
+        ? t("authentication.sending")
         : remaining > 0
-          ? `Resend in ${remaining}s`
-          : "Resend verification email"}
+          ? t("authentication.resendIn", { seconds: remaining })
+          : t("authentication.resend")}
     </button>
   );
 }
@@ -49,6 +51,7 @@ export default function ResendVerificationForm({
   email,
   allowEmailEntry = false,
 }: ResendVerificationFormProps) {
+  const { t } = useLanguage();
   const [state, action, pending] = useActionState(
     resendVerificationAction,
     INITIAL_AUTH_STATE,
@@ -62,7 +65,7 @@ export default function ResendVerificationForm({
             htmlFor="resend-email"
             className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-100"
           >
-            Email
+            {t("authentication.email")}
           </label>
           <input
             id="resend-email"

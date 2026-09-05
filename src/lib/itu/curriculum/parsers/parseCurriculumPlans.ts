@@ -1,10 +1,11 @@
 import * as cheerio from "cheerio";
 
-import type { ItuCurriculumPlan } from "@/lib/itu/curriculum/types";
+import type { ItuCurriculumPlan, ItuPlanType } from "@/lib/itu/curriculum/types";
 
 export function parseCurriculumPlans(
   html: string,
   programCode: string,
+  planType: ItuPlanType = "undergraduate",
 ): ItuCurriculumPlan[] {
   const $ = cheerio.load(html);
   const plans: ItuCurriculumPlan[] = [];
@@ -19,7 +20,11 @@ export function parseCurriculumPlans(
       id: Number(match[1]),
       programCode,
       title,
+      nameTr: title,
       isCurrent: /(?:sonrası|after|ve sonrası|and after)/i.test(title),
+      planType,
+      validityPeriod: title.match(/\d{4}-\d{4}[^]*$/)?.[0]?.trim(),
+      sourceUrl: `https://obs.itu.edu.tr/public/DersPlan/DersPlanDetay/${match[1]}`,
     });
   });
 

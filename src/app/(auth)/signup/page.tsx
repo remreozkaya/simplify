@@ -9,6 +9,8 @@ export default async function SignupPage() {
     <AuthCard
       title="Create your Simplify account"
       description="Use your email and verify it before accessing the application."
+      titleKey="authentication.signupTitle"
+      descriptionKey="authentication.signupDescription"
     >
       <SignupForm />
     </AuthCard>

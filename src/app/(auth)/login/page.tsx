@@ -16,6 +16,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <AuthCard
       title="Welcome back"
       description="Log in to continue to your Simplify workspace."
+      titleKey="authentication.welcome"
+      descriptionKey="authentication.welcomeDescription"
     >
       <LoginForm nextPath={getSafeNextPath(rawNext)} />
     </AuthCard>

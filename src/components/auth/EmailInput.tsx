@@ -1,3 +1,8 @@
+"use client";
+
+import { localizeRuntimeMessage } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n/client";
+
 type EmailInputProps = {
   error?: string;
   defaultValue?: string;
@@ -7,13 +12,14 @@ export default function EmailInput({
   error,
   defaultValue,
 }: EmailInputProps) {
+  const { language, t } = useLanguage();
   return (
     <div>
       <label
         htmlFor="email"
         className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-100"
       >
-        Email
+        {t("authentication.email")}
       </label>
       <input
         id="email"
@@ -35,7 +41,7 @@ export default function EmailInput({
       />
       {error ? (
         <p id="email-error" className="mt-1.5 text-sm text-red-600 dark:text-red-300">
-          {error}
+          {localizeRuntimeMessage(language, error)}
         </p>
       ) : null}
     </div>

@@ -10,6 +10,7 @@ import { parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteEx
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 
 const curriculum: ItuCurriculum = {
+  equivalenceRules: [],
   planId: 1,
   programCode: "TEST_LS",
   title: "Test",
@@ -118,5 +119,46 @@ describe("curriculum graph", () => {
       { id: "curve:course:b:course:c", source: "course:b", target: "course:c" },
     ]);
     expect(getVisibleCourseConnections(graph, new Set(["course:a", "course:c"]))).toEqual([]);
+  });
+
+  it("keeps official curves within and across display groups", () => {
+    const unorderedCurriculum = structuredClone(curriculum);
+    unorderedCurriculum.semesters[1].items.push({
+      kind: "course",
+      id: "course:d",
+      semester: 2,
+      code: "KIM 101E",
+      title: "Chemistry",
+      requirementType: "compulsory",
+      creditOptions: [3],
+      ectsOptions: [5],
+    });
+    unorderedCurriculum.prerequisites["BLG 102E"] = {
+      courseCode: "BLG 102E",
+      expression: parsePrerequisiteExpression(
+        "MAT 103E OR KIM 101E OR BBF 201E",
+      ),
+    };
+
+    const graph = buildCurriculumGraph(unorderedCurriculum);
+    const connections = getVisibleCourseConnections(
+      graph,
+      new Set(["course:a", "course:b", "course:c", "course:d"]),
+    );
+
+    expect(connections).toContainEqual({
+      id: "curve:course:a:course:b",
+      source: "course:a",
+      target: "course:b",
+    });
+    expect(connections).toContainEqual(expect.objectContaining({
+      source: "course:d",
+      target: "course:b",
+    }));
+    expect(connections).toContainEqual(expect.objectContaining({
+      source: "course:c",
+      target: "course:b",
+    }));
+    expect(graph.nodes.find((node) => node.id === "course:c")?.externalPrerequisiteCodes).toEqual(["FIZ 101E"]);
   });
 });

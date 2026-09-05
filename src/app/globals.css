@@ -33,7 +33,8 @@ aside,
 footer,
 button,
 input,
-select {
+select,
+textarea {
   transition-property: background-color, border-color, color;
   transition-duration: 180ms;
 }
@@ -80,7 +81,8 @@ select {
 }
 
 .dark input,
-.dark select {
+.dark select,
+.dark textarea {
   background-color: #0f172a;
   color: #e2e8f0;
 }
@@ -92,12 +94,4 @@ select {
 .dark .theme-toggle {
   background-color: #111827;
   color: #e2e8f0;
-}
-
-.dark .theme-light-label {
-  display: none;
-}
-
-.dark .theme-dark-label {
-  display: inline;
 }

@@ -1,0 +1,34 @@
+İngilizce Tamamlanan Dersler
+Dönem	CRN	Ders Kodu	Ders Adı	Kredi	Not
+202520	20527	ISP 101	İspanyolca I	3	AA
+202510	10167	FIZ 101EL	Physics I Laboratory	1	AA
+202510	15158	BBF 101E	Introduction to Information Systems	2	AA
+202510	13544	BLG 113E	Intr.toComp.Eng.and Ethics	1,5	AA
+202420	20418	MAT 103E	Mathematics I	4	AA
+202510	15163	BBF 102E	Linear Algebra and Applications	3	AA
+202420	22315	ING 100	EAP Through Global Goals	3	AA
+202420	21328	BLG 102E	Intr to Sci&Eng Comp (C)	4	AA
+202510	10029	MAT 104E	Mathematics II	4	AA
+202510	10226	FIZ 102E	Physics II	3	AA
+202420	20531	FIZ 102EL	Physics II Laboratory	1	AA
+202510	10363	ING 112A	Basics of Academic Writing	2	AA
+202610	15121	MAT 210E	Engineering Mathematics	4	AA
+202610	15945	BLG 223E	Data Structures	3,5	AA
+202610	14356	EEF 211E	Basics of Electrical Circuits	3	AA
+202520	20248	ING 201A	Essentials of Res.Paper Writ.	2	AA
+202620	23728	BLG 222E	Computer Organization	3	AA
+202620	23819	BLG 312E	Computer Operating Systems	3	AA
+202520	20670	SNT 226E	Philosophy of Art	3	AA
+202420	20714	EKO 201E	Economics	3	AA
+202420	20484	FIZ 101E	Physics I	3	BA+
+202520	22586	BBF 103E	Discrete Mathematics	3	BA+
+202520	22592	BLG 202E	Numerical Methods in CE	3	BA+
+202610	13495	BLG 231E	Digital Circuits	3	BA
+202620	23734	BLG 242E	Logic Circuits Laboratory	1	BA
+202620	23874	BLG 374E	Tech. Communic.for Comp.Eng.	1	BA
+202620	23900	BLG 478E	Network Security	2 / 3	BB+
+202620	23744	BBF 204E	Formal Languages and Automata	3	BB
+202520	22605	BLG 252E	Object Oriented Programming	3	CC
+Kullanılmayan Dersler
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Kredi	Not
+202520	20627	SNT 105E	Film Art	EN	3.00	BA+

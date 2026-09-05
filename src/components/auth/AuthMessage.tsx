@@ -1,3 +1,8 @@
+"use client";
+
+import { localizeRuntimeMessage } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n/client";
+
 type AuthMessageProps = {
   message?: string;
   tone?: "error" | "success" | "info";
@@ -15,6 +20,7 @@ export default function AuthMessage({
   message,
   tone = "error",
 }: AuthMessageProps) {
+  const { language } = useLanguage();
   if (!message) return null;
   return (
     <div
@@ -22,7 +28,7 @@ export default function AuthMessage({
       role={tone === "error" ? "alert" : "status"}
       aria-live="polite"
     >
-      {message}
+      {localizeRuntimeMessage(language, message)}
     </div>
   );
 }

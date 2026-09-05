@@ -28,6 +28,8 @@ import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
 import { formatSectionLabel } from "@/lib/calendar/sectionLabels";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
+import { formatDate, localizedWeekday } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n/client";
 import {
   hasMeetingConflicts,
   meetingsOverlap,
@@ -441,22 +443,6 @@ function getSectionById(
   );
 }
 
-function formatUpdatedAt(updatedAt: string) {
-  const date = new Date(updatedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return date.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function removeCourseBlocks(
   courseBlocks: CourseBlock[],
   courseBlockIds: string[],
@@ -500,6 +486,7 @@ function SortableCourseRow({
   onSectionChange,
   onDelete,
 }: SortableCourseRowProps) {
+  const { t } = useLanguage();
   const {
     attributes,
     listeners,
@@ -548,8 +535,8 @@ function SortableCourseRow({
       <button
         ref={setActivatorNodeRef}
         type="button"
-        aria-label="Drag to reorder course"
-        title="Drag to reorder"
+        aria-label={t("weeklyPlanner.dragCourse")}
+        title={t("weeklyPlanner.drag")}
         className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out hover:bg-gray-100/80 hover:text-gray-600 active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
         {...attributes}
         {...listeners}
@@ -569,7 +556,7 @@ function SortableCourseRow({
         className={selectClassName}
       >
         <option value="">
-          {isLoadingBranches ? "Loading prefixes…" : "Course Prefix"}
+          {t(isLoadingBranches ? "courses.loadingPrefixes" : "courses.prefix")}
         </option>
 
         {courseCatalog.map((faculty) => (
@@ -594,7 +581,7 @@ function SortableCourseRow({
         className={selectClassName}
       >
         <option value="">
-          {branchIsLoading ? "Loading courses…" : "Course Code and Name"}
+          {t(branchIsLoading ? "courses.loadingCourses" : "courses.codeAndName")}
         </option>
 
         {availableCourses.map((course) => (
@@ -618,7 +605,7 @@ function SortableCourseRow({
         disabled={!selection.courseId || branchIsLoading}
         className={selectClassName}
       >
-        <option value="">CRN / Section</option>
+        <option value="">{t("weeklyPlanner.crnSection")}</option>
 
         {selectedCourse?.sections.map(
           (section) => (
@@ -637,7 +624,7 @@ function SortableCourseRow({
         onClick={() => onDelete(selection)}
         className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100"
       >
-        Delete
+        {t("weeklyPlanner.delete")}
       </button>
     </div>
   );
@@ -650,6 +637,7 @@ function DraggedCourseRow({
   selection: CourseSelection;
   courseCatalog: FacultyOption[];
 }) {
+  const { t } = useLanguage();
   const selectedCourse = getCourseById(
     courseCatalog,
     selection.facultyCode,
@@ -663,15 +651,15 @@ function DraggedCourseRow({
 
   const facultyText =
     selection.facultyCode ||
-    "Faculty Code";
+    t("courses.prefix");
 
   const courseText = selectedCourse
     ? `${selectedCourse.code} - ${selectedCourse.title}`
-    : "Course Code and Name";
+    : t("courses.codeAndName");
 
   const sectionText = selectedSection
     ? formatSectionLabel(selectedSection)
-    : "CRN / Section";
+    : t("weeklyPlanner.crnSection");
 
   return (
     <div
@@ -700,7 +688,7 @@ function DraggedCourseRow({
       </div>
 
       <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm">
-        Delete
+        {t("weeklyPlanner.delete")}
       </div>
     </div>
   );
@@ -711,6 +699,7 @@ type WeeklyCalendarProps = {
 };
 
 export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps) {
+  const { language, t } = useLanguage();
   const {
     courseCatalog,
     isLoadingBranches,
@@ -937,7 +926,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     }
 
     return window.confirm(
-      "The program name has not been saved. Discard the name change?",
+      t("weeklyPlanner.discardName"),
     );
   }
 
@@ -983,9 +972,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
 
     const newProgram =
       createEmptyProgram(
-        `Program ${
-          weeklyPrograms.length + 1
-        }`,
+        t("weeklyPlanner.defaultProgram", { number: weeklyPrograms.length + 1 }),
       );
 
     setWeeklyPrograms(
@@ -1007,7 +994,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
 
     const trimmedProgramName =
       programName.trim() ||
-      "Untitled Program";
+      t("weeklyPlanner.untitled");
 
     updateSelectedProgram(
       (program) => ({
@@ -1038,12 +1025,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
   }
 
   function handleDeleteProgram() {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${
-        selectedProgram?.name ??
-        "this program"
-      }"? This action cannot be undone.`,
-    );
+    const confirmed = window.confirm(t("weeklyPlanner.deleteConfirm", { name: selectedProgram?.name ?? t("weeklyPlanner.thisProgram") }));
 
     if (!confirmed) {
       return;
@@ -1430,7 +1412,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     ).length;
     const program = generatedScheduleToWeeklyProgram(schedule, {
       id: programId,
-      name: `Generated Program ${generatedProgramCount + 1}`,
+      name: t("weeklyPlanner.generated", { number: generatedProgramCount + 1 }),
     });
 
     setWeeklyPrograms((currentPrograms) => [...currentPrograms, program]);
@@ -1450,7 +1432,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         name: programName.trim() || selectedProgram.name,
       });
       setJpegExportStatus({
-        message: `${filename} downloaded.`,
+        message: t("weeklyPlanner.downloaded", { filename }),
         isError: false,
       });
     } catch (error: unknown) {
@@ -1458,7 +1440,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         message:
           error instanceof Error
             ? error.message
-            : "The Weekly Program could not be exported as JPEG.",
+            : t("weeklyPlanner.exportError"),
         isError: true,
       });
     }
@@ -1471,7 +1453,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Weekly Program
+              {t("weeklyPlanner.weeklyProgram")}
             </label>
 
             <select
@@ -1504,14 +1486,14 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
                   NEW_PROGRAM_VALUE
                 }
               >
-                + New Program
+                + {t("weeklyPlanner.newProgram")}
               </option>
             </select>
           </div>
 
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Program Name
+              {t("weeklyPlanner.programName")}
             </label>
 
             <input
@@ -1525,7 +1507,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
               onKeyDown={
                 handleProgramNameKeyDown
               }
-              placeholder="Program name"
+              placeholder={t("weeklyPlanner.programNamePlaceholder")}
               className={
                 inputClassName
               }
@@ -1538,7 +1520,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
             disabled={!selectedProgram}
             className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Export JPEG
+            {t("weeklyPlanner.exportJpeg")}
           </button>
 
           <button
@@ -1552,7 +1534,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
             }
             className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
           >
-            Save
+            {t("weeklyPlanner.save")}
           </button>
 
           <button
@@ -1565,7 +1547,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
             }
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Delete Program
+            {t("weeklyPlanner.deleteProgram")}
           </button>
         </div>
 
@@ -1589,23 +1571,15 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         >
           {hasUnsavedNameChanges ? (
             <span className="font-medium text-orange-600">
-              Program name is not
-              saved. Course changes
-              are saved automatically.
+              {t("weeklyPlanner.unsavedName")}
             </span>
           ) : selectedProgram?.updatedAt ? (
             <span>
-              Courses save
-              automatically · Last
-              updated{" "}
-              {formatUpdatedAt(
-                selectedProgram.updatedAt,
-              )}
+              {t("weeklyPlanner.autosave")} · {t("weeklyPlanner.lastUpdated", { date: formatDate(language, selectedProgram.updatedAt, { dateStyle: "short", timeStyle: "short" }) })}
             </span>
           ) : (
             <span>
-              Courses save
-              automatically
+              {t("weeklyPlanner.autosave")}
             </span>
           )}
         </div>
@@ -1618,7 +1592,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
           disabled={!selectedProgram}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         >
-          Add Course
+          {t("weeklyPlanner.addCourse")}
         </button>
 
         {(isLoadingBranches || courseCatalogError) && (
@@ -1631,7 +1605,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
             role={courseCatalogError ? "alert" : "status"}
           >
             <span>
-              {courseCatalogError ?? "Loading İTÜ course prefixes…"}
+              {courseCatalogError ?? t("weeklyPlanner.loadingPrefixes")}
             </span>
 
             {courseCatalogError && (
@@ -1642,7 +1616,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
                 }
                 className="rounded-md border border-current px-2 py-1 text-xs font-semibold"
               >
-                Retry
+                {t("weeklyPlanner.retry")}
               </button>
             )}
           </div>
@@ -1653,7 +1627,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
             className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
             role="status"
           >
-            Schedule conflict: at least two selected meetings overlap.
+            {t("weeklyPlanner.conflict")}
           </div>
         )}
 
@@ -1661,10 +1635,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
           0 && (
           <div className="mt-4 space-y-3">
             <div className="text-xs text-gray-500">
-              Hold the three-line
-              handle and drag the
-              complete row to change
-              the course order.
+              {t("weeklyPlanner.dragHelp")}
             </div>
 
             <DndContext
@@ -1771,7 +1742,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
                 key={day}
                 className="border-r border-gray-200 bg-transparent p-3 text-center text-sm font-semibold text-gray-700 last:border-r-0"
               >
-                {day}
+                {localizedWeekday(language, day)}
               </div>
             ))}
           </div>
@@ -1888,7 +1859,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
                       </div>
 
                       <div className={`mt-1 font-medium ${colorStyle.body}`}>
-                        Instructor: {course.instructor ?? "TBA"}
+                        {t("weeklyPlanner.instructor")}: {course.instructor ?? t("weeklyPlanner.tba")}
                       </div>
 
                       {(course.building || course.room) && (

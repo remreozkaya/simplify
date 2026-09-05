@@ -2,15 +2,11 @@
 
 Simplify is a web application designed to make university life easier by bringing different student-planning tools into one place.
 
-The first goal of the project is to build a weekly lecture planner for ITU students. Users will be able to create a weekly course schedule by selecting course codes, courses, and course sessions. The selected lectures will appear on a weekly calendar view.
-
-This project is being developed step by step as a long-term full-stack web application.
+The project began as a weekly lecture planner for İTÜ students and has grown into a full academic-planning workspace. Students can audit multiple programs, import their transcript, receive semester recommendations, generate conflict-aware schedules, and keep visual weekly plans in one application.
 
 ## Current Status
 
-The project is in the early development stage.
-
-Implemented or in progress:
+Implemented:
 
 * Next.js project setup
 * TypeScript support
@@ -18,13 +14,34 @@ Implemented or in progress:
 * Weekly planner and schedule generator with device-local persistence
 * ITU OBS course and curriculum integrations
 * Curriculum prerequisite graph
+* Transcript import, course equivalencies, and graduation audits
+* Correct undergraduate, ÇAP, and Yandal profile/curriculum support
+* Smart Semester Planner with explainable, editable recommendations
 * Verified email/password authentication and password recovery
 
-## First Main Feature: Weekly Lecture Program
+## Smart Semester Planner
 
-The Weekly Lecture Program will allow users to create a visual weekly schedule.
+The Smart Semester Planner at `/semester-planner` turns the student's academic record into an editable course plan for the coming semester.
 
-Planned functionality:
+It uses:
+
+* the exact undergraduate, ÇAP, and Yandal curriculum plans saved in the student's profile;
+* completed courses, grades, transcript matches, verified equivalencies, and exemptions already recognized by each independent degree audit;
+* remaining compulsory courses and elective categories across every active program;
+* parsed prerequisite AND/OR expressions and minimum-grade requirements;
+* current published İTÜ offerings when that target is selected.
+
+Students can set a local-credit target, maximum course count, program priority, graduation date, and explicit include/exclude lists. Courses currently in progress can be entered separately: dependent recommendations are marked conditional and are never treated as already passed. Recommendations explain the requirement they serve, their program contribution, immediate prerequisite unlocks, and longer downstream chains.
+
+The planner counts an identical shared compulsory course once in semester workload while showing its contribution to each applicable program. It does not infer equivalence from similar course names or assume that elective overlap can be shared without an explicit rule. Recommendations can be locked, removed, replaced, and sent directly to the Schedule Generator. Existing generator time/day preferences are preserved during handoff; academically suitable alternatives remain available if the selected courses cannot produce a conflict-free timetable.
+
+Current data boundaries are shown in the interface instead of being silently guessed: future-semester availability remains unknown until offerings are published, official per-semester registration limits are not present in the source data, and İTÜ's public data does not expose corequisites as a separate structured rule. All recommendations remain provisional and should be verified in OBS before registration.
+
+## Weekly Lecture Program
+
+The Weekly Lecture Program creates and stores visual weekly schedules.
+
+Implemented functionality:
 
 * View a weekly calendar
 * Add lectures to the calendar
@@ -34,7 +51,9 @@ Planned functionality:
 * Display the selected session on the weekly calendar
 * Detect overlapping lecture times
 * Save selected lectures locally
-* Later, fetch real course data from ITU OBS
+* Fetch real course data from İTÜ OBS
+* Maintain multiple named weekly programs
+* Export a program as JPEG
 
 ## Future Features
 
@@ -42,19 +61,13 @@ The long-term goal is to turn Simplify into a broader university-life planning p
 
 Possible future features:
 
-* Course schedule planner
-* Time conflict detection
-* Multiple saved weekly schedules
 * Course search and filtering
 * Automatic data sync from ITU OBS
 * Exam calendar
 * Assignment and deadline tracker
 * GPA calculator
-* Degree progress tracker
-* Double-major/minor planning support
-* Study plan generator
-* Export schedule as image or PDF
-* User accounts and cloud-saved schedules
+* PDF and calendar (`.ics`) export
+* Cloud-saved schedules and academic progress
 
 ## Tech Stack
 
@@ -75,7 +88,7 @@ Planned future additions:
 
 ## Authentication
 
-Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and secure cookie-backed sessions. Application pages and ITU API routes are protected by the Next.js request Proxy; the protected server layout also validates the current verified user before rendering. Existing planner, generator, curriculum, and theme data remains in `localStorage` and is not deleted or uploaded by authentication.
+Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and secure cookie-backed sessions. Application pages and ITU API routes are protected by the Next.js request Proxy; the protected server layout also validates the current verified user before rendering. Personal details and academic-program enrollments from the Profile page are stored in the authenticated user's Supabase metadata. Planner, curriculum progress, the shared transcript, and theme data remain in `localStorage` and are not deleted or uploaded by authentication.
 
 ### 1. Create and configure Supabase
 
@@ -141,18 +154,16 @@ src/
     page.tsx
 
   components/
-    calendar/
-      WeeklyCalendar.tsx
-
-    courses/
-      AddLectureModal.tsx
-
-  data/
-    mockCourses.ts
+    calendar/              # weekly planner and schedule generator
+    curriculum/            # curriculum graph and graduation audit
+    semester-planner/      # smart semester-planning interface
+    profile/               # academic profile and program enrollment UI
 
   lib/
-    time.ts
-    conflict.ts
+    curriculum/            # progress, equivalency, eligibility, and audit logic
+    semester-planner/      # recommendation and workload engine
+    schedule/              # constraints, ranking, conflicts, and handoff session
+    itu/                   # OBS clients, parsers, schemas, and stored catalogs
 
   types/
     course.ts
@@ -176,6 +187,41 @@ Open the app:
 
 ```txt
 http://localhost:3000
+```
+
+### Official course-equivalence data
+
+Course-equivalence rules are imported at build/development time from İTÜ OBS and stored in `src/data/itu/equivalences.json`; the browser never scrapes OBS for equivalences. Import targets are explicit so program and plan scope cannot be lost:
+
+```bash
+npm run equivalences:import
+npm run equivalences:import -- --plan=1561
+```
+
+The importer rate-limits and caches requests, retries temporary failures, updates rules by deterministic ID, marks missing verified rows stale, and preserves prior verified rows whenever an OBS response fails validation. Inspect the stored data without making network requests:
+
+```bash
+npm run equivalences:report
+npm run equivalences:report -- --plan=1561 --target="BLG 113"
+npm run equivalences:report -- --equivalent="BLG 111" --unverified
+```
+
+Add another officially mapped program/plan to `src/data/itu/equivalence-targets.json` before importing it. Never add inferred equivalences by hand.
+
+At resolution time, Turkish and English offerings of the same course are treated as language counterparts (`BBF 101` ↔ `BBF 101E`; laboratory forms `FIZ 101L` ↔ `FIZ 101EL`). This application policy also expands the target and alternatives of an official plan rule, but is stored as a distinct `language-equivalence` satisfaction type so it is not presented as a separate OBS record.
+
+## Curriculum catalog refresh
+
+The Profile, Curriculum, and Graduation Calculator use the server-side snapshot at `src/data/itu/curriculum-catalog.json`. Refresh it from the official İTÜ OBS faculty and plan selectors with:
+
+```bash
+npm run curricula:import
+```
+
+The importer discovers faculties and undergraduate, ÇAP, and Yandal programs; follows every plan version; imports associations, notes, courses, elective pools, and prerequisites; and replaces the snapshot atomically only after a non-empty run. A focused prerequisite repair is also available:
+
+```bash
+npm run curricula:prerequisites
 ```
 
 ## Git Workflow
@@ -217,55 +263,60 @@ git push -u origin feature/name-of-feature
 * [x] Create GitHub repository
 * [x] Create Next.js project
 * [x] Configure TypeScript and Tailwind CSS
-* [ ] Create clean project folder structure
-* [ ] Update README
+* [x] Create clean project folder structure
+* [x] Update README
 
 ### Phase 2 — Weekly Calendar Layout
 
-* [ ] Build weekly calendar grid
-* [ ] Show Monday-Sunday columns
-* [ ] Show time range from 08:00 to 20:00
-* [ ] Align time labels with calendar lines
-* [ ] Make layout visually clean and responsive
+* [x] Build weekly calendar grid
+* [x] Show Monday-Sunday columns
+* [x] Show time range from 08:00 to 20:00
+* [x] Align time labels with calendar lines
+* [x] Make layout visually clean and responsive
 
 ### Phase 3 — Mock Course Data
 
-* [ ] Define course data types
-* [ ] Add mock lecture codes
-* [ ] Add mock courses
-* [ ] Add mock course sessions
-* [ ] Render a selected mock course on the calendar
+* [x] Define course data types
+* [x] Replace mock data with validated İTÜ data
+* [x] Render selected CRNs and all of their meetings
 
 ### Phase 4 — Add Lecture Flow
 
-* [ ] Add "Add Lecture" button
-* [ ] Create lecture selection modal
-* [ ] Select course code
-* [ ] Select course
-* [ ] Select session/CRN
-* [ ] Add selected session to calendar
+* [x] Add lectures from the live course catalog
+* [x] Select course prefix, course, and CRN
+* [x] Add every meeting of the selected CRN to the calendar
 
 ### Phase 5 — Conflict Detection
 
-* [ ] Detect overlapping lectures
-* [ ] Warn the user about conflicts
-* [ ] Prevent or mark conflicting sessions
+* [x] Detect overlapping lectures
+* [x] Warn the user about conflicts
+* [x] Rank conflict-free generated schedules and expose the best fallback
 
 ### Phase 6 — Persistence
 
-* [ ] Save selected lectures in localStorage
-* [ ] Restore selected lectures after page refresh
+* [x] Save selected lectures in localStorage
+* [x] Restore selected lectures after page refresh
 * [ ] Later, save schedules in a database
 
 ### Phase 7 — ITU OBS Integration
 
-* [ ] Investigate ITU OBS course schedule requests
-* [ ] Parse real course schedule data
+* [x] Investigate ITU OBS course schedule requests
+* [x] Parse real course schedule data
 * [ ] Store course data in database
-* [ ] Add manual course-data sync
-* [ ] Later, add automatic sync every 5 minutes
+* [x] Add controlled curriculum/equivalence import commands
+* [ ] Add scheduled, rate-limited data refresh
 
-### Phase 8 — Deployment
+### Phase 8 — Academic Planning
+
+* [x] Add authenticated academic profiles
+* [x] Support exact undergraduate, ÇAP, and Yandal curricula
+* [x] Import and reconcile transcript progress and verified equivalencies
+* [x] Add independent multi-program graduation audits
+* [x] Recommend editable semester workloads across all active programs
+* [x] Transfer semester recommendations into the schedule generator
+* [ ] Persist academic planning data to the authenticated user's cloud account
+
+### Phase 9 — Deployment
 
 * [ ] Prepare production build
 * [ ] Deploy first public version
@@ -274,4 +325,4 @@ git push -u origin feature/name-of-feature
 
 ## Notes
 
-This project is intentionally being built incrementally. The first priority is to create a clean and working weekly lecture planner with mock data. Real ITU OBS integration and database synchronization will be added after the core user interface and schedule logic are stable.
+This project is intentionally being built incrementally. Public İTÜ data is treated as advisory: unknown restrictions and availability are surfaced to the student, and registration decisions must still be verified in OBS. Cloud synchronization and deployment remain future work.

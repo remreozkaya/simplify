@@ -3,6 +3,7 @@ import Link from "next/link";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthMessage from "@/components/auth/AuthMessage";
 import ResendVerificationForm from "@/components/auth/ResendVerificationForm";
+import LocalizedText from "@/components/LocalizedText";
 
 type VerifyEmailPageProps = {
   searchParams: Promise<{
@@ -23,7 +24,7 @@ export default async function VerifyEmailPage({
 
   if (verified) {
     return (
-      <AuthCard title="Email verified successfully">
+      <AuthCard title="Email verified successfully" titleKey="authentication.emailVerified">
         <div className="space-y-5">
           <AuthMessage
             tone="success"
@@ -33,7 +34,7 @@ export default async function VerifyEmailPage({
             href="/login"
             className="flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
           >
-            Continue to Login
+            <LocalizedText translationKey="authentication.continueLogin" />
           </Link>
         </div>
       </AuthCard>
@@ -43,10 +44,11 @@ export default async function VerifyEmailPage({
   return (
     <AuthCard
       title="Verify your email"
+      titleKey="authentication.verifyTitle"
       description={
         email
-          ? `We've sent a verification link to ${email}.`
-          : "Open the verification link in your email to activate your account."
+          ? <LocalizedText translationKey="authentication.verifySent" values={{ email }} />
+          : <LocalizedText translationKey="authentication.verifyOpen" />
       }
     >
       <div className="space-y-5">
@@ -64,13 +66,13 @@ export default async function VerifyEmailPage({
             href="/login"
             className="font-black text-blue-700 hover:underline dark:text-blue-300"
           >
-            I&apos;ve verified my email — go to login
+            <LocalizedText translationKey="authentication.verifiedGoLogin" />
           </Link>
           <Link
             href="/login"
             className="font-semibold text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
           >
-            Back to login
+            <LocalizedText translationKey="authentication.backLogin" />
           </Link>
         </div>
       </div>

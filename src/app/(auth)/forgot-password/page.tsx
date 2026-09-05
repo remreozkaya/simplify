@@ -6,6 +6,8 @@ export default function ForgotPasswordPage() {
     <AuthCard
       title="Reset your password"
       description="Enter the email associated with your account."
+      titleKey="authentication.resetTitle"
+      descriptionKey="authentication.resetDescription"
     >
       <ForgotPasswordForm />
     </AuthCard>

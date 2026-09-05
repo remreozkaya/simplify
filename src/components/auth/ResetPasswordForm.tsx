@@ -8,8 +8,10 @@ import AuthMessage from "@/components/auth/AuthMessage";
 import PasswordInput from "@/components/auth/PasswordInput";
 import SubmitButton from "@/components/auth/SubmitButton";
 import { INITIAL_AUTH_STATE } from "@/lib/auth/types";
+import { useLanguage } from "@/lib/i18n/client";
 
 export default function ResetPasswordForm() {
+  const { t } = useLanguage();
   const [state, action] = useActionState(
     resetPasswordAction,
     INITIAL_AUTH_STATE,
@@ -22,19 +24,19 @@ export default function ResetPasswordForm() {
         <PasswordInput
           id="new-password"
           name="password"
-          label="New Password"
+          label={t("authentication.newPassword")}
           autoComplete="new-password"
           error={state.fieldErrors?.password}
-          hint="Use at least 8 characters."
+          hint={t("profile.passwordHint")}
         />
         <PasswordInput
           id="confirm-new-password"
           name="confirmPassword"
-          label="Confirm New Password"
+          label={t("profile.confirmPassword")}
           autoComplete="new-password"
           error={state.fieldErrors?.confirmPassword}
         />
-        <SubmitButton label="Update Password" pendingLabel="Updating password…" />
+        <SubmitButton label={t("authentication.updatePassword")} pendingLabel={t("authentication.updatingPassword")} />
       </form>
       {state.message?.includes("invalid or has expired") ? (
         <p className="text-center text-sm">
@@ -42,7 +44,7 @@ export default function ResetPasswordForm() {
             href="/forgot-password"
             className="font-black text-blue-700 hover:underline dark:text-blue-300"
           >
-            Request another reset link
+            {t("authentication.requestAnother")}
           </Link>
         </p>
       ) : null}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { localizeRuntimeMessage } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n/client";
 
 type PasswordInputProps = {
   id: string;
@@ -20,6 +22,7 @@ export default function PasswordInput({
   hint,
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
+  const { language, t } = useLanguage();
   const descriptionId = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (
@@ -57,7 +60,7 @@ export default function PasswordInput({
           type="button"
           onClick={() => setVisible((current) => !current)}
           className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-slate-500 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-blue-600 dark:text-slate-400 dark:hover:text-white"
-          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-label={t(visible ? "authentication.hidePassword" : "authentication.showPassword", { label: label.toLocaleLowerCase(language === "tr" ? "tr-TR" : "en") })}
           aria-pressed={visible}
         >
           {visible ? (
@@ -74,11 +77,11 @@ export default function PasswordInput({
       </div>
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-sm text-red-600 dark:text-red-300">
-          {error}
+          {localizeRuntimeMessage(language, error)}
         </p>
       ) : hint ? (
         <p id={`${id}-hint`} className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-          {hint}
+          {localizeRuntimeMessage(language, hint)}
         </p>
       ) : null}
     </div>

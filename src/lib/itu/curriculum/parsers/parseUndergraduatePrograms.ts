@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 
+import { academicOfferingId, baseProgramIdFromCode } from "@/lib/itu/curriculum/catalog";
 import type { ItuUndergraduateProgram } from "@/lib/itu/curriculum/types";
 
 const PROGRAM_CODE_PATTERN = /^[A-Z0-9_]{2,20}_LS$/;
@@ -32,7 +33,17 @@ export function parseUndergraduatePrograms(html: string): ItuUndergraduateProgra
       .toUpperCase();
     const name = clean($(cells[1]).text());
     if (!PROGRAM_CODE_PATTERN.test(code) || !name) return;
-    programs.push({ code, name, major: deriveMajorName(name), ...(faculty ? { faculty } : {}) });
+    programs.push({
+      id: academicOfferingId("unknown", "undergraduate", code),
+      baseProgramId: baseProgramIdFromCode(code),
+      officialProgramCode: code,
+      code,
+      name,
+      nameTr: name,
+      major: deriveMajorName(name),
+      planType: "undergraduate",
+      ...(faculty ? { faculty } : {}),
+    });
   });
 
   return [...new Map(programs.map((program) => [program.code, program])).values()].sort(

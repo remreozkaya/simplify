@@ -1,11 +1,57 @@
-import type { Grade } from "@/lib/itu/curriculum/types";
+import type { Grade } from "@/lib/curriculum/grades";
 
 type CourseProgressState = "passed" | "failed" | "none";
-export type CourseProgress = { state: CourseProgressState; grade?: Grade };
+export type CourseProgressSource = "manual" | "transcript";
+export type CompletionStatus = "passed" | "failed";
+
+export type TranscriptCourseRecord = {
+  term: string;
+  crn: string;
+  courseCode: string;
+  courseName: string;
+  courseLanguage?: string;
+  grade: Grade;
+  countedCredit: number;
+  transcriptCredit: number;
+  completionStatus: CompletionStatus;
+  source: "transcript";
+  calculated: boolean;
+};
+
+export type CourseProgress = {
+  state: CourseProgressState;
+  grade?: Grade;
+  term?: string;
+  crn?: string;
+  courseCode?: string;
+  courseName?: string;
+  courseLanguage?: string;
+  countedCredit?: number;
+  transcriptCredit?: number;
+  completionStatus?: CompletionStatus;
+  source?: CourseProgressSource;
+  matchedRequirementId?: string;
+  satisfactionType?: RequirementSatisfactionType;
+  equivalenceRuleId?: string;
+};
+
+export type RequirementSatisfactionType = "direct" | "language-equivalence" | "equivalence" | "elective" | "manual";
+
+export type RequirementSatisfaction = {
+  requirementId: string;
+  requirementCourseCode: string;
+  satisfiedByCourseCodes: string[];
+  satisfactionType: RequirementSatisfactionType;
+  equivalenceRuleId?: string;
+  sourceUrl?: string;
+};
+
 export type CurriculumProgress = {
-  version: 1;
+  version: 1 | 2 | 3;
   planId: number;
   courses: Record<string, CourseProgress>;
+  importedCourses?: TranscriptCourseRecord[];
+  requirementSatisfactions?: Record<string, RequirementSatisfaction>;
 };
 
 export type RequirementEvaluation = "satisfied" | "unsatisfied" | "unknown";

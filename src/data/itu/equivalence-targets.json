@@ -1,0 +1,44 @@
+[
+  {
+    "programId": 871,
+    "programCode": "BLG_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 1561
+  },
+  {
+    "programId": 907,
+    "programCode": "BLGE_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 1192
+  },
+  {
+    "programId": 907,
+    "programCode": "BLGE_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 1193
+  },
+  {
+    "programId": 907,
+    "programCode": "BLGE_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 1194
+  },
+  {
+    "programId": 907,
+    "programCode": "BLGE_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 1562
+  },
+  {
+    "programId": 907,
+    "programCode": "BLGE_LS",
+    "planTypeId": 2,
+    "planType": "Lisans",
+    "planId": 2340
+  }
+]

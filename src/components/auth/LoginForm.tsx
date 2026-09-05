@@ -10,8 +10,10 @@ import PasswordInput from "@/components/auth/PasswordInput";
 import ResendVerificationForm from "@/components/auth/ResendVerificationForm";
 import SubmitButton from "@/components/auth/SubmitButton";
 import { INITIAL_AUTH_STATE } from "@/lib/auth/types";
+import { useLanguage } from "@/lib/i18n/client";
 
 export default function LoginForm({ nextPath }: { nextPath: string }) {
+  const { t } = useLanguage();
   const [state, action] = useActionState(loginAction, INITIAL_AUTH_STATE);
 
   return (
@@ -23,7 +25,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
         <PasswordInput
           id="password"
           name="password"
-          label="Password"
+          label={t("authentication.password")}
           autoComplete="current-password"
           error={state.fieldErrors?.password}
         />
@@ -35,35 +37,35 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
               type="checkbox"
               className="size-4 rounded border-slate-300 accent-blue-600"
             />
-            Remember me
+            {t("authentication.remember")}
           </label>
           <Link
             href="/forgot-password"
             className="font-bold text-blue-700 hover:text-blue-800 hover:underline dark:text-blue-300"
           >
-            Forgot password?
+            {t("authentication.forgot")}
           </Link>
         </div>
 
-        <SubmitButton label="Log In" pendingLabel="Signing in…" />
+        <SubmitButton label={t("authentication.login")} pendingLabel={t("authentication.signingIn")} />
       </form>
 
       {state.status === "unverified" ? (
         <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
           <p className="text-sm leading-6 text-amber-900 dark:text-amber-100">
-            Check your inbox and verify your email before signing in.
+            {t("authentication.checkInbox")}
           </p>
           <ResendVerificationForm email={state.email} />
         </div>
       ) : null}
 
       <p className="text-center text-sm text-slate-600 dark:text-slate-300">
-        Don&apos;t have an account?{" "}
+        {t("authentication.noAccount")}{" "}
         <Link
           href="/signup"
           className="font-black text-blue-700 hover:underline dark:text-blue-300"
         >
-          Sign up
+          {t("authentication.signup")}
         </Link>
       </p>
     </div>

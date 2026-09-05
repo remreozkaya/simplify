@@ -9,8 +9,10 @@ import EmailInput from "@/components/auth/EmailInput";
 import PasswordInput from "@/components/auth/PasswordInput";
 import SubmitButton from "@/components/auth/SubmitButton";
 import { INITIAL_AUTH_STATE } from "@/lib/auth/types";
+import { useLanguage } from "@/lib/i18n/client";
 
 export default function SignupForm() {
+  const { t } = useLanguage();
   const [state, action] = useActionState(signupAction, INITIAL_AUTH_STATE);
 
   return (
@@ -21,28 +23,28 @@ export default function SignupForm() {
         <PasswordInput
           id="password"
           name="password"
-          label="Password"
+          label={t("authentication.password")}
           autoComplete="new-password"
           error={state.fieldErrors?.password}
-          hint="Use at least 8 characters."
+          hint={t("profile.passwordHint")}
         />
         <PasswordInput
           id="confirm-password"
           name="confirmPassword"
-          label="Confirm Password"
+          label={t("authentication.confirmPassword")}
           autoComplete="new-password"
           error={state.fieldErrors?.confirmPassword}
         />
-        <SubmitButton label="Create Account" pendingLabel="Creating account…" />
+        <SubmitButton label={t("authentication.createAccount")} pendingLabel={t("authentication.creatingAccount")} />
       </form>
 
       <p className="text-center text-sm text-slate-600 dark:text-slate-300">
-        Already have an account?{" "}
+        {t("authentication.haveAccount")}{" "}
         <Link
           href="/login"
           className="font-black text-blue-700 hover:underline dark:text-blue-300"
         >
-          Log in
+          {t("authentication.login")}
         </Link>
       </p>
     </div>

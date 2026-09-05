@@ -8,18 +8,8 @@ import type {
   MissingRequirement,
   RequirementEvaluation,
 } from "@/lib/curriculum/types";
-
-const GRADE_RANK = {
-  FF: 0,
-  FD: 1,
-  DD: 2,
-  DC: 3,
-  CC: 4,
-  CB: 5,
-  BB: 6,
-  BA: 7,
-  AA: 8,
-} as const;
+import { GRADE_POINTS } from "@/lib/curriculum/grades";
+import { courseLanguageVariants } from "@/lib/itu/courseCode.mjs";
 
 export function evaluatePrerequisiteExpression(
   expression: PrerequisiteExpression,
@@ -31,7 +21,10 @@ export function evaluatePrerequisiteExpression(
     if (course?.state !== "passed") return "unsatisfied";
     if (!expression.minimumGrade) return "satisfied";
     if (!course.grade) return "unknown";
-    return GRADE_RANK[course.grade] >= GRADE_RANK[expression.minimumGrade]
+    const actual = course.grade === "BL" ? undefined : GRADE_POINTS[course.grade];
+    const minimum = expression.minimumGrade === "BL" ? undefined : GRADE_POINTS[expression.minimumGrade];
+    if (actual === undefined || minimum === undefined) return "unknown";
+    return actual >= minimum
       ? "satisfied"
       : "unsatisfied";
   }
@@ -89,9 +82,10 @@ export function isCourseTakeableThisSemester(
   offeredCourseCodes: ReadonlySet<string>,
   prerequisiteDataKnown = true,
 ): boolean {
+  const languageVariants = courseLanguageVariants(courseCode);
   return (
-    progress[courseCode]?.state !== "passed" &&
-    offeredCourseCodes.has(courseCode) &&
+    !languageVariants.some((code) => progress[code]?.state === "passed") &&
+    languageVariants.some((code) => offeredCourseCodes.has(code)) &&
     evaluateCourseEligibility(prerequisite, progress, prerequisiteDataKnown) === "satisfied"
   );
 }

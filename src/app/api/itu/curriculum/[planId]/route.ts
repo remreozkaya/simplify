@@ -7,6 +7,7 @@ import {
 import { getCurriculum } from "@/lib/itu/curriculum/services/getCurriculum";
 import { getCurriculumPlans } from "@/lib/itu/curriculum/services/getCurriculumPlans";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
+import type { ItuPlanType } from "@/lib/itu/curriculum/types";
 
 export async function GET(
   request: NextRequest,
@@ -23,8 +24,13 @@ export async function GET(
       { status: 400 },
     );
   }
+  const planType = request.nextUrl.searchParams.get("planType") as ItuPlanType | null;
+  const primaryProgramCode = request.nextUrl.searchParams.get("primaryProgramCode") ?? undefined;
+  if (!planType || !["undergraduate", "cap", "yandal"].includes(planType)) {
+    return NextResponse.json({ error: { code: "INVALID_PLAN_TYPE", message: "A valid curriculum type is required." } }, { status: 400 });
+  }
   try {
-    const plans = await getCurriculumPlans(programCode.data);
+    const plans = await getCurriculumPlans(programCode.data, planType, primaryProgramCode);
     if (!plans.some((plan) => plan.id === planId.data)) {
       return NextResponse.json(
         { error: { code: "PLAN_NOT_FOUND", message: "This plan does not belong to the selected program." } },
@@ -32,7 +38,7 @@ export async function GET(
       );
     }
     return NextResponse.json({
-      curriculum: await getCurriculum(planId.data, programCode.data),
+      curriculum: await getCurriculum(planId.data, programCode.data, planType),
     });
   } catch (error: unknown) {
     const upstream = error instanceof ItuObsUpstreamError;

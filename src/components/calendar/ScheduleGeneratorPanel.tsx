@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -21,6 +22,9 @@ import {
   type GeneratorSessionCourse,
 } from "@/lib/schedule/session";
 import { minutesToTime } from "@/lib/schedule/time";
+import { useLanguage } from "@/lib/i18n/client";
+import { formatNumber, localizedWeekday } from "@/lib/i18n";
+import { courseLanguageVariants } from "@/lib/itu/courseCode.mjs";
 import type {
   GeneratedSchedule,
   GeneratorCourse,
@@ -65,12 +69,13 @@ const TIME_OPTIONS = Array.from({ length: 25 }, (_value, index) =>
 );
 
 function ScheduleStarRating({ rating }: { rating: number }) {
+  const { language, t } = useLanguage();
   const filledWidth = `${(rating / 5) * 100}%`;
 
   return (
     <span
       className="inline-flex items-center gap-2"
-      aria-label={`${rating.toFixed(1)} out of 5 stars`}
+      aria-label={t("courses.stars", { rating: formatNumber(language, rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
     >
       <span className="relative inline-block text-lg leading-none tracking-wide">
         <span className="text-gray-300" aria-hidden="true">
@@ -85,7 +90,7 @@ function ScheduleStarRating({ rating }: { rating: number }) {
         </span>
       </span>
       <span className="font-semibold text-gray-900">
-        {rating.toFixed(1)}/5
+        {formatNumber(language, rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5
       </span>
     </span>
   );
@@ -142,6 +147,7 @@ export default function ScheduleGeneratorPanel({
   onPreviewChange,
   onSave,
 }: ScheduleGeneratorPanelProps) {
+  const { language, t } = useLanguage();
   const [rows, setRows] = useState<DesiredCourseRow[]>([]);
   const [earliestStartTime, setEarliestStartTime] = useState("");
   const [latestEndTime, setLatestEndTime] = useState("");
@@ -152,6 +158,8 @@ export default function ScheduleGeneratorPanel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [hasLoadedSession, setHasLoadedSession] = useState(false);
+  const [plannerAlternatives, setPlannerAlternatives] = useState<string[]>([]);
+  const [plannerLockedCourseCodes, setPlannerLockedCourseCodes] = useState<string[]>([]);
   const generationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resolvedCourses = useMemo(
@@ -194,6 +202,8 @@ export default function ScheduleGeneratorPanel({
         setEarliestStartTime(session.earliestStartTime);
         setLatestEndTime(session.latestEndTime);
         setExcludedDays(session.excludedDays);
+        setPlannerAlternatives(session.plannerAlternatives ?? []);
+        setPlannerLockedCourseCodes(session.plannerLockedCourseCodes ?? []);
       }
     } catch {
       // Ignore malformed or unavailable browser storage.
@@ -212,11 +222,12 @@ export default function ScheduleGeneratorPanel({
       localStorage.setItem(
         GENERATOR_SESSION_STORAGE_KEY,
         JSON.stringify({
-          version: 1,
+          version: 2,
           courses: rows,
           earliestStartTime,
           latestEndTime,
           excludedDays,
+          ...(plannerAlternatives.length ? { source: "semester-planner", plannerAlternatives, plannerLockedCourseCodes } : {}),
         }),
       );
     } catch {
@@ -227,6 +238,8 @@ export default function ScheduleGeneratorPanel({
     excludedDays,
     hasLoadedSession,
     latestEndTime,
+    plannerAlternatives,
+    plannerLockedCourseCodes,
     rows,
   ]);
 
@@ -241,6 +254,28 @@ export default function ScheduleGeneratorPanel({
       },
     );
   }, [hasLoadedSession, isLoadingBranches, loadBranch, rows]);
+
+  useEffect(() => {
+    if (!hasLoadedSession) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- Planner handoff rows
+     * resolve after the matching branch catalog has loaded. */
+    setRows((current) => {
+      let changed = false;
+      const next = current.map((row) => {
+        if (!row.courseCode || !row.branchCode) return row;
+        const courses = coursesForBranch(courseCatalog, row.branchCode);
+        const currentCourse = courses.find((course) => course.id === row.courseId);
+        if (currentCourse?.code === row.courseCode) return row;
+        const variants = new Set(courseLanguageVariants(row.courseCode));
+        const resolved = courses.find((course) => variants.has(course.code));
+        if (!resolved) return row;
+        changed = true;
+        return { ...row, courseId: resolved.id };
+      });
+      return changed ? next : current;
+    });
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [courseCatalog, hasLoadedSession]);
 
   useEffect(
     () => () => {
@@ -299,7 +334,7 @@ export default function ScheduleGeneratorPanel({
 
     if (duplicate) {
       invalidateResults("error");
-      setMessage("That course is already in your desired course list.");
+      setMessage(t("courses.alreadyAdded"));
       return;
     }
 
@@ -342,7 +377,7 @@ export default function ScheduleGeneratorPanel({
   function handleGenerate() {
     if (!resolvedCourses || !isReady) {
       setStatus("error");
-      setMessage("Select at least one complete course before generating.");
+      setMessage(t("courses.selectComplete"));
       return;
     }
 
@@ -352,7 +387,7 @@ export default function ScheduleGeneratorPanel({
 
     if (courseWithoutSections) {
       setStatus("error");
-      setMessage(`${courseWithoutSections.courseCode} has no valid CRNs.`);
+      setMessage(t("courses.noCrn", { code: courseWithoutSections.courseCode }));
       return;
     }
 
@@ -368,12 +403,12 @@ export default function ScheduleGeneratorPanel({
       earliestStartTime > latestEndTime
     ) {
       setStatus("error");
-      setMessage("Earliest class time must be before latest class time.");
+      setMessage(t("courses.invalidTime"));
       return;
     }
 
     setStatus("generating");
-    setMessage("Generating conflict-free schedules…");
+    setMessage(t("courses.generating"));
     setSchedules([]);
     setCurrentIndex(0);
 
@@ -392,29 +427,19 @@ export default function ScheduleGeneratorPanel({
           setStatus("no-results");
           setMessage(
             result.searchLimitReached
-              ? "No schedule was found before the safe search limit was reached. Try fewer courses or stricter preferences."
-              : "No schedule satisfies the selected hard constraints.",
+              ? t("courses.searchLimit")
+              : t("courses.noSchedule"),
           );
         } else if (result.usedConflictFallback) {
           const minimumConflicts = result.schedules[0].conflictCount;
           setStatus("fallback");
-          setMessage(
-            `No conflict-free schedule exists. Showing ${
-              result.schedules.length
-            } schedule${result.schedules.length === 1 ? "" : "s"} with the minimum of ${
-              minimumConflicts
-            } overlapping meeting pair${minimumConflicts === 1 ? "" : "s"}${
-              result.searchLimitReached ? " found within the safe search limit" : ""
-            }.`,
-          );
+          setMessage(t("courses.conflictFallback", { count: result.schedules.length, conflicts: minimumConflicts, limit: result.searchLimitReached ? t("courses.withinLimit") : "" }));
         } else {
           setStatus("success");
           setMessage(
             result.truncated
-              ? `More than ${MAX_GENERATED_SCHEDULES} valid schedules exist. Showing the best ${MAX_GENERATED_SCHEDULES} found.`
-              : `${result.schedules.length} valid schedule${
-                  result.schedules.length === 1 ? "" : "s"
-                } found.`,
+              ? t("courses.truncated", { limit: MAX_GENERATED_SCHEDULES })
+              : t("courses.found", { count: result.schedules.length }),
           );
         }
       } catch (error: unknown) {
@@ -422,7 +447,7 @@ export default function ScheduleGeneratorPanel({
         setMessage(
           error instanceof Error
             ? error.message
-            : "Schedules could not be generated.",
+            : t("courses.generationError"),
         );
       }
     }, 0);
@@ -453,13 +478,13 @@ export default function ScheduleGeneratorPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            Generate Schedule
+            {t("courses.generate")}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Choose courses; Simplify will select and rank conflict-free CRNs.
+            {t("courses.generatorDescription")}
           </p>
           <p className="mt-1 text-xs text-gray-400">
-            Your latest generator session is saved automatically in this browser.
+            {t("courses.autosaved")}
           </p>
         </div>
 
@@ -469,13 +494,13 @@ export default function ScheduleGeneratorPanel({
           disabled={isLoadingBranches}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         >
-          Add Course
+          {t("courses.addCourse")}
         </button>
       </div>
 
       {rows.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-5 text-center text-sm text-gray-500">
-          Add the courses you want to take. You will not need to choose CRNs.
+          {t("courses.emptyDesired")}
         </div>
       ) : (
         <div className="mt-4 space-y-2">
@@ -492,9 +517,9 @@ export default function ScheduleGeneratorPanel({
                 className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_auto]"
               >
                 <label className="min-w-0">
-                  <span className="sr-only">Course prefix</span>
+                  <span className="sr-only">{t("courses.prefix")}</span>
                   <select
-                    aria-label="Course prefix"
+                    aria-label={t("courses.prefix")}
                     value={row.branchCode}
                     onChange={(event) =>
                       handleBranchChange(row.id, event.target.value)
@@ -503,7 +528,7 @@ export default function ScheduleGeneratorPanel({
                     className={selectClassName}
                   >
                     <option value="">
-                      {isLoadingBranches ? "Loading prefixes…" : "Course Prefix"}
+                      {t(isLoadingBranches ? "courses.loadingPrefixes" : "courses.prefix")}
                     </option>
                     {courseCatalog.map((branch) => (
                       <option
@@ -517,9 +542,9 @@ export default function ScheduleGeneratorPanel({
                 </label>
 
                 <label className="min-w-0">
-                  <span className="sr-only">Desired course</span>
+                  <span className="sr-only">{t("courses.desired")}</span>
                   <select
-                    aria-label="Desired course"
+                    aria-label={t("courses.desired")}
                     value={row.courseId}
                     onChange={(event) =>
                       handleCourseChange(row.id, event.target.value)
@@ -528,7 +553,7 @@ export default function ScheduleGeneratorPanel({
                     className={selectClassName}
                   >
                     <option value="">
-                      {branchIsLoading ? "Loading courses…" : "Course Code and Name"}
+                      {t(branchIsLoading ? "courses.loadingCourses" : "courses.codeAndName")}
                     </option>
                     {courses.map((course) => (
                       <option key={course.id} value={course.id}>
@@ -540,9 +565,9 @@ export default function ScheduleGeneratorPanel({
                 </label>
 
                 <label className="min-w-0">
-                  <span className="sr-only">Pinned CRN</span>
+                  <span className="sr-only">{t("courses.pinnedCrn")}</span>
                   <select
-                    aria-label="Pinned CRN"
+                    aria-label={t("courses.pinnedCrn")}
                     value={row.pinnedSectionId}
                     onChange={(event) =>
                       handlePinnedSectionChange(row.id, event.target.value)
@@ -550,13 +575,13 @@ export default function ScheduleGeneratorPanel({
                     disabled={!selectedCourse || branchIsLoading}
                     className={selectClassName}
                   >
-                    <option value="">Any CRN</option>
+                    <option value="">{t("courses.anyCrn")}</option>
                     {selectedCourse?.sections.map((section) => (
                       <option key={section.id} value={section.id}>
-                        Pin {section.crn} · {section.meetings
+                        {t("courses.pin")} {section.crn} · {section.meetings
                           .map(
                             (meeting) =>
-                              `${meeting.day.slice(0, 3)} ${meeting.startTime}–${meeting.endTime}`,
+                              `${localizedWeekday(language, meeting.day, "short")} ${meeting.startTime}–${meeting.endTime}`,
                           )
                           .join(", ")}
                         {section.instructor
@@ -572,7 +597,7 @@ export default function ScheduleGeneratorPanel({
                   onClick={() => handleRemoveCourse(row.id)}
                   className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-100"
                 >
-                  Remove
+                  {t("common.remove")}
                 </button>
               </div>
             );
@@ -582,12 +607,12 @@ export default function ScheduleGeneratorPanel({
 
       <fieldset className="mt-5 border-t border-gray-200 pt-4">
         <legend className="px-1 text-sm font-semibold text-gray-800">
-          Preferences
+          {t("courses.preferences")}
         </legend>
 
         <div className="mt-2 grid gap-4 md:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
-            Earliest class time
+            {t("courses.earliest")}
             <select
               value={earliestStartTime}
               onChange={(event) => {
@@ -596,7 +621,7 @@ export default function ScheduleGeneratorPanel({
               }}
               className={`mt-1 w-full ${inputClassName}`}
             >
-              <option value="">No earliest limit</option>
+              <option value="">{t("courses.noEarliest")}</option>
               {TIME_OPTIONS.map((time) => (
                 <option key={time} value={time}>
                   {time}
@@ -606,7 +631,7 @@ export default function ScheduleGeneratorPanel({
           </label>
 
           <label className="text-sm font-medium text-gray-700">
-            Latest class time
+            {t("courses.latest")}
             <select
               value={latestEndTime}
               onChange={(event) => {
@@ -615,7 +640,7 @@ export default function ScheduleGeneratorPanel({
               }}
               className={`mt-1 w-full ${inputClassName}`}
             >
-              <option value="">No latest limit</option>
+              <option value="">{t("courses.noLatest")}</option>
               {TIME_OPTIONS.map((time) => (
                 <option key={time} value={time}>
                   {time}
@@ -627,7 +652,7 @@ export default function ScheduleGeneratorPanel({
 
         <div className="mt-4">
           <span className="text-sm font-medium text-gray-700">
-            Keep days free
+            {t("courses.keepDaysFree")}
           </span>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
             {days.map((day) => (
@@ -641,7 +666,7 @@ export default function ScheduleGeneratorPanel({
                   onChange={() => toggleExcludedDay(day)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                {day}
+                {localizedWeekday(language, day)}
               </label>
             ))}
           </div>
@@ -650,9 +675,7 @@ export default function ScheduleGeneratorPanel({
 
       {combinationCount >= LARGE_SEARCH_SPACE_THRESHOLD && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          This selection has {combinationCount.toLocaleString()} possible CRN
-          combinations. Conflict pruning and the {MAX_GENERATED_SCHEDULES}-result
-          limit will keep generation bounded.
+          {t("courses.largeSearch", { count: formatNumber(language, combinationCount), limit: MAX_GENERATED_SCHEDULES })}
         </div>
       )}
 
@@ -663,7 +686,7 @@ export default function ScheduleGeneratorPanel({
           disabled={!isReady || status === "generating" || Boolean(catalogError)}
           className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
         >
-          {status === "generating" ? "Generating…" : "Generate Schedules"}
+          {t(status === "generating" ? "courses.generating" : "courses.generateSchedules")}
         </button>
 
         <div
@@ -680,24 +703,33 @@ export default function ScheduleGeneratorPanel({
           role={status === "error" ? "alert" : "status"}
         >
           {isLoadingBranches
-            ? "Loading courses…"
+            ? t("courses.loadingCourses")
             : isLoadingSelectedCourses
-              ? "Loading selected course catalog…"
+              ? t("courses.loadingSelected")
               : catalogError
                 ? catalogError
                 : message ||
                   (visibleStatus === "ready"
-                    ? "Ready to generate."
-                    : "Select your desired courses.")}
+                    ? t("courses.ready")
+                    : t("courses.selectDesired"))}
         </div>
       </div>
+
+      {(visibleStatus === "no-results" || visibleStatus === "fallback") && plannerAlternatives.length > 0 ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-black">{t("courses.plannerReplacements")}</p>
+          <p className="mt-1">{t("courses.plannerReplacementsDescription", { locked: plannerLockedCourseCodes.join(", ") || t("courses.noneLocked") })}</p>
+          <p className="mt-2 font-semibold">{plannerAlternatives.join(" · ")}</p>
+          <Link href="/semester-planner" className="mt-3 inline-flex rounded-lg bg-amber-700 px-3 py-2 font-black text-white">{t("courses.returnToPlanner")}</Link>
+        </div>
+      ) : null}
 
       {currentSchedule && (
         <div
           className="mt-5 rounded-xl border border-blue-200 bg-blue-50/40 p-4 outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
           tabIndex={0}
           onKeyDown={handleResultKeyDown}
-          aria-label="Generated schedule results. Use left and right arrow keys to navigate."
+          aria-label={t("courses.resultsLabel")}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <button
@@ -706,11 +738,11 @@ export default function ScheduleGeneratorPanel({
               disabled={currentIndex === 0}
               className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              ← Previous
+              ← {t("courses.previous")}
             </button>
 
             <div className="text-sm font-semibold text-gray-800">
-              Schedule {currentIndex + 1} / {schedules.length}
+              {t("courses.schedule", { current: currentIndex + 1, total: schedules.length })}
               {truncated ? "+" : ""}
             </div>
 
@@ -720,46 +752,43 @@ export default function ScheduleGeneratorPanel({
               disabled={currentIndex === schedules.length - 1}
               className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Next →
+              {t("courses.next")} →
             </button>
           </div>
 
           {currentSchedule.conflictCount > 0 && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Best available fallback: {currentSchedule.conflictCount}{" "}
-              overlapping meeting pair
-              {currentSchedule.conflictCount === 1 ? "" : "s"},{" "}
-              {currentSchedule.totalConflictMinutes} overlapping minutes.
+              {t("courses.fallbackConflicts", { count: currentSchedule.conflictCount, minutes: currentSchedule.totalConflictMinutes })}
             </div>
           )}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
             <div>
-              <dt className="text-gray-500">Rating</dt>
+              <dt className="text-gray-500">{t("courses.rating")}</dt>
               <dd className="mt-1">
                 <ScheduleStarRating rating={currentRating} />
               </dd>
             </div>
             <div>
-              <dt className="text-gray-500">Campus days</dt>
+              <dt className="text-gray-500">{t("courses.campusDays")}</dt>
               <dd className="font-semibold text-gray-900">
                 {currentSchedule.metrics.campusDays}
               </dd>
             </div>
             <div>
-              <dt className="text-gray-500">Total gaps</dt>
+              <dt className="text-gray-500">{t("courses.totalGaps")}</dt>
               <dd className="font-semibold text-gray-900">
-                {currentSchedule.metrics.totalGapMinutes} min
+                {formatNumber(language, currentSchedule.metrics.totalGapMinutes)} {t("courses.minute")}
               </dd>
             </div>
             <div>
-              <dt className="text-gray-500">Earliest</dt>
+              <dt className="text-gray-500">{t("courses.earliestShort")}</dt>
               <dd className="font-semibold text-gray-900">
                 {minutesToTime(currentSchedule.metrics.earliestStartMinutes)}
               </dd>
             </div>
             <div>
-              <dt className="text-gray-500">Latest</dt>
+              <dt className="text-gray-500">{t("courses.latestShort")}</dt>
               <dd className="font-semibold text-gray-900">
                 {minutesToTime(currentSchedule.metrics.latestEndMinutes)}
               </dd>
@@ -772,7 +801,7 @@ export default function ScheduleGeneratorPanel({
               onClick={() => onSave(currentSchedule)}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
-              Save as Weekly Program
+              {t("courses.saveWeekly")}
             </button>
           </div>
         </div>

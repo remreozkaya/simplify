@@ -24,8 +24,8 @@ export function parseCurriculumDetail(
       $(table).find("h2").first().text() || $(table).prevAll("h2").first().text(),
     );
     const semesterMatch = heading.match(/(\d+)\s*\.?\s*(?:yarıyıl|yariyil|semester)/i);
-    if (!semesterMatch) return;
-    const semester = Number(semesterMatch[1]);
+    if (!semesterMatch && $(table).attr("id") === "dersPlanProgramList") return;
+    const semester = semesterMatch ? Number(semesterMatch[1]) : 1;
     const items: ItuCurriculumItem[] = [];
 
     $(table)
@@ -94,15 +94,23 @@ export function parseCurriculumDetail(
     .map((_, element) => clean($(element).text()))
     .get()
     .filter((text) => text && !/(?:Toplam Kredi|Total Credit)/i.test(text));
+  const associatedPrimaryProgramCodes = $("#dersPlanProgramList tbody tr")
+    .map((_, row) => clean($(row).find("td").first().text()))
+    .get()
+    .filter(Boolean);
+  const planTitle = clean($(".content-area h2").first().text()) || `Plan ${planId}`;
 
   return {
     planId,
     programCode,
     title: clean($(".content-area h1").first().text()) || programCode,
-    planTitle: clean($(".content-area h2").first().text()) || `Plan ${planId}`,
+    planTitle,
     semesters: semesters.sort((a, b) => a.semester - b.semester),
     ...(totalCreditMatch ? { totalCredit: firstNumericValue(totalCreditMatch[1]) } : {}),
     ...(totalEctsMatch ? { totalEcts: firstNumericValue(totalEctsMatch[1]) } : {}),
     ...(notes.length ? { note: notes.join(" ") } : {}),
+    ...(associatedPrimaryProgramCodes.length ? { associatedPrimaryProgramCodes } : {}),
+    sourceUrl: `https://obs.itu.edu.tr/public/DersPlan/DersPlanDetay/${planId}`,
+    ...(planTitle.match(/\d{4}-\d{4}[^]*$/)?.[0] ? { validityPeriod: planTitle.match(/\d{4}-\d{4}[^]*$/)?.[0].trim() } : {}),
   };
 }

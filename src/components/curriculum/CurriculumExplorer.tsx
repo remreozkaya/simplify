@@ -4,13 +4,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import CurriculumGraph from "@/components/curriculum/CurriculumGraph";
+import ProgramTabs, { programPanelId, programTabId } from "@/components/curriculum/ProgramTabs";
+import { useProfile } from "@/components/profile/ProfileProvider";
+import { GRADES } from "@/lib/curriculum/grades";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import {
   evaluateCourseEligibility,
   getCourseStatus,
   getMissingPrerequisites,
-  isCourseTakeableThisSemester,
 } from "@/lib/curriculum/eligibility";
+import {
+  availableCoursesForElectiveSlot,
+  courseBranch,
+  curriculumPrerequisitesKnown,
+  isCurriculumItemAvailableThisSemester,
+} from "@/lib/curriculum/availability";
 import {
   buildCurriculumGraph,
   getAncestorNodeIds,
@@ -19,8 +27,18 @@ import {
 import {
   CURRICULUM_PROGRESS_STORAGE_KEY,
   parseCurriculumProgress,
-  updateStoredCurriculumProgress,
+  persistCurriculumProgress,
 } from "@/lib/curriculum/progress";
+import { applyTranscriptImport, curriculumTotals, progressForRequirement, reconcileImportedProgress, resolvedCourseProgress } from "@/lib/curriculum/graduation";
+import {
+  parseSharedTranscript,
+  persistSharedTranscript,
+  SHARED_TRANSCRIPT_STORAGE_KEY,
+  transcriptFromLegacyProgress,
+  transcriptFromLegacyProgressStore,
+  transcriptParseResult,
+  sharedCourseProgress,
+} from "@/lib/curriculum/transcriptStore";
 import {
   parseSavedCurriculum,
   SAVED_CURRICULUM_STORAGE_KEY,
@@ -39,19 +57,17 @@ import type {
   ItuElectiveSlot,
   ItuUndergraduateProgram,
 } from "@/lib/itu/curriculum/types";
+import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
+import { orderedEnrollments } from "@/lib/profile/validation";
+import { groupCurriculum } from "@/lib/curriculum/grouping";
+import { useLanguage } from "@/lib/i18n/client";
+import { formatDate, formatNumber, localizedAcademicName, localizedCurriculumSection, localizeRuntimeMessage, offeringDisplayName } from "@/lib/i18n";
 
-const STATUS_LABEL: Record<CourseDerivedStatus, string> = {
-  "not-taken": "Not Taken",
-  passed: "Passed",
-  failed: "Failed",
-};
 const STATUS_CLASS: Record<CourseDerivedStatus, string> = {
   "not-taken": "border-slate-500 bg-slate-200 text-black",
   passed: "border-emerald-600 bg-emerald-200 text-emerald-950",
   failed: "border-red-600 bg-red-200 text-red-950",
 };
-const GRADES: Grade[] = ["AA", "BA", "BB", "CB", "CC", "DC", "DD", "FD", "FF"];
-
 async function responseJson<T>(response: Response): Promise<T> {
   const value = (await response.json()) as T & { error?: { message?: string } };
   if (!response.ok) throw new Error(value.error?.message ?? "The request failed.");
@@ -62,31 +78,21 @@ function optionsText(values: number[], suffix: string) {
   return values.length ? `${values.join(" / ")} ${suffix}` : "—";
 }
 
-function branchOf(code: string) {
-  return code.split(" ")[0];
-}
-
-function requirementKnown(curriculum: ItuCurriculum, courseCode: string) {
-  return (
-    curriculum.prerequisiteDataAvailable &&
-    curriculum.prerequisiteBranchesLoaded.includes(branchOf(courseCode))
-  );
-}
-
 function MissingList({ requirements }: { requirements: MissingRequirement[] }) {
-  if (!requirements.length) return <p className="text-sm text-slate-500">No missing prerequisites.</p>;
+  const { t } = useLanguage();
+  if (!requirements.length) return <p className="text-sm text-slate-500">{t("curriculum.noMissingPrerequisites")}</p>;
   return (
     <ul className="space-y-2 text-sm text-slate-700">
       {requirements.map((requirement, index) => (
         <li key={index} className="rounded-lg bg-slate-50 px-3 py-2">
           {requirement.kind === "course" && (
-            <span>Missing {requirement.courseCode}{requirement.minimumGrade ? ` with at least ${requirement.minimumGrade}` : ""}</span>
+            <span>{t("curriculum.missingCourse", { code: requirement.courseCode, grade: requirement.minimumGrade ? t("curriculum.minimumGrade", { grade: requirement.minimumGrade }) : "" })}</span>
           )}
-          {requirement.kind === "credits" && <span>Requires at least {requirement.minimumCredits} earned credits; enterable credit totals are not supported yet.</span>}
-          {requirement.kind === "unknown" && <span>Unknown prerequisite: {requirement.raw}</span>}
+          {requirement.kind === "credits" && <span>{t("curriculum.minimumCredits", { credits: requirement.minimumCredits })}</span>}
+          {requirement.kind === "unknown" && <span>{t("curriculum.unknownPrerequisite", { value: requirement.raw })}</span>}
           {(requirement.kind === "all" || requirement.kind === "one-of") && (
             <div>
-              <p className="font-semibold">{requirement.kind === "all" ? "All of:" : "One of:"}</p>
+              <p className="font-semibold">{t(requirement.kind === "all" ? "curriculum.allOf" : "curriculum.oneOf")}</p>
               <div className="mt-2 pl-2"><MissingList requirements={requirement.requirements} /></div>
             </div>
           )}
@@ -97,19 +103,28 @@ function MissingList({ requirements }: { requirements: MissingRequirement[] }) {
 }
 
 export default function CurriculumExplorer() {
+  const { profile } = useProfile();
+  const { language, t } = useLanguage();
+  const statusLabel = (status: CourseDerivedStatus) => t(status === "not-taken" ? "curriculum.notTaken" : status === "passed" ? "curriculum.passed" : "curriculum.failed");
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedProgram = searchParams.get("program");
   const requestedPlan = Number(searchParams.get("plan"));
   const programCodeRef = useRef("");
+  const enrolledPrograms = useMemo(() => orderedEnrollments(profile.programEnrollments), [profile.programEnrollments]);
+  const defaultProfileProgram = enrolledPrograms[0]?.programCode ?? "";
   const [programs, setPrograms] = useState<ItuUndergraduateProgram[]>([]);
   const [plans, setPlans] = useState<ItuCurriculumPlan[]>([]);
   const [faculty, setFaculty] = useState("");
   const [major, setMajor] = useState("");
   const [programCode, setProgramCode] = useState("");
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState(() => enrolledPrograms[0]?.id ?? "");
+  const selectedEnrollment = enrolledPrograms.find((item) => item.id === selectedEnrollmentId);
+  const profilePlanId = selectedEnrollment?.curriculumPlanId ?? enrolledPrograms.find((item) => item.programCode === programCode)?.curriculumPlanId ?? null;
   const [planId, setPlanId] = useState<number | null>(null);
   const [curriculum, setCurriculum] = useState<ItuCurriculum | null>(null);
   const [progress, setProgress] = useState<CurriculumProgress | null>(null);
+  const [sharedCompletedCourses, setSharedCompletedCourses] = useState<ReturnType<typeof sharedCourseProgress>>({});
   const [programsLoading, setProgramsLoading] = useState(true);
   const [plansLoading, setPlansLoading] = useState(false);
   const [curriculumLoading, setCurriculumLoading] = useState(false);
@@ -134,18 +149,34 @@ export default function CurriculumExplorer() {
   } = useItuCourseCatalog();
 
   useEffect(() => {
+    if (enrolledPrograms.length) {
+      const loaded = enrolledPrograms.map((item) => ({ id: `${item.facultyId}:${item.planType}:${item.programCode}`, baseProgramId: item.programCode.replace(/_(?:LS|YD)$/u, ""), officialProgramCode: item.programCode, code: item.programCode, name: item.programName, nameTr: item.programNameTr ?? item.programName, nameEn: item.programNameEn, major: item.programName, facultyId: item.facultyId, faculty: item.facultyName, planType: item.planType }));
+      const desired = enrolledPrograms.find((item) => item.programCode === requestedProgram) ?? enrolledPrograms[0];
+      const frame = requestAnimationFrame(() => {
+        setPrograms(loaded);
+        setProgramsLoading(false);
+        setFaculty(desired.facultyName);
+        setMajor(desired.programName);
+        setSelectedEnrollmentId(desired.id);
+        programCodeRef.current = desired.programCode;
+        setProgramCode(desired.programCode);
+        setPlanId(desired.curriculumPlanId);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
     const controller = new AbortController();
-    void fetch("/api/itu/curriculum/programs", { signal: controller.signal })
+    void fetch("/api/itu/curriculum/programs?facultyId=10&planType=undergraduate", { signal: controller.signal })
       .then((response) => responseJson<{ programs: ItuUndergraduateProgram[] }>(response))
       .then(({ programs: loaded }) => {
         setProgramsLoading(false);
         setPrograms(loaded);
         const saved = parseSavedCurriculum(localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY));
-        const programToRestore = requestedProgram ?? saved?.programCode;
+        const programToRestore = requestedProgram ?? (defaultProfileProgram || saved?.programCode);
         const restoredProgram = loaded.find((program) => program.code === programToRestore) ?? loaded[0];
         const restored = restoredProgram?.code ?? "";
         setFaculty(restoredProgram?.faculty ?? "Other Faculty");
         setMajor(restoredProgram?.major ?? "");
+        setSelectedEnrollmentId("");
         const programChanged = programCodeRef.current !== restored;
         programCodeRef.current = restored;
         setPlansLoading(Boolean(restored) && programChanged);
@@ -159,12 +190,13 @@ export default function CurriculumExplorer() {
         }
       });
     return () => controller.abort();
-  }, [requestedProgram]);
+  }, [defaultProfileProgram, enrolledPrograms, requestedProgram]);
 
   useEffect(() => {
     if (!programCode) return;
+    const enrollment = selectedEnrollment ?? enrolledPrograms.find((item) => item.programCode === programCode);
     const controller = new AbortController();
-    void fetch(`/api/itu/curriculum/plans?programCode=${encodeURIComponent(programCode)}`, {
+    void fetch(`/api/itu/curriculum/plans?programCode=${encodeURIComponent(programCode)}&planType=${enrollment?.planType ?? "undergraduate"}${enrollment?.primaryProgramCode ? `&primaryProgramCode=${encodeURIComponent(enrollment.primaryProgramCode)}` : ""}`, {
       signal: controller.signal,
     })
       .then((response) => responseJson<{ plans: ItuCurriculumPlan[] }>(response))
@@ -172,8 +204,10 @@ export default function CurriculumExplorer() {
         setPlansLoading(false);
         setPlans(loaded);
         const saved = parseSavedCurriculum(localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY));
-        const planToRestore = requestedProgram === programCode && Number.isInteger(requestedPlan)
+        const planToRestore = requestedProgram === programCode && Number.isInteger(requestedPlan) && requestedPlan > 0
           ? requestedPlan
+          : profilePlanId
+            ? profilePlanId
           : saved?.programCode === programCode
             ? saved.planId
             : null;
@@ -194,19 +228,31 @@ export default function CurriculumExplorer() {
     // `planId` directly, so reacting again to our own router.replace would
     // refetch the same plan list and leave a stale loading state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [programCode]);
+  }, [profilePlanId, programCode, selectedEnrollment]);
 
   useEffect(() => {
     if (!programCode || !planId) return;
+    const enrollment = selectedEnrollment ?? enrolledPrograms.find((item) => item.programCode === programCode && item.curriculumPlanId === planId) ?? enrolledPrograms.find((item) => item.programCode === programCode);
     router.replace(`/curriculum?program=${encodeURIComponent(programCode)}&plan=${planId}`, { scroll: false });
     const controller = new AbortController();
-    void fetch(`/api/itu/curriculum/${planId}?programCode=${encodeURIComponent(programCode)}`, {
+    void fetch(`/api/itu/curriculum/${planId}?programCode=${encodeURIComponent(programCode)}&planType=${enrollment?.planType ?? "undergraduate"}${enrollment?.primaryProgramCode ? `&primaryProgramCode=${encodeURIComponent(enrollment.primaryProgramCode)}` : ""}`, {
       signal: controller.signal,
     })
       .then((response) => responseJson<{ curriculum: ItuCurriculum }>(response))
       .then(({ curriculum: loaded }) => {
-        setCurriculum(loaded);
-        setProgress(parseCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY), loaded.planId));
+        setCurriculum(groupCurriculum(loaded));
+        const storedProgress = parseCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY), loaded.planId);
+        let sharedTranscript = parseSharedTranscript(localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY));
+        if (!sharedTranscript.length) {
+          sharedTranscript = transcriptFromLegacyProgressStore(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY));
+          if (!sharedTranscript.length) sharedTranscript = transcriptFromLegacyProgress([storedProgress]);
+          if (sharedTranscript.length) persistSharedTranscript(sharedTranscript);
+        }
+        setSharedCompletedCourses(sharedCourseProgress(sharedTranscript));
+        const evaluated = sharedTranscript.length
+          ? applyTranscriptImport(loaded, storedProgress, transcriptParseResult(sharedTranscript)).progress
+          : reconcileImportedProgress(loaded, storedProgress);
+        setProgress(sharedTranscript.length ? { ...evaluated, importedCourses: [] } : evaluated);
         const saved = parseSavedCurriculum(localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY));
         setSaveConfirmed(saved?.programCode === programCode && saved.planId === loaded.planId);
         setCurriculumLoading(false);
@@ -219,14 +265,11 @@ export default function CurriculumExplorer() {
         }
       });
     return () => controller.abort();
-  }, [planId, programCode, router]);
+  }, [enrolledPrograms, planId, programCode, router, selectedEnrollment]);
 
   useEffect(() => {
     if (!progress) return;
-    localStorage.setItem(
-      CURRICULUM_PROGRESS_STORAGE_KEY,
-      updateStoredCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY), progress),
-    );
+    persistCurriculumProgress(progress);
   }, [progress]);
 
   const graph = useMemo(() => (curriculum ? buildCurriculumGraph(curriculum) : null), [curriculum]);
@@ -252,14 +295,18 @@ export default function CurriculumExplorer() {
       ...new Set(
         items.flatMap((item) =>
           item.kind === "course"
-            ? [branchOf(item.code)]
-            : item.courses.map((course) => branchOf(course.code)),
+            ? [courseBranch(item.code)]
+            : item.courses.map((course) => courseBranch(course.code)),
         ),
       ),
     ].sort(),
     [items],
   );
   const relevantBranchesKey = relevantBranchCodes.join(",");
+  const resolvedProgress = useMemo(
+    () => ({ ...sharedCompletedCourses, ...(curriculum && progress ? resolvedCourseProgress(curriculum, progress) : progress?.courses ?? {}) }),
+    [curriculum, progress, sharedCompletedCourses],
+  );
 
   useEffect(() => {
     if (
@@ -297,17 +344,23 @@ export default function CurriculumExplorer() {
               ? "failed"
               : "not-taken";
         } else {
-          statuses[node.id] = getCourseStatus(
+          const item = itemById.get(node.id);
+          const completion = item ? progressForRequirement(item, progress) : null;
+          statuses[node.id] = completion?.course.state === "passed" ? "passed" : getCourseStatus(
             node.courseCode,
             curriculum.prerequisites[node.courseCode],
-            progress.courses,
-            requirementKnown(curriculum, node.courseCode),
+            resolvedProgress,
+            curriculumPrerequisitesKnown(curriculum, node.courseCode),
           ).status;
         }
+      } else if (node.kind === "elective-slot") {
+        const item = itemById.get(node.id);
+        const resolved = item ? progressForRequirement(item, progress)?.course : undefined;
+        statuses[node.id] = resolved?.state === "passed" ? "passed" : resolved?.state === "failed" ? "failed" : "not-taken";
       }
     });
     return statuses;
-  }, [curriculum, graph, progress]);
+  }, [curriculum, graph, itemById, progress, resolvedProgress]);
 
   const availableCourseCodes = useMemo(
     () => new Set(
@@ -328,29 +381,16 @@ export default function CurriculumExplorer() {
 
     graph.nodes.forEach((node) => {
       const item = itemById.get(node.id);
-      if (item?.kind === "course") {
-        if (isCourseTakeableThisSemester(
-          item.code,
-          curriculum.prerequisites[item.code],
-          progress.courses,
-          availableCourseCodes,
-          requirementKnown(curriculum, item.code),
-        )) takeable.add(node.id);
-      } else if (item?.kind === "elective-slot") {
-        const hasTakeableOption = item.courses.some((course) =>
-          isCourseTakeableThisSemester(
-            course.code,
-            curriculum.prerequisites[course.code],
-            progress.courses,
-            availableCourseCodes,
-            requirementKnown(curriculum, course.code),
-          ),
-        );
-        if (hasTakeableOption) takeable.add(node.id);
-      }
+      if (item && isCurriculumItemAvailableThisSemester(
+        item,
+        curriculum,
+        progress,
+        resolvedProgress,
+        availableCourseCodes,
+      )) takeable.add(node.id);
     });
     return takeable;
-  }, [availableCourseCodes, curriculum, graph, itemById, offeringsLoading, progress]);
+  }, [availableCourseCodes, curriculum, graph, itemById, offeringsLoading, progress, resolvedProgress]);
 
   const visibleNodeIds = useMemo(() => {
     if (!graph) return new Set<string>();
@@ -376,16 +416,22 @@ export default function CurriculumExplorer() {
       failed: 0,
     };
     graph?.nodes.forEach((node) => {
-      if (node.kind === "course") counts[nodeStatuses[node.id] ?? "not-taken"] += 1;
+      if (node.kind === "course" || node.kind === "elective-slot") counts[nodeStatuses[node.id] ?? "not-taken"] += 1;
     });
     return counts;
   }, [graph, nodeStatuses]);
+  const auditTotals = useMemo(() => curriculum && progress ? curriculumTotals(curriculum, progress) : null, [curriculum, progress]);
+  const completionPercentage = auditTotals?.requiredCourses
+    ? Math.min(100, Math.round((auditTotals.earnedCourses / auditTotals.requiredCourses) * 100))
+    : 0;
+  const currentEnrollment = selectedEnrollment ?? enrolledPrograms.find((item) => item.programCode === programCode && item.curriculumPlanId === planId);
 
   const selectedItem = selectedNodeId ? itemById.get(selectedNodeId) : undefined;
   const selectedNode = graph?.nodes.find((node) => node.id === selectedNodeId);
   const selectedCode = selectedItem?.kind === "course" ? selectedItem.code : selectedNode?.courseCode;
   const selectedPrerequisite = selectedCode ? curriculum?.prerequisites[selectedCode] : undefined;
   const selectedStatus = selectedNodeId ? nodeStatuses[selectedNodeId] : undefined;
+  const selectedCompletion = selectedItem && progress ? progressForRequirement(selectedItem, progress) : null;
   const prerequisiteNodeIds = useMemo(() => {
     if (!graph || !selectedNodeId) return undefined;
     const ids = getAncestorNodeIds(graph, selectedNodeId);
@@ -412,12 +458,21 @@ export default function CurriculumExplorer() {
       if (!current) return current;
       const courses = { ...current.courses };
       if (state === "none") delete courses[code];
-      else courses[code] = { state, ...(state === "passed" && grade ? { grade } : {}) };
+      else {
+        const existing = courses[code];
+        courses[code] = {
+          ...existing,
+          state,
+          completionStatus: state,
+          source: existing?.source ?? "manual",
+          ...(state === "passed" && grade ? { grade } : state === "failed" ? { grade: existing?.grade } : {}),
+        };
+      }
       return { ...current, courses };
     });
   }
 
-  function changeProgram(nextProgramCode: string) {
+  function changeProgram(nextProgramCode: string, enrollmentId = "") {
     setError("");
     setPlans([]);
     setPlanId(null);
@@ -426,8 +481,17 @@ export default function CurriculumExplorer() {
     setSaveConfirmed(false);
     setPlansLoading(true);
     setCurriculumLoading(false);
+    setSelectedEnrollmentId(enrollmentId);
     programCodeRef.current = nextProgramCode;
     setProgramCode(nextProgramCode);
+  }
+
+  function selectEnrollment(enrollmentId: string) {
+    const enrollment = enrolledPrograms.find((item) => item.id === enrollmentId);
+    if (!enrollment) return;
+    setFaculty(enrollment.facultyName);
+    setMajor(enrollment.programName);
+    changeProgram(enrollment.programCode, enrollment.id);
   }
 
   function changeFaculty(nextFaculty: string) {
@@ -464,56 +528,61 @@ export default function CurriculumExplorer() {
       SAVED_CURRICULUM_STORAGE_KEY,
       serializeSavedCurriculum(programCode, planId),
     );
-    localStorage.setItem(
-      CURRICULUM_PROGRESS_STORAGE_KEY,
-      updateStoredCurriculumProgress(
-        localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
-        progress,
-      ),
-    );
+    persistCurriculumProgress(progress);
     setSaveConfirmed(true);
   }
 
   const loadingStage = programsLoading
-    ? "Loading undergraduate programs…"
+    ? t("curriculum.loadingUndergraduate")
     : plansLoading
-      ? "Loading curriculum versions…"
+      ? t("curriculum.loadingVersions")
       : curriculumLoading
-        ? "Loading curriculum and prerequisites…"
+        ? t("curriculum.loadingRequirements")
         : "";
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      {enrolledPrograms.length ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="text-xs font-black uppercase tracking-[.18em] text-blue-700 dark:text-blue-300">{t("curriculum.yourPrograms")}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("curriculum.independentAudit")}</p></div>
+            <a href="/profile" className="text-sm font-black text-blue-700 hover:underline dark:text-blue-300">{t("curriculum.manageProfile")}</a>
+          </div>
+          <div className="mt-4">
+            <ProgramTabs enrollments={enrolledPrograms} activeEnrollmentId={currentEnrollment?.id ?? selectedEnrollmentId} onSelect={selectEnrollment} />
+          </div>
+        </section>
+      ) : null}
+      {!enrolledPrograms.length ? <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-4">
-          <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700">Choose your program</p>
-          <p className="mt-1 text-sm text-slate-500">Selections narrow from faculty to major, then to the exact degree program.</p>
+          <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700">{t("curriculum.chooseProgram")}</p>
+          <p className="mt-1 text-sm text-slate-500">{t("curriculum.chooseDescription")}</p>
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <label className="text-sm font-semibold text-slate-700">
-            Faculty
+            {t("common.faculty")}
             <select value={faculty} onChange={(event) => changeFaculty(event.target.value)} disabled={!faculties.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
               {faculties.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700">
-            Major
+            {t("curriculum.major")}
             <select value={major} onChange={(event) => changeMajor(event.target.value)} disabled={!majors.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
               {majors.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700">
-            Degree Program
+            {t("curriculum.degreeProgram")}
             <select value={programCode} onChange={(event) => changeProgram(event.target.value)} disabled={!degreePrograms.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-              {degreePrograms.map((program) => <option key={program.code} value={program.code}>{program.name} · {program.code}</option>)}
+              {degreePrograms.map((program) => <option key={program.id} value={program.code}>{offeringDisplayName(program, language)} · {program.code}</option>)}
             </select>
           </label>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <label className="text-sm font-semibold text-slate-700">
-            Curriculum Version
+            {t("curriculum.curriculumVersion")}
             <select value={planId ?? ""} onChange={(event) => changePlan(Number(event.target.value))} disabled={!plans.length} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-              {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.title}{plan.isCurrent ? " · Current" : ""}</option>)}
+              {plans.map((plan) => <option key={`${plan.planType}:${plan.programCode}:${plan.id}`} value={plan.id}>{localizedAcademicName(plan, language)}{plan.isCurrent ? ` · ${t("common.current")}` : ""}</option>)}
             </select>
           </label>
           <div className="flex items-center gap-3">
@@ -523,56 +592,56 @@ export default function CurriculumExplorer() {
               disabled={!curriculum || !progress}
               className="min-w-36 rounded-xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saveConfirmed ? "Saved" : "Save Curriculum"}
+              {t(saveConfirmed ? "curriculum.saved" : "curriculum.saveCurriculum")}
             </button>
-            {saveConfirmed && <span className="text-xs font-bold text-emerald-700" role="status">Statuses saved</span>}
           </div>
         </div>
-      </section>
+      </section> : null}
 
       {(loadingStage || error) && (
         <div role={error ? "alert" : "status"} aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${error ? "border-red-200 bg-red-50 text-red-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>
-          {error || loadingStage}
+          {error ? localizeRuntimeMessage(language, error) : loadingStage}
         </div>
       )}
 
       {curriculum && graph && progress && (
-        <>
+        <div
+          className="space-y-5"
+          {...(currentEnrollment && enrolledPrograms.length > 1 ? {
+            role: "tabpanel",
+            id: programPanelId(currentEnrollment.id),
+            "aria-labelledby": programTabId(currentEnrollment.id),
+          } : {})}
+        >
           <section className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm lg:grid-cols-[1fr_auto]">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300">{curriculum.programCode}</p>
+              <p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300">{currentEnrollment ? t(currentEnrollment.type === "main" ? "academicPrograms.main" : currentEnrollment.type === "double-major" ? "academicPrograms.doubleMajor" : "academicPrograms.minor") : curriculum.programCode}</p>
               <h2 className="mt-2 text-2xl font-black">{curriculum.title}</h2>
               <p className="mt-1 max-w-3xl text-sm text-slate-300">{curriculum.planTitle}</p>
               <p className="mt-3 text-sm text-slate-300">
-                {curriculum.semesters.length} semesters · {curriculum.totalCredit ?? "—"} credits · {curriculum.totalEcts ?? "—"} ECTS
+                {currentEnrollment?.facultyName ? `${currentEnrollment.facultyName} · ` : ""}{t(curriculum.planType === "undergraduate" ? "curriculum.semesters" : "curriculum.courseGroups", { count: curriculum.semesters.length })} · {curriculum.totalCredit === undefined ? "—" : formatNumber(language, curriculum.totalCredit)} {t("common.credit")} · {curriculum.totalEcts === undefined ? "—" : formatNumber(language, curriculum.totalEcts)} {t("curriculum.ects")}
               </p>
+              {auditTotals ? <p className="mt-2 text-sm font-bold text-white">{auditTotals.earnedCourses} / {auditTotals.requiredCourses} {t("graduationCalculator.requirements")} · {formatNumber(language, auditTotals.earnedCredit)} / {formatNumber(language, auditTotals.requiredCredit)} {t("common.credit")} · {t("curriculum.completeSummary", { percent: formatNumber(language, completionPercentage) })}</p> : null}
             </div>
             <div className="grid grid-cols-3 gap-2 self-center text-center">
               {(Object.keys(summary) as CourseDerivedStatus[]).map((status) => (
                 <div key={status} className={`rounded-xl border-2 px-3 py-2 ${STATUS_CLASS[status]}`}>
                   <div className="text-xl font-black">{summary[status]}</div>
-                  <div className="text-[10px] font-black uppercase tracking-wide">{STATUS_LABEL[status]}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wide">{statusLabel(status)}</div>
                 </div>
               ))}
             </div>
           </section>
 
-          {curriculum.warnings.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
-              <p className="font-bold">Some OBS data is incomplete</p>
-              <ul className="mt-1 list-disc pl-5">{curriculum.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-            </div>
-          )}
-
           <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="mb-2 text-xs font-black uppercase tracking-[.16em] text-slate-500">Course status</p>
-                <div className="flex flex-wrap gap-2" aria-label="Course status filters">
+                <p className="mb-2 text-xs font-black uppercase tracking-[.16em] text-slate-500">{t("curriculum.courseStatus")}</p>
+                <div className="flex flex-wrap gap-2" aria-label={t("curriculum.statusFilters")}>
                   {(Object.keys(filters) as CourseDerivedStatus[]).map((filter) => (
                     <label key={filter} className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-black ${STATUS_CLASS[filter]}`}>
                       <input type="checkbox" checked={filters[filter]} onChange={(event) => setFilters((current) => ({ ...current, [filter]: event.target.checked }))} className="size-4 accent-slate-900" />
-                      {STATUS_LABEL[filter]}
+                      {statusLabel(filter)}
                     </label>
                   ))}
                 </div>
@@ -585,30 +654,30 @@ export default function CurriculumExplorer() {
                     onChange={(event) => setShowTakeableCourses(event.target.checked)}
                     className="size-5 accent-blue-700"
                   />
-                  Show the courses that I can take this semester
+                  {t("curriculum.showAvailable")}
                 </label>
-                {selectedNodeId && <button type="button" onClick={() => setSelectedNodeId(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Clear focus</button>}
+                {selectedNodeId && <button type="button" onClick={() => setSelectedNodeId(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">{t("curriculum.clearFocus")}</button>}
               </div>
             </div>
 
             {showTakeableCourses && offeringsLoading && (
               <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900" role="status">
-                Checking the current İTÜ course schedule and your prerequisites…
+                {t("curriculum.checkingOfferings")}
               </div>
             )}
             {showTakeableCourses && !offeringsLoading && offeringsError && (
               <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950" role="status">
-                Some live course offerings could not be checked: {offeringsError}
+                {t("curriculum.offeringsError", { error: offeringsError })}
               </div>
             )}
 
             <div className="space-y-4">
               <div className="min-w-0">
-                <CurriculumGraph graph={graph} statuses={nodeStatuses} visibleNodeIds={visibleNodeIds} selectedNodeId={selectedNodeId ?? undefined} prerequisiteNodeIds={prerequisiteNodeIds} dependentNodeIds={dependentNodeIds} takeableNodeIds={!offeringsLoading ? takeableNodeIds : undefined} onSelectNode={setSelectedNodeId} />
+                <CurriculumGraph graph={graph} planType={curriculum.planType} statuses={nodeStatuses} visibleNodeIds={visibleNodeIds} selectedNodeId={selectedNodeId ?? undefined} prerequisiteNodeIds={prerequisiteNodeIds} dependentNodeIds={dependentNodeIds} takeableNodeIds={!offeringsLoading ? takeableNodeIds : undefined} onSelectNode={setSelectedNodeId} />
               </div>
 
               {selectedNodeId && (
-                <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-lg" aria-label="Course details">
+                <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-lg" aria-label={t("curriculum.courseDetails")}>
                   {selectedItem?.kind === "elective-slot" ? (
                     <ElectiveDetails slot={selectedItem} curriculum={curriculum} progress={progress} onlyTakeable={showTakeableCourses && !offeringsLoading} availableCourseCodes={availableCourseCodes} onSelectCourse={(course) => {
                       const node = graph.nodes.find((candidate) => candidate.courseCode === course.code);
@@ -617,57 +686,65 @@ export default function CurriculumExplorer() {
                   ) : selectedCode ? (
                     <>
                       <div className="flex items-start justify-between gap-3">
-                        <div><p className="text-xl font-black text-slate-950">{selectedCode}</p><p className="mt-1 text-sm text-slate-600">{selectedItem?.kind === "course" ? selectedItem.title : "External prerequisite"}</p></div>
-                        {selectedStatus && <span className={`rounded-full border px-2 py-1 text-xs font-bold ${STATUS_CLASS[selectedStatus]}`}>{STATUS_LABEL[selectedStatus]}</span>}
+                        <div><p className="text-xl font-black text-slate-950">{selectedCode}</p><p className="mt-1 text-sm text-slate-600">{selectedItem?.kind === "course" ? localizedAcademicName(selectedItem, language) : t("curriculum.externalPrerequisite")}</p></div>
+                        {selectedStatus && <span className={`rounded-full border px-2 py-1 text-xs font-bold ${STATUS_CLASS[selectedStatus]}`}>{statusLabel(selectedStatus)}</span>}
                       </div>
-                      {selectedItem?.kind === "course" && <p className="mt-3 text-xs text-slate-500">Semester {selectedItem.semester} · {selectedItem.requirementType === "elective" ? "Elective" : "Compulsory"} · {optionsText(selectedItem.creditOptions, "cr")} · {optionsText(selectedItem.ectsOptions, "ECTS")}{selectedItem.category ? ` · ${selectedItem.category}` : ""}</p>}
-                      {selectedNode?.kind === "external" && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">This course is outside the selected curriculum and does not count as a plan requirement.</p>}
+                      {selectedItem?.kind === "course" && <p className="mt-3 text-xs text-slate-500">{localizedCurriculumSection(language, curriculum.planType, selectedItem.semester)} · {t(selectedItem.requirementType === "elective" ? "common.elective" : "curriculum.compulsory")} · {optionsText(selectedItem.creditOptions, t("common.credit"))} · {optionsText(selectedItem.ectsOptions, t("curriculum.ects"))}{selectedItem.category ? ` · ${selectedItem.category}` : ""}</p>}
+                      {selectedCompletion?.course.source === "transcript" && (
+                        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                          {(selectedCompletion.satisfaction.satisfactionType === "equivalence" || selectedCompletion.satisfaction.satisfactionType === "language-equivalence") && <span className="mr-2 rounded-full bg-blue-100 px-2 py-1 font-black text-blue-800">{t(selectedCompletion.satisfaction.satisfactionType === "language-equivalence" ? "curriculum.languageEquivalentBadge" : "curriculum.equivalentCourse")}</span>}
+                          {(selectedCompletion.satisfaction.satisfactionType === "equivalence" || selectedCompletion.satisfaction.satisfactionType === "language-equivalence") && <>{t("curriculum.requirementLabel")}: {selectedCompletion.requirementCode} · {t("curriculum.satisfiedByLabel")}: {selectedCompletion.satisfaction.satisfiedByCourseCodes.join(" + ")} · </>}
+                          {t("curriculum.termDetail", { term: selectedCompletion.course.term ?? "", crn: selectedCompletion.course.crn ?? "", grade: selectedCompletion.course.grade ?? "" })}
+                          {selectedCompletion.satisfaction.sourceUrl && <> · <a href={selectedCompletion.satisfaction.sourceUrl} target="_blank" rel="noreferrer" className="underline">{t("curriculum.officialSource")}</a></>}
+                        </p>
+                      )}
+                      {selectedNode?.kind === "external" && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">{t("curriculum.outsidePlan")}</p>}
 
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">Status</h4>
+                        <h4 className="text-sm font-black text-slate-900">{t("common.status")}</h4>
                         <div className="mt-3 grid grid-cols-3 gap-2">
-                          <button type="button" onClick={() => setCourseProgress(selectedCode, "none")} aria-pressed={!progress.courses[selectedCode]} className={`rounded-lg border-2 border-slate-500 bg-slate-200 px-2 py-2 text-xs font-black text-black hover:bg-slate-300 ${!progress.courses[selectedCode] ? "ring-2 ring-slate-700 ring-offset-2" : "opacity-65"}`}>Not Taken</button>
-                          <button type="button" onClick={() => setCourseProgress(selectedCode, "passed", progress.courses[selectedCode]?.grade)} aria-pressed={progress.courses[selectedCode]?.state === "passed"} className={`rounded-lg border-2 border-emerald-600 bg-emerald-200 px-2 py-2 text-xs font-black text-emerald-950 hover:bg-emerald-300 ${progress.courses[selectedCode]?.state === "passed" ? "ring-2 ring-emerald-700 ring-offset-2" : "opacity-65"}`}>Passed</button>
-                          <button type="button" onClick={() => setCourseProgress(selectedCode, "failed")} aria-pressed={progress.courses[selectedCode]?.state === "failed"} className={`rounded-lg border-2 border-red-600 bg-red-200 px-2 py-2 text-xs font-black text-red-950 hover:bg-red-300 ${progress.courses[selectedCode]?.state === "failed" ? "ring-2 ring-red-700 ring-offset-2" : "opacity-65"}`}>Failed</button>
+                          <button type="button" onClick={() => setCourseProgress(selectedCode, "none")} aria-pressed={!progress.courses[selectedCode]} className={`rounded-lg border-2 border-slate-500 bg-slate-200 px-2 py-2 text-xs font-black text-black hover:bg-slate-300 ${!progress.courses[selectedCode] ? "ring-2 ring-slate-700 ring-offset-2" : "opacity-65"}`}>{t("curriculum.notTaken")}</button>
+                          <button type="button" onClick={() => setCourseProgress(selectedCode, "passed", progress.courses[selectedCode]?.grade)} aria-pressed={progress.courses[selectedCode]?.state === "passed"} className={`rounded-lg border-2 border-emerald-600 bg-emerald-200 px-2 py-2 text-xs font-black text-emerald-950 hover:bg-emerald-300 ${progress.courses[selectedCode]?.state === "passed" ? "ring-2 ring-emerald-700 ring-offset-2" : "opacity-65"}`}>{t("curriculum.passed")}</button>
+                          <button type="button" onClick={() => setCourseProgress(selectedCode, "failed")} aria-pressed={progress.courses[selectedCode]?.state === "failed"} className={`rounded-lg border-2 border-red-600 bg-red-200 px-2 py-2 text-xs font-black text-red-950 hover:bg-red-300 ${progress.courses[selectedCode]?.state === "failed" ? "ring-2 ring-red-700 ring-offset-2" : "opacity-65"}`}>{t("curriculum.failed")}</button>
                         </div>
                         {progress.courses[selectedCode]?.state === "passed" && (
-                          <label className="mt-3 block text-xs font-semibold text-slate-600">Grade (required for minimum-grade rules)
+                          <label className="mt-3 block text-xs font-semibold text-slate-600">{t("curriculum.gradeRules")}
                             <select value={progress.courses[selectedCode]?.grade ?? ""} onChange={(event) => setCourseProgress(selectedCode, "passed", event.target.value ? event.target.value as Grade : undefined)} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2">
-                              <option value="">Not provided</option>{GRADES.map((grade) => <option key={grade}>{grade}</option>)}
+                              <option value="">{t("curriculum.notProvided")}</option>{GRADES.map((grade) => <option key={grade}>{grade}</option>)}
                             </select>
                           </label>
                         )}
                       </div>
 
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">Prerequisites</h4>
-                        {selectedPrerequisite?.rawExpression ? <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">{selectedPrerequisite.rawExpression}</p> : <p className="mt-2 text-sm text-slate-500">No course prerequisite listed.</p>}
-                        {selectedPrerequisite && <div className="mt-3"><MissingList requirements={getMissingPrerequisites(selectedPrerequisite, progress.courses)} /></div>}
+                        <h4 className="text-sm font-black text-slate-900">{t("curriculum.prerequisites")}</h4>
+                        {selectedPrerequisite?.rawExpression ? <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">{selectedPrerequisite.rawExpression}</p> : <p className="mt-2 text-sm text-slate-500">{t("curriculum.noPrerequisite")}</p>}
+                        {selectedPrerequisite && <div className="mt-3"><MissingList requirements={getMissingPrerequisites(selectedPrerequisite, resolvedProgress)} /></div>}
                       </div>
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">Unlocks</h4>
-                        {unlocks.length ? <ul className="mt-2 space-y-1 text-sm text-slate-700">{unlocks.map((node) => <li key={node.id}>→ {node.courseCode} · {node.label.split("\n")[1]}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No downstream curriculum course.</p>}
+                        <h4 className="text-sm font-black text-slate-900">{t("curriculum.unlocks")}</h4>
+                        {unlocks.length ? <ul className="mt-2 space-y-1 text-sm text-slate-700">{unlocks.map((node) => <li key={node.id}>→ {node.courseCode} · {node.label.split("\n")[1]}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">{t("curriculum.noDownstream")}</p>}
                       </div>
                     </>
                   ) : selectedNode?.kind === "and" ? (
-                    <div><p className="text-xl font-black">AND requirement</p><p className="mt-2 text-sm text-slate-600">Every incoming branch is required.</p></div>
+                    <div><p className="text-xl font-black">{t("curriculum.andRequirement")}</p><p className="mt-2 text-sm text-slate-600">{t("curriculum.everyBranch")}</p></div>
                   ) : null}
                 </aside>
               )}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600" aria-label="Curriculum legend">
-              {(Object.keys(STATUS_LABEL) as CourseDerivedStatus[]).map((status) => <span key={status} className={`rounded-full border px-2 py-1 font-bold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>)}
-              <span className="rounded-full border border-violet-500 bg-violet-100 px-2 py-1 font-bold text-violet-950">Elective requirement</span>
-              <span className="rounded-full border border-amber-500 bg-amber-50 px-2 py-1 font-bold text-amber-900">Selected prerequisite</span>
-              <span className="rounded-full border border-sky-500 bg-sky-50 px-2 py-1 font-bold text-sky-900">Uses selected course</span>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600" aria-label={t("curriculum.legend")}>
+              {(["not-taken", "passed", "failed"] as CourseDerivedStatus[]).map((status) => <span key={status} className={`rounded-full border px-2 py-1 font-bold ${STATUS_CLASS[status]}`}>{statusLabel(status)}</span>)}
+              <span className="rounded-full border border-violet-500 bg-violet-100 px-2 py-1 font-bold text-violet-950">{t("curriculum.electiveRequirement")}</span>
+              <span className="rounded-full border border-amber-500 bg-amber-50 px-2 py-1 font-bold text-amber-900">{t("curriculum.selectedPrerequisite")}</span>
+              <span className="rounded-full border border-sky-500 bg-sky-50 px-2 py-1 font-bold text-sky-900">{t("curriculum.usesCourse")}</span>
             </div>
           </section>
 
           <footer className="rounded-xl bg-slate-100 px-4 py-3 text-xs leading-relaxed text-slate-600">
-            Source: <a href="https://obs.itu.edu.tr/public/DersPlan/" target="_blank" rel="noreferrer" className="font-bold text-blue-700 underline">İTÜ OBS</a> · Fetched {new Date(curriculum.fetchedAt).toLocaleString("en-GB")}. Eligibility is derived from public OBS prerequisite data and is not an official registration decision. Verify requirements in OBS before registration.
+            {t("curriculum.source")}: <a href="https://obs.itu.edu.tr/public/DersPlan/" target="_blank" rel="noreferrer" className="font-bold text-blue-700 underline">İTÜ OBS</a> · {t("curriculum.fetched", { date: formatDate(language, curriculum.fetchedAt, { dateStyle: "short", timeStyle: "short" }) })} {t("curriculum.disclaimer")}
           </footer>
-        </>
+        </div>
       )}
     </div>
   );
@@ -688,40 +765,46 @@ function ElectiveDetails({
   availableCourseCodes: Set<string>;
   onSelectCourse: (course: ItuElectiveCourse) => void;
 }) {
+  const { language, t } = useLanguage();
+  const effectiveProgress = resolvedCourseProgress(curriculum, progress);
   const displayedCourses = onlyTakeable
-    ? slot.courses.filter((course) =>
-        isCourseTakeableThisSemester(
-          course.code,
-          curriculum.prerequisites[course.code],
-          progress.courses,
-          availableCourseCodes,
-          requirementKnown(curriculum, course.code),
-        ),
+    ? availableCoursesForElectiveSlot(
+        slot,
+        curriculum,
+        progress,
+        effectiveProgress,
+        availableCourseCodes,
       )
     : slot.courses;
 
   return (
     <div>
-      <p className="text-xl font-black text-slate-950">{slot.title}</p>
-      <p className="mt-2 text-xs text-slate-500">Semester {slot.semester} · Elective requirement · {optionsText(slot.creditOptions, "cr")} · {optionsText(slot.ectsOptions, "ECTS")}</p>
-      <h4 className="mt-5 border-t border-slate-100 pt-4 text-sm font-black">{onlyTakeable ? "Available this semester" : "Course options"} ({displayedCourses.length})</h4>
+      <p className="text-xl font-black text-slate-950">{localizedAcademicName(slot, language)}</p>
+      <p className="mt-2 text-xs text-slate-500">{localizedCurriculumSection(language, curriculum.planType, slot.semester)} · {t("curriculum.electiveRequirement")} · {optionsText(slot.creditOptions, t("common.credit"))} · {optionsText(slot.ectsOptions, t("curriculum.ects"))}</p>
+      <h4 className="mt-5 border-t border-slate-100 pt-4 text-sm font-black">{t(onlyTakeable ? "curriculum.availableThisSemester" : "curriculum.courseOptions")} ({displayedCourses.length})</h4>
       {displayedCourses.length ? (
         <div className="mt-2 max-h-[55vh] space-y-2 overflow-auto pr-1">
           {displayedCourses.map((course) => {
+            const expectedCode = normalizeCourseCode(course.code);
+            const actualCode = courseLanguageVariants(expectedCode).find((code) => progress.courses[code]);
+            const courseProgress = actualCode ? progress.courses[actualCode] : undefined;
+            const languageEquivalent = Boolean(actualCode && actualCode !== expectedCode);
             const eligibility = evaluateCourseEligibility(
               curriculum.prerequisites[course.code],
-              progress.courses,
-              requirementKnown(curriculum, course.code),
+              effectiveProgress,
+              curriculumPrerequisitesKnown(curriculum, course.code),
             );
             return (
               <button key={course.code} type="button" onClick={() => onSelectCourse(course)} className="w-full rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50">
-                <div className="flex justify-between gap-2"><span className="font-bold text-slate-900">{course.code}</span><span className="text-[10px] font-bold uppercase text-slate-500">{eligibility}</span></div>
-                <p className="mt-1 text-xs text-slate-600">{course.title}</p>
+                <div className="flex justify-between gap-2"><span className="font-bold text-slate-900">{course.code}</span><span className={`text-[10px] font-bold uppercase ${courseProgress?.state === "passed" ? "text-emerald-700" : courseProgress?.state === "failed" ? "text-red-700" : "text-slate-500"}`}>{courseProgress?.state ?? eligibility}{courseProgress?.grade ? ` · ${courseProgress.grade}` : ""}</span></div>
+                <p className="mt-1 text-xs text-slate-600">{localizedAcademicName(course, language)}</p>
+                {languageEquivalent && <p className="mt-1 text-[10px] font-black text-blue-700">{t("curriculum.languageEquivalent", { code: actualCode ?? "" })}</p>}
+                {courseProgress?.source === "transcript" && <p className="mt-1 text-[10px] font-semibold text-emerald-700">{t("curriculum.termDetail", { term: courseProgress.term ?? "", crn: courseProgress.crn ?? "", grade: courseProgress.grade ?? "" })}</p>}
               </button>
             );
           })}
         </div>
-      ) : <p className="mt-2 text-sm text-slate-500">{onlyTakeable ? "No currently offered option has all prerequisites completed." : "This elective pool could not be loaded."}</p>}
+      ) : <p className="mt-2 text-sm text-slate-500">{t(onlyTakeable ? "curriculum.noTakeableOption" : "curriculum.poolUnavailable")}</p>}
     </div>
   );
 }
