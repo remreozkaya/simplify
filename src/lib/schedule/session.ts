@@ -18,7 +18,6 @@ export type GeneratorSession = {
   excludedDays: Day[];
   source?: "semester-planner";
   targetSemester?: string;
-  plannerLockedCourseCodes?: string[];
   plannerAlternatives?: string[];
 };
 
@@ -88,9 +87,6 @@ export function parseGeneratorSession(value: unknown): GeneratorSession | null {
     ...(value.source === "semester-planner" ? { source: value.source } : {}),
     ...(typeof value.targetSemester === "string" && value.targetSemester
       ? { targetSemester: value.targetSemester }
-      : {}),
-    ...(Array.isArray(value.plannerLockedCourseCodes) && value.plannerLockedCourseCodes.every((code) => typeof code === "string")
-      ? { plannerLockedCourseCodes: value.plannerLockedCourseCodes }
       : {}),
     ...(Array.isArray(value.plannerAlternatives) && value.plannerAlternatives.every((code) => typeof code === "string")
       ? { plannerAlternatives: value.plannerAlternatives }

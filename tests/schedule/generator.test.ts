@@ -167,7 +167,7 @@ describe("schedule generator", () => {
     ).toBe(2);
   });
 
-  it("falls back to the schedule with the fewest conflict pairs", () => {
+  it("rejects a complete assignment when every section combination conflicts", () => {
     const result = generateSchedules([
       course("BLG 101", [
         section("100", [["Monday", "09:00", "12:00"]]),
@@ -181,17 +181,11 @@ describe("schedule generator", () => {
       ]),
     ]);
 
-    expect(result.usedConflictFallback).toBe(true);
-    expect(result.schedules).toHaveLength(1);
-    expect(result.schedules[0].conflictCount).toBe(2);
-    expect(result.schedules[0].selections.map((item) => item.crn)).toEqual([
-      "100",
-      "200",
-      "301",
-    ]);
+    expect(result.usedConflictFallback).toBe(false);
+    expect(result.schedules).toEqual([]);
   });
 
-  it("uses fewer overlap minutes to break equal conflict-count ties", () => {
+  it("never returns a partial-overlap fallback", () => {
     const result = generateSchedules([
       course("BLG 101", [
         section("100", [["Monday", "09:00", "11:00"]]),
@@ -202,13 +196,8 @@ describe("schedule generator", () => {
       ]),
     ]);
 
-    expect(result.usedConflictFallback).toBe(true);
-    expect(result.schedules).toHaveLength(1);
-    expect(result.schedules[0]).toMatchObject({
-      conflictCount: 1,
-      totalConflictMinutes: 30,
-    });
-    expect(result.schedules[0].selections[1].crn).toBe("201");
+    expect(result.usedConflictFallback).toBe(false);
+    expect(result.schedules).toEqual([]);
   });
 
   it("does not use conflict fallback when valid schedules exist", () => {

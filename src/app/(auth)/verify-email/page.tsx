@@ -24,7 +24,7 @@ export default async function VerifyEmailPage({
 
   if (verified) {
     return (
-      <AuthCard title="Email verified successfully" titleKey="authentication.emailVerified">
+      <AuthCard titleKey="authentication.emailVerified">
         <div className="space-y-5">
           <AuthMessage
             tone="success"
@@ -43,31 +43,24 @@ export default async function VerifyEmailPage({
 
   return (
     <AuthCard
-      title="Verify your email"
       titleKey="authentication.verifyTitle"
       description={
-        email
-          ? <LocalizedText translationKey="authentication.verifySent" values={{ email }} />
-          : <LocalizedText translationKey="authentication.verifyOpen" />
+        email ? (
+          <LocalizedText
+            translationKey="authentication.verifySent"
+            values={{ email }}
+          />
+        ) : (
+          <LocalizedText translationKey="authentication.verifyOpen" />
+        )
       }
     >
       <div className="space-y-5">
-        <AuthMessage
-          tone={invalid ? "error" : "info"}
-          message={
-            invalid
-              ? "This verification link is invalid or has expired."
-              : "Check your inbox and verify your email before signing in."
-          }
-        />
+        {invalid ? (
+          <AuthMessage message="This verification link is invalid or has expired." />
+        ) : null}
         <ResendVerificationForm email={email} allowEmailEntry={!email} />
         <div className="flex flex-col gap-3 text-center text-sm">
-          <Link
-            href="/login"
-            className="font-black text-blue-700 hover:underline dark:text-blue-300"
-          >
-            <LocalizedText translationKey="authentication.verifiedGoLogin" />
-          </Link>
           <Link
             href="/login"
             className="font-semibold text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"

@@ -7,31 +7,19 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useLanguage } from "@/lib/i18n/client";
 
 type AuthCardProps = {
-  title: string;
   description?: React.ReactNode;
-  titleKey?: string;
-  descriptionKey?: string;
+  titleKey: string;
   children: React.ReactNode;
 };
 
 export default function AuthCard({
-  title,
   description,
   titleKey,
-  descriptionKey,
   children,
 }: AuthCardProps) {
   const { t } = useLanguage();
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-slate-100 px-4 py-10 sm:px-6 dark:bg-slate-950">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-30"
-        aria-hidden="true"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 10%, rgba(37,99,235,.12), transparent 35%), radial-gradient(circle at 10% 90%, rgba(124,58,237,.08), transparent 30%)",
-        }}
-      />
       <div className="relative w-full max-w-[440px]">
         <div className="mb-6 flex items-center justify-between px-1">
           <Link
@@ -44,26 +32,25 @@ export default function AuthCard({
             </span>
             Simplify
           </Link>
-          <div className="flex"><ThemeToggle /><LanguageToggle /></div>
+          <div className="flex">
+            <ThemeToggle />
+            <LanguageToggle />
+          </div>
         </div>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/[.06] sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
           <header className="mb-7">
             <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
-              {titleKey ? t(titleKey) : title}
+              {t(titleKey)}
             </h1>
             {description ? (
               <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {descriptionKey ? t(descriptionKey) : description}
+                {description}
               </p>
             ) : null}
           </header>
           {children}
         </section>
-
-        <p className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
-          {t("authentication.footer")}
-        </p>
       </div>
     </main>
   );

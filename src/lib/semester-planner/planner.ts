@@ -17,6 +17,8 @@ import {
   courseLanguageVariants,
   normalizeCourseCode,
 } from "@/lib/itu/courseCode.mjs";
+import { generateConflictFreeSchedules } from "@/lib/schedule/generator";
+import type { GeneratedSchedule, GeneratorCourse } from "@/lib/schedule/types";
 import type {
   PlannerAvailability,
   PlannerContribution,
@@ -29,13 +31,12 @@ import type {
   SemesterPlannerProgram,
 } from "@/lib/semester-planner/types";
 
+export const MAX_PLANNER_CREDITS = 60;
+export const MAX_PLANNER_COURSES = 30;
+
 type MutableCandidate = Omit<SemesterCourseCandidate, "eligibility" | "availability" | "missingPrerequisites" | "immediateUnlocks" | "downstreamUnlocks" | "score"> & {
   prerequisiteSources: Array<{ prerequisite?: ItuCoursePrerequisite; prerequisiteKnown: boolean }>;
 };
-
-function uniqueCodes(values: readonly string[] = []) {
-  return new Set(values.map(normalizeCourseCode).filter(Boolean));
-}
 
 function firstCredit(item: ItuCurriculumItem) {
   return item.creditOptions[0] ?? 0;
@@ -309,56 +310,120 @@ function baseScore(candidate: Omit<SemesterCourseCandidate, "score">) {
 }
 
 function candidateSelectionScore(
-  candidate: SemesterCourseCandidate,
   selected: readonly SemesterCourseCandidate[],
   programSummaries: readonly PlannerProgramSummary[],
   options: SemesterPlannerOptions,
 ) {
-  let score = candidate.score;
-  const totalNeed = programSummaries.reduce((sum, program) => sum + program.remainingCredits, 0) || 1;
-  const selectedByProgram = new Map(programSummaries.map((program) => [program.enrollmentId, selected
-    .filter((course) => course.contributions.some((contribution) => contribution.enrollmentId === program.enrollmentId))
-    .reduce((sum, course) => sum + course.credits, 0)]));
-  const selectedTotal = Math.max(1, selected.reduce((sum, course) => sum + course.credits, 0));
+  let score = selected.reduce((sum, candidate) => sum + candidate.score, 0);
+  if (options.priority !== "balanced") {
+    return score + selected.reduce((sum, candidate) => sum + (
+      candidate.contributions.some((contribution) => contribution.enrollmentType === options.priority) ? 45 : 0
+    ), 0);
+  }
 
-  candidate.contributions.forEach((contribution) => {
-    const program = programSummaries.find((value) => value.enrollmentId === contribution.enrollmentId);
-    if (!program) return;
-    if (options.priority === "balanced") {
-      const needShare = program.remainingCredits / totalNeed;
-      const currentShare = (selectedByProgram.get(program.enrollmentId) ?? 0) / selectedTotal;
-      score += (needShare - currentShare) * 35;
-    } else if (options.priority === contribution.enrollmentType) {
-      score += 45;
-    }
+  const completionRatios = programSummaries.map((program) => {
+    const selectedCredits = selected
+      .filter((course) => course.contributions.some((contribution) => contribution.enrollmentId === program.enrollmentId))
+      .reduce((sum, course) => sum + course.credits, 0);
+    return program.remainingCredits > 0 ? selectedCredits / program.remainingCredits : 1;
   });
+  const coveredPrograms = completionRatios.filter((ratio) => ratio > 0).length;
+  const spread = completionRatios.length
+    ? Math.max(...completionRatios) - Math.min(...completionRatios)
+    : 0;
+  score += coveredPrograms * 80 - spread * 60;
   return score;
 }
 
-function suggestedCredits(remaining: number) {
-  if (remaining <= 0) return 0;
-  return Math.min(18, Math.max(3, Math.ceil(Math.min(remaining, 18) / 3) * 3));
+function validateOptions(options: SemesterPlannerOptions) {
+  if (!Number.isFinite(options.desiredCredits) || options.desiredCredits < 0 || options.desiredCredits > MAX_PLANNER_CREDITS) {
+    throw new RangeError(`desiredCredits must be between 0 and ${MAX_PLANNER_CREDITS}.`);
+  }
+  if (options.maxCourses !== undefined && (
+    !Number.isInteger(options.maxCourses) || options.maxCourses < 0 || options.maxCourses > MAX_PLANNER_COURSES
+  )) {
+    throw new RangeError(`maxCourses must be a whole number between 0 and ${MAX_PLANNER_COURSES}.`);
+  }
+}
+
+function offeringForCode(code: string, offerings: readonly GeneratorCourse[] = []) {
+  const variants = new Set(courseLanguageVariants(code));
+  return offerings.find((offering) => variants.has(normalizeCourseCode(offering.courseCode)));
+}
+
+function scheduleForCourses(
+  courses: readonly SemesterCourseCandidate[],
+  options: SemesterPlannerOptions,
+): GeneratedSchedule | null {
+  if (!courses.length) return null;
+  const generatorCourses: GeneratorCourse[] = [];
+  for (const candidate of courses) {
+    const offering = offeringForCode(candidate.code, options.courseOfferings);
+    if (!offering) return null;
+    generatorCourses.push({
+      ...offering,
+      courseCode: candidate.code,
+      courseTitle: candidate.title,
+    });
+  }
+  return generateConflictFreeSchedules(generatorCourses, {
+    maxResults: 1,
+    maxVisitedNodes: Number.MAX_SAFE_INTEGER,
+    stopAfterFirst: true,
+  }).schedules[0] ?? null;
+}
+
+function comparisonForSelection(
+  selected: readonly SemesterCourseCandidate[],
+  programSummaries: readonly PlannerProgramSummary[],
+  options: SemesterPlannerOptions,
+) {
+  const credits = selected.reduce((sum, course) => sum + course.credits, 0);
+  return {
+    distance: Math.abs(options.desiredCredits - credits),
+    overTarget: credits > options.desiredCredits ? 1 : 0,
+    score: candidateSelectionScore(selected, programSummaries, options),
+    courses: selected.length,
+    codeKey: selected.map((course) => course.code).sort().join("|"),
+  };
+}
+
+function isBetterSelection(
+  candidate: ReturnType<typeof comparisonForSelection>,
+  current: ReturnType<typeof comparisonForSelection>,
+) {
+  return candidate.distance < current.distance ||
+    (candidate.distance === current.distance && candidate.overTarget < current.overTarget) ||
+    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score > current.score) ||
+    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score === current.score && candidate.courses < current.courses) ||
+    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score === current.score && candidate.courses === current.courses && candidate.codeKey < current.codeKey);
+}
+
+export function semesterPlannerCandidateCodes(programs: readonly SemesterPlannerProgram[]) {
+  return [...collectCandidates(programs).keys()].sort();
 }
 
 export function buildSemesterPlan(
   programs: readonly SemesterPlannerProgram[],
   options: SemesterPlannerOptions,
 ): SemesterPlan {
+  validateOptions(options);
   const confirmedProgress = combinedProgress(programs);
-  const projectedProgress = { ...confirmedProgress };
-  uniqueCodes(options.inProgressCourseCodes).forEach((code) => addProgress(projectedProgress, code, { state: "passed", grade: "AA" }));
-  const included = uniqueCodes([...(options.includedCourseCodes ?? []), ...(options.lockedCourseCodes ?? [])]);
-  const excluded = uniqueCodes(options.excludedCourseCodes);
   const notices: PlannerNotice[] = [];
   const candidateMap = collectCandidates(programs);
   const candidates: SemesterCourseCandidate[] = [];
+  let hasUnknownEligibility = false;
+  let hasUnknownAvailability = options.availabilityMode === "unknown";
 
   candidateMap.forEach((candidate, code) => {
     if (courseLanguageVariants(code).some((variant) => confirmedProgress[variant]?.state === "passed")) return;
-    const { eligibility, missing } = evaluateCandidateEligibility(candidate.prerequisiteSources, confirmedProgress, projectedProgress);
-    if (eligibility === "ineligible") return;
+    const { eligibility, missing } = evaluateCandidateEligibility(candidate.prerequisiteSources, confirmedProgress, confirmedProgress);
+    if (eligibility === "unknown") hasUnknownEligibility = true;
+    if (eligibility !== "confirmed") return;
     const availability = evaluateAvailability(code, options);
-    if (availability === "unavailable") return;
+    if (availability === "unknown") hasUnknownAvailability = true;
+    const offering = offeringForCode(code, options.courseOfferings);
+    if (availability !== "available" || !offering?.sections.some((section) => section.meetings.length > 0)) return;
     const unlocks = unlocksForCandidate(code, programs, confirmedProgress);
     const value = {
       code: candidate.code,
@@ -377,16 +442,6 @@ export function buildSemesterPlan(
     candidates.push({ ...value, score: baseScore(value) });
   });
 
-  included.forEach((code) => {
-    if (candidates.some((candidate) => candidate.code === code)) return;
-    const raw = candidateMap.get(code);
-    if (!raw) notices.push({ kind: "included-not-found", courseCode: code });
-    else {
-      const availability = evaluateAvailability(code, options);
-      notices.push({ kind: availability === "unavailable" ? "included-unavailable" : "included-ineligible", courseCode: code });
-    }
-  });
-
   const programSummaries: PlannerProgramSummary[] = programs.map((program) => ({
     enrollmentId: program.enrollment.id,
     enrollmentType: program.enrollment.type,
@@ -397,25 +452,42 @@ export function buildSemesterPlan(
     selectedCredits: 0,
     selectedCourses: 0,
   }));
-  const available = candidates.filter((candidate) => !excluded.has(candidate.code));
-  const selected: SemesterCourseCandidate[] = [];
-  const forced = available.filter((candidate) => included.has(candidate.code));
-  forced.sort((first, second) => second.score - first.score || first.code.localeCompare(second.code));
-  forced.forEach((candidate) => {
-    if (options.maxCourses && selected.length >= options.maxCourses) return;
-    selected.push(candidate);
-  });
+  const available = candidates.sort((first, second) => second.score - first.score || first.code.localeCompare(second.code));
+  const maximumCourses = options.maxCourses && options.maxCourses > 0
+    ? Math.min(options.maxCourses, available.length)
+    : available.length;
+  const maximumSingleCredit = Math.max(0, ...available.map((candidate) => candidate.credits));
+  const maximumUsefulCredits = options.desiredCredits + maximumSingleCredit;
+  let selected: SemesterCourseCandidate[] = [];
+  let compatibleSchedule: GeneratedSchedule | null = null;
+  let bestComparison = comparisonForSelection(selected, programSummaries, options);
 
-  while (!options.maxCourses || selected.length < options.maxCourses) {
-    const selectedCredits = selected.reduce((sum, course) => sum + course.credits, 0);
-    const choices = available
-      .filter((candidate) => !selected.includes(candidate) && selectedCredits + candidate.credits <= options.desiredCredits)
-      .sort((first, second) =>
-        candidateSelectionScore(second, selected, programSummaries, options) - candidateSelectionScore(first, selected, programSummaries, options) ||
-        second.credits - first.credits || first.code.localeCompare(second.code));
-    if (!choices.length) break;
-    selected.push(choices[0]);
+  function explore(startIndex: number, current: SemesterCourseCandidate[], usedRequirements: ReadonlySet<string>) {
+    if (current.length >= maximumCourses) return;
+    const currentCredits = current.reduce((sum, course) => sum + course.credits, 0);
+    for (let index = startIndex; index < available.length; index += 1) {
+      const candidate = available[index];
+      if (candidate.credits < 0 || !Number.isFinite(candidate.credits)) continue;
+      if (currentCredits >= options.desiredCredits && candidate.credits > 0) continue;
+      if (currentCredits + candidate.credits > maximumUsefulCredits) continue;
+      const requirementKeys = candidate.contributions.map(contributionKey);
+      if (requirementKeys.every((key) => usedRequirements.has(key))) continue;
+      const next = [...current, candidate];
+      const schedule = scheduleForCourses(next, options);
+      if (!schedule) continue;
+      const comparison = comparisonForSelection(next, programSummaries, options);
+      if (isBetterSelection(comparison, bestComparison)) {
+        selected = next;
+        compatibleSchedule = schedule;
+        bestComparison = comparison;
+      }
+      const nextRequirements = new Set(usedRequirements);
+      requirementKeys.forEach((key) => nextRequirements.add(key));
+      explore(index + 1, next, nextRequirements);
+    }
   }
+
+  explore(0, [], new Set());
 
   const selectedCredits = selected.reduce((sum, course) => sum + course.credits, 0);
   const selectedEcts = selected.reduce((sum, course) => sum + course.ects, 0);
@@ -426,10 +498,28 @@ export function buildSemesterPlan(
   });
 
   if (selectedCredits < options.desiredCredits) notices.push({ kind: "target-shortfall", credits: options.desiredCredits - selectedCredits });
-  if (selectedCredits > options.desiredCredits) notices.push({ kind: "forced-over-target", credits: selectedCredits - options.desiredCredits });
+  if (selectedCredits > options.desiredCredits) notices.push({ kind: "target-overage", credits: selectedCredits - options.desiredCredits });
+  const collisionBlocked = available.some((candidate) => {
+    if (selected.includes(candidate)) return false;
+    if (options.maxCourses && options.maxCourses > 0 && selected.length >= options.maxCourses) return false;
+    const differenceBefore = Math.abs(options.desiredCredits - selectedCredits);
+    const differenceAfter = Math.abs(options.desiredCredits - selectedCredits - candidate.credits);
+    return differenceAfter < differenceBefore && !scheduleForCourses([...selected, candidate], options);
+  });
+  if (selectedCredits !== options.desiredCredits && collisionBlocked) notices.push({ kind: "collision-shortfall" });
   if (options.maxCourses && selected.length >= options.maxCourses && available.some((candidate) => !selected.includes(candidate))) notices.push({ kind: "max-courses", count: options.maxCourses });
-  if (options.availabilityMode === "unknown" || candidates.some((candidate) => candidate.availability === "unknown")) notices.push({ kind: "availability-unknown" });
+  if (hasUnknownAvailability) notices.push({ kind: "availability-unknown" });
+  if (hasUnknownEligibility) notices.push({ kind: "eligibility-unknown" });
   notices.push({ kind: "registration-limit-unknown" }, { kind: "corequisites-unknown" });
+
+  const selectedSchedule = compatibleSchedule as GeneratedSchedule | null;
+  const compatibleSectionConstraints = selectedSchedule?.selections.map((selection) => ({
+    courseCode: selection.courseCode,
+    branchCode: selection.branchCode,
+    courseId: selection.courseId,
+    sectionId: selection.sectionId,
+    crn: selection.crn,
+  })) ?? [];
 
   return {
     recommendations: selected,
@@ -438,15 +528,7 @@ export function buildSemesterPlan(
     selectedCredits,
     selectedEcts,
     combinedRemainingCredits: combinedRemainingCredits(programs),
-    suggestedCredits: suggestedCredits(combinedRemainingCredits(programs)),
+    compatibleSectionConstraints,
     notices,
   };
-}
-
-export function estimateSemestersUntil(targetDate: string, from = new Date()) {
-  if (!targetDate) return null;
-  const target = new Date(`${targetDate}T00:00:00`);
-  if (Number.isNaN(target.getTime()) || target <= from) return null;
-  const months = (target.getFullYear() - from.getFullYear()) * 12 + target.getMonth() - from.getMonth();
-  return Math.max(1, Math.ceil(months / 6));
 }

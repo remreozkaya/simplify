@@ -9,7 +9,9 @@ const COURSE_CODE_PATTERN = /^([A-ZÇĞİÖŞÜ]{2,8})(\d{2,5}[A-Z]{0,3})$/u;
 export function normalizeCourseCode(value) {
   const normalized = value.replace(/\s+/g, "").toUpperCase();
   const match = normalized.match(COURSE_CODE_PATTERN);
-  return match ? `${match[1]} ${match[2]}` : value.replace(/\s+/g, " ").trim().toUpperCase();
+  return match
+    ? `${match[1]} ${match[2]}`
+    : value.replace(/\s+/g, " ").trim().toUpperCase();
 }
 
 /** @param {string} value */
@@ -27,19 +29,24 @@ export function isValidCourseCode(value) {
  */
 export function courseLanguageVariants(value) {
   const normalized = normalizeCourseCode(value);
-  const match = normalized.match(/^([A-ZÇĞİÖŞÜ]{2,8})\s(\d{2,5})([A-Z]{0,3})$/u);
+  const match = normalized.match(
+    /^([A-ZÇĞİÖŞÜ]{2,8})\s(\d{2,5})([A-Z]{0,3})$/u,
+  );
   if (!match) return [normalized];
   const [, branch, number, suffix] = match;
-  const counterpartSuffix = suffix === "" ? "E" : suffix === "E" ? "" : suffix === "L" ? "EL" : suffix === "EL" ? "L" : null;
+  const counterpartSuffix =
+    suffix === ""
+      ? "E"
+      : suffix === "E"
+        ? ""
+        : suffix === "L"
+          ? "EL"
+          : suffix === "EL"
+            ? "L"
+            : null;
   return counterpartSuffix === null
     ? [normalized]
     : [normalized, `${branch} ${number}${counterpartSuffix}`];
-}
-
-/** @param {string} first @param {string} second */
-export function areCourseLanguageVariants(first, second) {
-  const normalizedSecond = normalizeCourseCode(second);
-  return courseLanguageVariants(first).slice(1).includes(normalizedSecond);
 }
 
 /** @param {string} value @returns {"EN" | "TR" | undefined} */

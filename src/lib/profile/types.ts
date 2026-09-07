@@ -45,12 +45,6 @@ export const EMPTY_PROFILE: UserProfile = {
   profileUpdatedAt: null,
 };
 
-export const ENROLLMENT_LABELS: Record<EnrollmentType, string> = {
-  main: "Main program",
-  "double-major": "Double major",
-  minor: "Minor",
-};
-
 export function profileFullName(profile: UserProfile) {
   return [profile.name, profile.surname].filter(Boolean).join(" ");
 }
@@ -64,5 +58,9 @@ export function profileInitials(profile: UserProfile) {
 }
 
 export function isProfileComplete(profile: UserProfile) {
-  return Boolean(profile.name && profile.surname && profile.programEnrollments.some((item) => item.type === "main"));
+  return Boolean(
+    profile.name &&
+    profile.surname &&
+    profile.programEnrollments.some((item) => item.type === "main"),
+  );
 }

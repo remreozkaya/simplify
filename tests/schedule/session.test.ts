@@ -72,7 +72,6 @@ describe("generator session persistence", () => {
       excludedDays: [],
       source: "semester-planner",
       targetSemester: "published",
-      plannerLockedCourseCodes: ["BLG 335E"],
       plannerAlternatives: ["BLG 411E"],
     })).toEqual({
       version: 2,
@@ -88,7 +87,6 @@ describe("generator session persistence", () => {
       excludedDays: [],
       source: "semester-planner",
       targetSemester: "published",
-      plannerLockedCourseCodes: ["BLG 335E"],
       plannerAlternatives: ["BLG 411E"],
     });
   });

@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
   --background: #f1f5f9;
   --foreground: #0f172a;
 }
@@ -15,6 +16,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #020617;
   --foreground: #e2e8f0;
 }
@@ -22,7 +24,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 body,
@@ -94,4 +96,32 @@ textarea {
 .dark .theme-toggle {
   background-color: #111827;
   color: #e2e8f0;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.dark
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]
+  ):focus-visible {
+  outline-color: #93c5fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

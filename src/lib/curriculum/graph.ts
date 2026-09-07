@@ -6,8 +6,16 @@ import { curriculumSectionLabel } from "@/lib/curriculum/grouping";
 
 type CurriculumGraphNode = {
   id: string;
-  kind: "course" | "elective-slot" | "external" | "and" | "semester-label" | "semester-band";
+  kind:
+    | "course"
+    | "elective-slot"
+    | "external"
+    | "and"
+    | "semester-label"
+    | "semester-band";
   label: string;
+  nameTr?: string;
+  nameEn?: string;
   courseCode?: string;
   semester?: number;
   externalPrerequisiteCodes?: string[];
@@ -33,7 +41,9 @@ export type CurriculumCourseConnection = {
   target: string;
 };
 
-export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph {
+export function buildCurriculumGraph(
+  curriculum: ItuCurriculum,
+): CurriculumGraph {
   const nodes: CurriculumGraphNode[] = [];
   const edges: CurriculumGraphEdge[] = [];
   const courseNodeByCode = new Map<string, string>();
@@ -61,7 +71,10 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
     nodes.push({
       id: `semester:${semester.semester}`,
       kind: "semester-label",
-      label: curriculumSectionLabel(curriculum.planType, semester.semester).toUpperCase(),
+      label: curriculumSectionLabel(
+        curriculum.planType,
+        semester.semester,
+      ).toUpperCase(),
       semester: semester.semester,
       x: graphWidth / 2 - 75,
       y: semesterY + 12,
@@ -70,7 +83,10 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
       nodes.push({
         id: item.id,
         kind: item.kind,
-        label: item.kind === "course" ? `${item.code}\n${item.title}` : item.title,
+        label:
+          item.kind === "course" ? `${item.code}\n${item.title}` : item.title,
+        nameTr: item.nameTr,
+        nameEn: item.nameEn,
         ...(item.kind === "course" ? { courseCode: item.code } : {}),
         semester: semester.semester,
         x: rowStartX + row * courseGap,
@@ -132,11 +148,14 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
     const expression = prerequisite.expression;
     const externalCodes: string[] = [];
     const collectExternal = (value: PrerequisiteExpression) => {
-      if (value.kind === "course" && !courseNodeByCode.has(value.courseCode)) externalCodes.push(value.courseCode);
-      if (value.kind === "and" || value.kind === "or") value.operands.forEach(collectExternal);
+      if (value.kind === "course" && !courseNodeByCode.has(value.courseCode))
+        externalCodes.push(value.courseCode);
+      if (value.kind === "and" || value.kind === "or")
+        value.operands.forEach(collectExternal);
     };
     collectExternal(expression);
-    if (externalCodes.length) targetNode.externalPrerequisiteCodes = [...new Set(externalCodes)];
+    if (externalCodes.length)
+      targetNode.externalPrerequisiteCodes = [...new Set(externalCodes)];
     const sources = connectExpression(expression, targetId, "0", targetNode);
     sources.forEach((source) => {
       edges.push({
@@ -151,15 +170,24 @@ export function buildCurriculumGraph(curriculum: ItuCurriculum): CurriculumGraph
   return { nodes, edges };
 }
 
-function traverse(startId: string, edges: CurriculumGraphEdge[], direction: "up" | "down") {
+function traverse(
+  startId: string,
+  edges: CurriculumGraphEdge[],
+  direction: "up" | "down",
+) {
   const visited = new Set<string>([startId]);
   const queue = [startId];
   while (queue.length) {
     const current = queue.shift()!;
     edges.forEach((edge) => {
-      const next = direction === "up"
-        ? edge.target === current ? edge.source : undefined
-        : edge.source === current ? edge.target : undefined;
+      const next =
+        direction === "up"
+          ? edge.target === current
+            ? edge.source
+            : undefined
+          : edge.source === current
+            ? edge.target
+            : undefined;
       if (next && !visited.has(next)) {
         visited.add(next);
         queue.push(next);
@@ -169,11 +197,17 @@ function traverse(startId: string, edges: CurriculumGraphEdge[], direction: "up"
   return visited;
 }
 
-export function getAncestorNodeIds(graph: CurriculumGraph, nodeId: string): Set<string> {
+export function getAncestorNodeIds(
+  graph: CurriculumGraph,
+  nodeId: string,
+): Set<string> {
   return traverse(nodeId, graph.edges, "up");
 }
 
-export function getDependentNodeIds(graph: CurriculumGraph, nodeId: string): Set<string> {
+export function getDependentNodeIds(
+  graph: CurriculumGraph,
+  nodeId: string,
+): Set<string> {
   return traverse(nodeId, graph.edges, "down");
 }
 
@@ -184,17 +218,24 @@ export function getVisibleCourseConnections(
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const incoming = new Map<string, string[]>();
   graph.edges.forEach((edge) => {
-    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
+    incoming.set(edge.target, [
+      ...(incoming.get(edge.target) ?? []),
+      edge.source,
+    ]);
   });
 
-  function findCourseSources(nodeId: string, visited = new Set<string>()): string[] {
+  function findCourseSources(
+    nodeId: string,
+    visited = new Set<string>(),
+  ): string[] {
     if (visited.has(nodeId)) return [];
     visited.add(nodeId);
 
     return (incoming.get(nodeId) ?? []).flatMap((sourceId) => {
       const source = nodeById.get(sourceId);
       if (!source) return [];
-      if (source.kind === "course" && visibleNodeIds.has(sourceId)) return [sourceId];
+      if (source.kind === "course" && visibleNodeIds.has(sourceId))
+        return [sourceId];
       if (source.kind === "and") return findCourseSources(sourceId, visited);
       return [];
     });
@@ -206,7 +247,11 @@ export function getVisibleCourseConnections(
       [...new Set(findCourseSources(target.id))]
         .filter((sourceId) => {
           const source = nodeById.get(sourceId);
-          return source?.semester !== undefined && target.semester !== undefined && sourceId !== target.id;
+          return (
+            source?.semester !== undefined &&
+            target.semester !== undefined &&
+            sourceId !== target.id
+          );
         })
         .map((source) => ({
           id: `curve:${source}:${target.id}`,

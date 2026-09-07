@@ -1,5 +1,6 @@
 "use client";
 
+import { getCoursesByFaculty } from "@/lib/calendar/catalog";
 import Link from "next/link";
 import {
   useEffect,
@@ -23,30 +24,23 @@ import {
 } from "@/lib/schedule/session";
 import { minutesToTime } from "@/lib/schedule/time";
 import { useLanguage } from "@/lib/i18n/client";
-import { formatNumber, localizedWeekday } from "@/lib/i18n";
+import {
+  formatNumber,
+  localizedWeekday,
+  localizeRuntimeMessage,
+} from "@/lib/i18n";
 import { courseLanguageVariants } from "@/lib/itu/courseCode.mjs";
 import type {
   GeneratedSchedule,
   GeneratorCourse,
   ScheduleConstraints,
 } from "@/lib/schedule/types";
-import {
-  days,
-  type CourseOption,
-  type Day,
-  type FacultyOption,
-} from "@/types/calendar";
+import { days, type Day, type FacultyOption } from "@/types/calendar";
 
 type DesiredCourseRow = GeneratorSessionCourse;
 
 type GeneratorStatus =
-  | "idle"
-  | "ready"
-  | "generating"
-  | "success"
-  | "fallback"
-  | "no-results"
-  | "error";
+  "idle" | "ready" | "generating" | "success" | "no-results" | "error";
 
 type ScheduleGeneratorPanelProps = {
   courseCatalog: FacultyOption[];
@@ -55,7 +49,7 @@ type ScheduleGeneratorPanelProps = {
   loadBranch: (branchCode: string) => Promise<void>;
   catalogError: string | null;
   onPreviewChange: (schedule: GeneratedSchedule | null) => void;
-  onSave: (schedule: GeneratedSchedule) => void;
+  onSave: (schedule: GeneratedSchedule) => string;
 };
 
 const selectClassName =
@@ -75,7 +69,12 @@ function ScheduleStarRating({ rating }: { rating: number }) {
   return (
     <span
       className="inline-flex items-center gap-2"
-      aria-label={t("courses.stars", { rating: formatNumber(language, rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+      aria-label={t("courses.stars", {
+        rating: formatNumber(language, rating, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }),
+      })}
     >
       <span className="relative inline-block text-lg leading-none tracking-wide">
         <span className="text-gray-300" aria-hidden="true">
@@ -90,7 +89,11 @@ function ScheduleStarRating({ rating }: { rating: number }) {
         </span>
       </span>
       <span className="font-semibold text-gray-900">
-        {formatNumber(language, rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5
+        {formatNumber(language, rating, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })}
+        /5
       </span>
     </span>
   );
@@ -100,22 +103,12 @@ function createRowId(): string {
   return `desired-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function coursesForBranch(
-  courseCatalog: FacultyOption[],
-  branchCode: string,
-): CourseOption[] {
-  return (
-    courseCatalog.find((branch) => branch.facultyCode === branchCode)
-      ?.courses ?? []
-  );
-}
-
 function resolveGeneratorCourses(
   rows: DesiredCourseRow[],
   courseCatalog: FacultyOption[],
 ): GeneratorCourse[] | null {
   const resolved: Array<GeneratorCourse | null> = rows.map((row) => {
-    const course = coursesForBranch(courseCatalog, row.branchCode).find(
+    const course = getCoursesByFaculty(courseCatalog, row.branchCode).find(
       (candidate) => candidate.id === row.courseId,
     );
 
@@ -131,9 +124,7 @@ function resolveGeneratorCourses(
       : null;
   });
 
-  return resolved.every(
-    (course): course is GeneratorCourse => course !== null,
-  )
+  return resolved.every((course): course is GeneratorCourse => course !== null)
     ? resolved
     : null;
 }
@@ -158,8 +149,8 @@ export default function ScheduleGeneratorPanel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [hasLoadedSession, setHasLoadedSession] = useState(false);
+  const [savedProgramId, setSavedProgramId] = useState("");
   const [plannerAlternatives, setPlannerAlternatives] = useState<string[]>([]);
-  const [plannerLockedCourseCodes, setPlannerLockedCourseCodes] = useState<string[]>([]);
   const generationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resolvedCourses = useMemo(
@@ -190,9 +181,7 @@ export default function ScheduleGeneratorPanel({
    * restored only after hydration so localStorage never affects server HTML. */
   useEffect(() => {
     try {
-      const storedSession = localStorage.getItem(
-        GENERATOR_SESSION_STORAGE_KEY,
-      );
+      const storedSession = localStorage.getItem(GENERATOR_SESSION_STORAGE_KEY);
       const session = storedSession
         ? parseGeneratorSession(JSON.parse(storedSession) as unknown)
         : null;
@@ -203,7 +192,6 @@ export default function ScheduleGeneratorPanel({
         setLatestEndTime(session.latestEndTime);
         setExcludedDays(session.excludedDays);
         setPlannerAlternatives(session.plannerAlternatives ?? []);
-        setPlannerLockedCourseCodes(session.plannerLockedCourseCodes ?? []);
       }
     } catch {
       // Ignore malformed or unavailable browser storage.
@@ -227,7 +215,9 @@ export default function ScheduleGeneratorPanel({
           earliestStartTime,
           latestEndTime,
           excludedDays,
-          ...(plannerAlternatives.length ? { source: "semester-planner", plannerAlternatives, plannerLockedCourseCodes } : {}),
+          ...(plannerAlternatives.length
+            ? { source: "semester-planner", plannerAlternatives }
+            : {}),
         }),
       );
     } catch {
@@ -239,7 +229,6 @@ export default function ScheduleGeneratorPanel({
     hasLoadedSession,
     latestEndTime,
     plannerAlternatives,
-    plannerLockedCourseCodes,
     rows,
   ]);
 
@@ -263,8 +252,10 @@ export default function ScheduleGeneratorPanel({
       let changed = false;
       const next = current.map((row) => {
         if (!row.courseCode || !row.branchCode) return row;
-        const courses = coursesForBranch(courseCatalog, row.branchCode);
-        const currentCourse = courses.find((course) => course.id === row.courseId);
+        const courses = getCoursesByFaculty(courseCatalog, row.branchCode);
+        const currentCourse = courses.find(
+          (course) => course.id === row.courseId,
+        );
         if (currentCourse?.code === row.courseCode) return row;
         const variants = new Set(courseLanguageVariants(row.courseCode));
         const resolved = courses.find((course) => variants.has(course.code));
@@ -287,6 +278,7 @@ export default function ScheduleGeneratorPanel({
   );
 
   function invalidateResults(nextStatus: GeneratorStatus = "idle") {
+    setSavedProgramId("");
     setSchedules([]);
     setCurrentIndex(0);
     setTruncated(false);
@@ -311,7 +303,13 @@ export default function ScheduleGeneratorPanel({
     setRows((current) =>
       current.map((row) =>
         row.id === rowId
-          ? { ...row, branchCode, courseId: "", pinnedSectionId: "" }
+          ? {
+              ...row,
+              branchCode,
+              courseId: "",
+              courseCode: undefined,
+              pinnedSectionId: "",
+            }
           : row,
       ),
     );
@@ -341,17 +339,19 @@ export default function ScheduleGeneratorPanel({
     setRows((current) =>
       current.map((candidate) =>
         candidate.id === rowId
-          ? { ...candidate, courseId, pinnedSectionId: "" }
+          ? {
+              ...candidate,
+              courseId,
+              courseCode: undefined,
+              pinnedSectionId: "",
+            }
           : candidate,
       ),
     );
     invalidateResults(courseId ? "ready" : "idle");
   }
 
-  function handlePinnedSectionChange(
-    rowId: string,
-    pinnedSectionId: string,
-  ) {
+  function handlePinnedSectionChange(rowId: string, pinnedSectionId: string) {
     setRows((current) =>
       current.map((row) =>
         row.id === rowId ? { ...row, pinnedSectionId } : row,
@@ -387,7 +387,9 @@ export default function ScheduleGeneratorPanel({
 
     if (courseWithoutSections) {
       setStatus("error");
-      setMessage(t("courses.noCrn", { code: courseWithoutSections.courseCode }));
+      setMessage(
+        t("courses.noCrn", { code: courseWithoutSections.courseCode }),
+      );
       return;
     }
 
@@ -430,10 +432,6 @@ export default function ScheduleGeneratorPanel({
               ? t("courses.searchLimit")
               : t("courses.noSchedule"),
           );
-        } else if (result.usedConflictFallback) {
-          const minimumConflicts = result.schedules[0].conflictCount;
-          setStatus("fallback");
-          setMessage(t("courses.conflictFallback", { count: result.schedules.length, conflicts: minimumConflicts, limit: result.searchLimitReached ? t("courses.withinLimit") : "" }));
         } else {
           setStatus("success");
           setMessage(
@@ -445,9 +443,7 @@ export default function ScheduleGeneratorPanel({
       } catch (error: unknown) {
         setStatus("error");
         setMessage(
-          error instanceof Error
-            ? error.message
-            : t("courses.generationError"),
+          error instanceof Error ? error.message : t("courses.generationError"),
         );
       }
     }, 0);
@@ -474,18 +470,15 @@ export default function ScheduleGeneratorPanel({
         : status;
 
   return (
-    <section id="schedule-generator" className="w-full scroll-mt-24 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <section
+      id="schedule-generator"
+      className="w-full scroll-mt-24 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            {t("courses.generate")}
+            {t("common.courses")}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {t("courses.generatorDescription")}
-          </p>
-          <p className="mt-1 text-xs text-gray-400">
-            {t("courses.autosaved")}
-          </p>
         </div>
 
         <button
@@ -506,7 +499,7 @@ export default function ScheduleGeneratorPanel({
         <div className="mt-4 space-y-2">
           {rows.map((row) => {
             const branchIsLoading = isBranchLoading(row.branchCode);
-            const courses = coursesForBranch(courseCatalog, row.branchCode);
+            const courses = getCoursesByFaculty(courseCatalog, row.branchCode);
             const selectedCourse = courses.find(
               (course) => course.id === row.courseId,
             );
@@ -514,10 +507,12 @@ export default function ScheduleGeneratorPanel({
             return (
               <div
                 key={row.id}
-                className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_auto]"
+                className="grid items-end gap-3 border-b border-slate-200 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_auto]"
               >
                 <label className="min-w-0">
-                  <span className="sr-only">{t("courses.prefix")}</span>
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("courses.prefix")}
+                  </span>
                   <select
                     aria-label={t("courses.prefix")}
                     value={row.branchCode}
@@ -528,7 +523,11 @@ export default function ScheduleGeneratorPanel({
                     className={selectClassName}
                   >
                     <option value="">
-                      {t(isLoadingBranches ? "courses.loadingPrefixes" : "courses.prefix")}
+                      {t(
+                        isLoadingBranches
+                          ? "courses.loadingPrefixes"
+                          : "courses.prefix",
+                      )}
                     </option>
                     {courseCatalog.map((branch) => (
                       <option
@@ -542,7 +541,9 @@ export default function ScheduleGeneratorPanel({
                 </label>
 
                 <label className="min-w-0">
-                  <span className="sr-only">{t("courses.desired")}</span>
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("courses.desired")}
+                  </span>
                   <select
                     aria-label={t("courses.desired")}
                     value={row.courseId}
@@ -553,19 +554,25 @@ export default function ScheduleGeneratorPanel({
                     className={selectClassName}
                   >
                     <option value="">
-                      {t(branchIsLoading ? "courses.loadingCourses" : "courses.codeAndName")}
+                      {t(
+                        branchIsLoading
+                          ? "courses.loadingCourses"
+                          : "courses.codeAndName",
+                      )}
                     </option>
                     {courses.map((course) => (
                       <option key={course.id} value={course.id}>
                         {course.code} - {course.title} ({course.sections.length}{" "}
-                        CRNs)
+                        CRN)
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label className="min-w-0">
-                  <span className="sr-only">{t("courses.pinnedCrn")}</span>
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    {t("courses.pinnedCrn")}
+                  </span>
                   <select
                     aria-label={t("courses.pinnedCrn")}
                     value={row.pinnedSectionId}
@@ -578,15 +585,14 @@ export default function ScheduleGeneratorPanel({
                     <option value="">{t("courses.anyCrn")}</option>
                     {selectedCourse?.sections.map((section) => (
                       <option key={section.id} value={section.id}>
-                        {t("courses.pin")} {section.crn} · {section.meetings
+                        {t("courses.pin")} {section.crn} ·{" "}
+                        {section.meetings
                           .map(
                             (meeting) =>
                               `${localizedWeekday(language, meeting.day, "short")} ${meeting.startTime}–${meeting.endTime}`,
                           )
                           .join(", ")}
-                        {section.instructor
-                          ? ` · ${section.instructor}`
-                          : ""}
+                        {section.instructor ? ` · ${section.instructor}` : ""}
                       </option>
                     ))}
                   </select>
@@ -675,7 +681,10 @@ export default function ScheduleGeneratorPanel({
 
       {combinationCount >= LARGE_SEARCH_SPACE_THRESHOLD && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {t("courses.largeSearch", { count: formatNumber(language, combinationCount), limit: MAX_GENERATED_SCHEDULES })}
+          {t("courses.largeSearch", {
+            count: formatNumber(language, combinationCount),
+            limit: MAX_GENERATED_SCHEDULES,
+          })}
         </div>
       )}
 
@@ -683,18 +692,22 @@ export default function ScheduleGeneratorPanel({
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={!isReady || status === "generating" || Boolean(catalogError)}
-          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+          disabled={
+            !isReady || status === "generating" || Boolean(catalogError)
+          }
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t(status === "generating" ? "courses.generating" : "courses.generateSchedules")}
+          {t(
+            status === "generating"
+              ? "courses.generating"
+              : "courses.generateSchedules",
+          )}
         </button>
 
         <div
           className={`text-sm ${
             status === "error" || status === "no-results"
               ? "text-red-700"
-              : status === "fallback"
-                ? "font-medium text-amber-700"
               : status === "success"
                 ? "font-medium text-green-700"
                 : "text-gray-500"
@@ -707,20 +720,23 @@ export default function ScheduleGeneratorPanel({
             : isLoadingSelectedCourses
               ? t("courses.loadingSelected")
               : catalogError
-                ? catalogError
-                : message ||
-                  (visibleStatus === "ready"
-                    ? t("courses.ready")
-                    : t("courses.selectDesired"))}
+                ? localizeRuntimeMessage(language, catalogError)
+                : localizeRuntimeMessage(language, message)}
         </div>
       </div>
 
-      {(visibleStatus === "no-results" || visibleStatus === "fallback") && plannerAlternatives.length > 0 ? (
+      {visibleStatus === "no-results" && plannerAlternatives.length > 0 ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-black">{t("courses.plannerReplacements")}</p>
-          <p className="mt-1">{t("courses.plannerReplacementsDescription", { locked: plannerLockedCourseCodes.join(", ") || t("courses.noneLocked") })}</p>
-          <p className="mt-2 font-semibold">{plannerAlternatives.join(" · ")}</p>
-          <Link href="/semester-planner" className="mt-3 inline-flex rounded-lg bg-amber-700 px-3 py-2 font-black text-white">{t("courses.returnToPlanner")}</Link>
+          <p className="mt-2 font-semibold">
+            {plannerAlternatives.join(" · ")}
+          </p>
+          <Link
+            href="/semester-planner"
+            className="mt-3 inline-flex rounded-lg bg-amber-700 px-3 py-2 font-black text-white"
+          >
+            {t("courses.returnToPlanner")}
+          </Link>
         </div>
       ) : null}
 
@@ -742,7 +758,10 @@ export default function ScheduleGeneratorPanel({
             </button>
 
             <div className="text-sm font-semibold text-gray-800">
-              {t("courses.schedule", { current: currentIndex + 1, total: schedules.length })}
+              {t("courses.schedule", {
+                current: currentIndex + 1,
+                total: schedules.length,
+              })}
               {truncated ? "+" : ""}
             </div>
 
@@ -755,12 +774,6 @@ export default function ScheduleGeneratorPanel({
               {t("courses.next")} →
             </button>
           </div>
-
-          {currentSchedule.conflictCount > 0 && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              {t("courses.fallbackConflicts", { count: currentSchedule.conflictCount, minutes: currentSchedule.totalConflictMinutes })}
-            </div>
-          )}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
             <div>
@@ -778,7 +791,11 @@ export default function ScheduleGeneratorPanel({
             <div>
               <dt className="text-gray-500">{t("courses.totalGaps")}</dt>
               <dd className="font-semibold text-gray-900">
-                {formatNumber(language, currentSchedule.metrics.totalGapMinutes)} {t("courses.minute")}
+                {formatNumber(
+                  language,
+                  currentSchedule.metrics.totalGapMinutes,
+                )}{" "}
+                {t("courses.minute")}
               </dd>
             </div>
             <div>
@@ -795,10 +812,24 @@ export default function ScheduleGeneratorPanel({
             </div>
           </dl>
 
+          {savedProgramId ? (
+            <p
+              role="status"
+              className="mt-4 text-sm text-emerald-700 dark:text-emerald-300"
+            >
+              {t("courses.savedWeekly")}{" "}
+              <Link
+                href={`/weekly-planner?program=${encodeURIComponent(savedProgramId)}`}
+                className="font-semibold underline"
+              >
+                {t("courses.openWeekly")}
+              </Link>
+            </p>
+          ) : null}
           <div className="mt-4 flex justify-end">
             <button
               type="button"
-              onClick={() => onSave(currentSchedule)}
+              onClick={() => setSavedProgramId(onSave(currentSchedule))}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
               {t("courses.saveWeekly")}

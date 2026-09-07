@@ -65,6 +65,7 @@ export type GenerateScheduleOptions = {
   constraints?: ScheduleConstraints;
   maxResults?: number;
   maxVisitedNodes?: number;
+  stopAfterFirst?: boolean;
   weights?: ScheduleWeights;
 };
 

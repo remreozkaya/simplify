@@ -2,7 +2,13 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { applyLanguagePreference, DEFAULT_LANGUAGE, translate, validLanguage, type Language } from "@/lib/i18n";
+import {
+  applyLanguagePreference,
+  DEFAULT_LANGUAGE,
+  translate,
+  validLanguage,
+  type Language,
+} from "@/lib/i18n";
 
 const LANGUAGE_CHANGE_EVENT = "simplify-language-change";
 
@@ -21,12 +27,26 @@ function subscribe(callback: () => void) {
 }
 
 export function applyLanguage(language: Language) {
-  applyLanguagePreference(language, document.documentElement, localStorage);
+  let storage: Storage | undefined;
+  try {
+    storage = window.localStorage;
+  } catch {
+    /* Storage may be blocked. */
+  }
+  applyLanguagePreference(language, document.documentElement, storage);
   window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT));
 }
 
 export function useLanguage() {
-  const language = useSyncExternalStore(subscribe, currentLanguage, () => DEFAULT_LANGUAGE);
-  const t = useCallback((key: string, parameters?: Record<string, string | number>) => translate(language, key, parameters), [language]);
+  const language = useSyncExternalStore(
+    subscribe,
+    currentLanguage,
+    () => DEFAULT_LANGUAGE,
+  );
+  const t = useCallback(
+    (key: string, parameters?: Record<string, string | number>) =>
+      translate(language, key, parameters),
+    [language],
+  );
   return { language, t, setLanguage: applyLanguage };
 }

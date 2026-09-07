@@ -33,7 +33,9 @@ export default function ThemeToggle() {
   const { t } = useLanguage();
 
   function toggleTheme() {
-    const nextTheme = document.documentElement.classList.contains("dark") ? "light" : "dark";
+    const nextTheme = document.documentElement.classList.contains("dark")
+      ? "light"
+      : "dark";
     applyTheme(nextTheme);
   }
 
@@ -41,7 +43,7 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="theme-toggle ml-1 inline-grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-lg font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+      className="theme-toggle inline-grid size-9 sm:size-10 place-items-center rounded-xl border border-slate-200 bg-white text-lg font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       aria-label={t("theme.toggle")}
       aria-pressed={theme === "dark"}
       title={t("theme.toggle")}

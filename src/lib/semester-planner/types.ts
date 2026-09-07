@@ -1,6 +1,7 @@
 import type { CurriculumProgress, MissingRequirement } from "@/lib/curriculum/types";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 import type { EnrollmentType, ProgramEnrollment } from "@/lib/profile/types";
+import type { GeneratorCourse } from "@/lib/schedule/types";
 
 export type ProgramPriority = "balanced" | EnrollmentType;
 export type PlannerEligibility = "confirmed" | "conditional" | "unknown";
@@ -46,13 +47,18 @@ export type SemesterPlannerOptions = {
   desiredCredits: number;
   maxCourses?: number;
   priority: ProgramPriority;
-  includedCourseCodes?: readonly string[];
-  excludedCourseCodes?: readonly string[];
-  lockedCourseCodes?: readonly string[];
-  inProgressCourseCodes?: readonly string[];
   availabilityMode: "published" | "unknown";
   knownBranchCodes?: ReadonlySet<string>;
   offeredCourseCodes?: ReadonlySet<string>;
+  courseOfferings?: readonly GeneratorCourse[];
+};
+
+export type PlannerSectionConstraint = {
+  courseCode: string;
+  branchCode: string;
+  courseId: string;
+  sectionId: string;
+  crn: string;
 };
 
 export type PlannerProgramSummary = {
@@ -68,12 +74,11 @@ export type PlannerProgramSummary = {
 
 export type PlannerNotice =
   | { kind: "target-shortfall"; credits: number }
-  | { kind: "forced-over-target"; credits: number }
+  | { kind: "target-overage"; credits: number }
+  | { kind: "collision-shortfall" }
   | { kind: "max-courses"; count: number }
-  | { kind: "included-ineligible"; courseCode: string }
-  | { kind: "included-unavailable"; courseCode: string }
-  | { kind: "included-not-found"; courseCode: string }
   | { kind: "availability-unknown" }
+  | { kind: "eligibility-unknown" }
   | { kind: "registration-limit-unknown" }
   | { kind: "corequisites-unknown" };
 
@@ -84,6 +89,6 @@ export type SemesterPlan = {
   selectedCredits: number;
   selectedEcts: number;
   combinedRemainingCredits: number;
-  suggestedCredits: number;
+  compatibleSectionConstraints: PlannerSectionConstraint[];
   notices: PlannerNotice[];
 };

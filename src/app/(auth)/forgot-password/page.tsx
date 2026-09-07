@@ -3,12 +3,7 @@ import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
 
 export default function ForgotPasswordPage() {
   return (
-    <AuthCard
-      title="Reset your password"
-      description="Enter the email associated with your account."
-      titleKey="authentication.resetTitle"
-      descriptionKey="authentication.resetDescription"
-    >
+    <AuthCard titleKey="authentication.resetTitle">
       <ForgotPasswordForm />
     </AuthCard>
   );

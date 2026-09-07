@@ -1,27 +1,26 @@
 import {
-  type CourseSectionOption,
-  type Day,
-} from "@/types/calendar";
+  DEFAULT_LANGUAGE,
+  localizedWeekday,
+  translate,
+  type Language,
+} from "@/lib/i18n";
+import type { CourseSectionOption } from "@/types/calendar";
 
-const shortDays: Record<Day, string> = {
-  Monday: "Mon",
-  Tuesday: "Tue",
-  Wednesday: "Wed",
-  Thursday: "Thu",
-  Friday: "Fri",
-  Saturday: "Sat",
-  Sunday: "Sun",
-};
-
-export function formatSectionLabel(section: CourseSectionOption) {
+export function formatSectionLabel(
+  section: CourseSectionOption,
+  language: Language = DEFAULT_LANGUAGE,
+) {
   const meetings = section.meetings
     .map(
       (meeting) =>
-        `${shortDays[meeting.day]} ${meeting.startTime}–${meeting.endTime}`,
+        `${localizedWeekday(language, meeting.day, "short")} ${meeting.startTime}–${meeting.endTime}`,
     )
     .join(", ");
-
-  return [section.crn, meetings, section.instructor ?? "TBA"]
+  return [
+    section.crn,
+    meetings,
+    section.instructor ?? translate(language, "weeklyPlanner.tba"),
+  ]
     .filter(Boolean)
     .join(" · ");
 }

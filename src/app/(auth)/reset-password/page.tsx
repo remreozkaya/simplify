@@ -21,7 +21,7 @@ export default async function ResetPasswordPage({
 
   if (params.updated === "1") {
     return (
-      <AuthCard title="Your password has been updated" titleKey="authentication.passwordUpdated">
+      <AuthCard titleKey="authentication.passwordUpdated">
         <div className="space-y-5">
           <AuthMessage
             tone="success"
@@ -45,7 +45,7 @@ export default async function ResetPasswordPage({
 
   if (invalid) {
     return (
-      <AuthCard title="Reset link unavailable" titleKey="authentication.resetUnavailable">
+      <AuthCard titleKey="authentication.resetUnavailable">
         <div className="space-y-5">
           <AuthMessage message="This password reset link is invalid or has expired." />
           <Link
@@ -68,12 +68,7 @@ export default async function ResetPasswordPage({
   }
 
   return (
-    <AuthCard
-      title="Choose a new password"
-      description="Your reset link is single-use and expires automatically."
-      titleKey="authentication.choosePassword"
-      descriptionKey="authentication.choosePasswordDescription"
-    >
+    <AuthCard titleKey="authentication.choosePassword">
       <ResetPasswordForm />
     </AuthCard>
   );

@@ -60,12 +60,12 @@ export default function ProgramTabs({
             tabIndex={active ? 0 : -1}
             onClick={() => onSelect(enrollment.id)}
             onKeyDown={(event) => selectFromKeyboard(event, index)}
-            className={`rounded-xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${active ? "border-blue-600 bg-blue-50 shadow-sm dark:bg-blue-950" : "border-slate-200 bg-white hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900"}`}
+            className={`rounded-lg border-b-2 px-3 py-2 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${active ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : "border-transparent hover:border-blue-300"}`}
           >
-            <span className="text-[10px] font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
               {t(enrollment.type === "main" ? "academicPrograms.main" : enrollment.type === "double-major" ? "academicPrograms.doubleMajor" : "academicPrograms.minor")}
             </span>
-            <span className="mt-1 block truncate text-sm font-black text-slate-900 dark:text-white">
+            <span className="mt-1 block truncate text-sm font-semibold text-slate-900 dark:text-white">
               {localizedAcademicName({ name: enrollment.programName, nameTr: enrollment.programNameTr, nameEn: enrollment.programNameEn }, language)}
             </span>
             <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">

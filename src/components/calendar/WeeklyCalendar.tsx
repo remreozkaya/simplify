@@ -15,10 +15,8 @@ import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel";
@@ -26,38 +24,32 @@ import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
-import { formatSectionLabel } from "@/lib/calendar/sectionLabels";
-import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
-import { formatDate, localizedWeekday } from "@/lib/i18n";
-import { useLanguage } from "@/lib/i18n/client";
+import { getCourseById, getSectionById } from "@/lib/calendar/catalog";
 import {
-  hasMeetingConflicts,
-  meetingsOverlap,
-} from "@/lib/schedule/conflicts";
-import { minutesToTime, timeToMinutes } from "@/lib/schedule/time";
+  SortableCourseRow,
+  DraggedCourseRow,
+} from "@/components/calendar/CourseRows";
+import OptionalHelp from "@/components/OptionalHelp";
+import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
+import { localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
+import { useLanguage } from "@/lib/i18n/client";
+import { hasMeetingConflicts } from "@/lib/schedule/conflicts";
+import {
+  START_TIME,
+  END_TIME,
+  generateTimeLabels,
+  getTimeTop,
+  getCourseHeight,
+  getCourseLayoutMap,
+  reorderCourseBlocksBySelections,
+} from "@/lib/calendar/layout";
 import type { GeneratedSchedule } from "@/lib/schedule/types";
 import {
   days,
   type CourseBlock,
-  type CourseOption,
   type CourseSelection,
-  type Day,
-  type FacultyOption,
   type WeeklyProgram,
 } from "@/types/calendar";
-
-/*
- * The background calendar grid still displays one line every 30 minutes,
- * but course blocks can begin and end at any valid minute.
- */
-const SLOT_HEIGHT = 26;
-const GRID_INTERVAL_MINUTES = 30;
-
-const START_TIME = "08:00";
-const END_TIME = "20:00";
-
-const PIXELS_PER_MINUTE =
-  SLOT_HEIGHT / GRID_INTERVAL_MINUTES;
 
 const WEEKLY_PROGRAMS_STORAGE_KEY = "simplify-weekly-programs";
 const NEW_PROGRAM_VALUE = "__new_program__";
@@ -68,12 +60,6 @@ const selectClassName =
 const inputClassName =
   "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
-const overlayFieldClassName =
-  "flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm";
-
-const sortableGridClassName =
-  "grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-3 rounded-xl p-2";
-
 const timeLabels = generateTimeLabels();
 
 const dropAnimation = {
@@ -81,35 +67,8 @@ const dropAnimation = {
   easing: "cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
-type CourseLayout = {
-  leftPercent: number;
-  widthPercent: number;
-};
-
-type SortableCourseRowProps = {
-  selection: CourseSelection;
-  courseCatalog: FacultyOption[];
-  isLoadingBranches: boolean;
-  isBranchLoading: (branchCode: string) => boolean;
-  onFacultyChange: (
-    selectionId: string,
-    facultyCode: string,
-  ) => void;
-  onCourseChange: (
-    selectionId: string,
-    courseId: string,
-  ) => void;
-  onSectionChange: (
-    selectionId: string,
-    sectionId: string,
-  ) => void;
-  onDelete: (selection: CourseSelection) => void;
-};
-
 function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function createEmptyProgram(name: string): WeeklyProgram {
@@ -122,327 +81,6 @@ function createEmptyProgram(name: string): WeeklyProgram {
   };
 }
 
-function generateTimeLabels(): string[] {
-  const labels: string[] = [];
-
-  const calendarStartMinutes =
-    timeToMinutes(START_TIME);
-
-  const calendarEndMinutes =
-    timeToMinutes(END_TIME);
-
-  for (
-    let currentMinutes = calendarStartMinutes;
-    currentMinutes <= calendarEndMinutes;
-    currentMinutes += GRID_INTERVAL_MINUTES
-  ) {
-    labels.push(minutesToTime(currentMinutes));
-  }
-
-  return labels;
-}
-
-/**
- * Returns the exact vertical position of a course.
- *
- * The result is not rounded to a 30-minute grid position.
- */
-function getCourseTop(startTime: string): number {
-  const courseStartMinutes =
-    timeToMinutes(startTime);
-
-  const calendarStartMinutes =
-    timeToMinutes(START_TIME);
-
-  return (
-    courseStartMinutes - calendarStartMinutes
-  ) * PIXELS_PER_MINUTE;
-}
-
-/**
- * Returns the exact course height based on its minute duration.
- *
- * For example:
- * 14:30–16:29 = 119 minutes
- * 119 × pixels per minute
- */
-function getCourseHeight(
-  startTime: string,
-  endTime: string,
-): number {
-  const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
-
-  if (endMinutes <= startMinutes) {
-    return 0;
-  }
-
-  return (
-    endMinutes - startMinutes
-  ) * PIXELS_PER_MINUTE;
-}
-
-function getGridLineTop(time: string): number {
-  const lineMinutes = timeToMinutes(time);
-  const calendarStartMinutes =
-    timeToMinutes(START_TIME);
-
-  return (
-    lineMinutes - calendarStartMinutes
-  ) * PIXELS_PER_MINUTE;
-}
-
-function getDayIndex(day: Day) {
-  return days.indexOf(day);
-}
-
-function reorderCourseBlocksBySelections(
-  courseBlocks: CourseBlock[],
-  courseSelections: CourseSelection[],
-) {
-  const courseBlockMap = new Map(
-    courseBlocks.map((courseBlock) => [
-      courseBlock.id,
-      courseBlock,
-    ]),
-  );
-
-  const orderedCourseBlockIds = courseSelections.flatMap(
-    (selection) => selection.courseBlockIds,
-  );
-
-  const orderedCourseBlocks = orderedCourseBlockIds
-    .map((courseBlockId) =>
-      courseBlockMap.get(courseBlockId),
-    )
-    .filter(
-      (
-        courseBlock,
-      ): courseBlock is CourseBlock =>
-        Boolean(courseBlock),
-    );
-
-  const orderedCourseBlockIdSet = new Set(
-    orderedCourseBlockIds,
-  );
-
-  const remainingCourseBlocks = courseBlocks.filter(
-    (courseBlock) =>
-      !orderedCourseBlockIdSet.has(courseBlock.id),
-  );
-
-  return [
-    ...orderedCourseBlocks,
-    ...remainingCourseBlocks,
-  ];
-}
-
-function getCourseLayoutMap(
-  courseBlocks: CourseBlock[],
-) {
-  const layoutMap: Record<string, CourseLayout> = {};
-  const courseOrderMap = new Map<string, number>();
-
-  courseBlocks.forEach((courseBlock, index) => {
-    courseOrderMap.set(courseBlock.id, index);
-  });
-
-  const dayColumnWidth = 100 / days.length;
-
-  days.forEach((day) => {
-    const dayCourses = courseBlocks.filter(
-      (course) => course.day === day,
-    );
-
-    const unvisitedCourseIds = new Set(
-      dayCourses.map((course) => course.id),
-    );
-
-    while (unvisitedCourseIds.size > 0) {
-      const firstCourseId =
-        Array.from(unvisitedCourseIds)[0];
-
-      const firstCourse = dayCourses.find(
-        (course) => course.id === firstCourseId,
-      );
-
-      if (!firstCourse) {
-        break;
-      }
-
-      const overlapGroup: CourseBlock[] = [];
-      const queue: CourseBlock[] = [firstCourse];
-
-      unvisitedCourseIds.delete(firstCourse.id);
-
-      while (queue.length > 0) {
-        const currentCourse = queue.shift();
-
-        if (!currentCourse) {
-          continue;
-        }
-
-        overlapGroup.push(currentCourse);
-
-        dayCourses.forEach(
-          (possibleOverlappingCourse) => {
-            if (
-              !unvisitedCourseIds.has(
-                possibleOverlappingCourse.id,
-              )
-            ) {
-              return;
-            }
-
-            const overlapsWithGroup =
-              overlapGroup.some((groupCourse) =>
-                meetingsOverlap(
-                  groupCourse,
-                  possibleOverlappingCourse,
-                ),
-              );
-
-            const overlapsWithCurrentCourse =
-              meetingsOverlap(
-                currentCourse,
-                possibleOverlappingCourse,
-              );
-
-            if (
-              !overlapsWithGroup &&
-              !overlapsWithCurrentCourse
-            ) {
-              return;
-            }
-
-            unvisitedCourseIds.delete(
-              possibleOverlappingCourse.id,
-            );
-
-            queue.push(
-              possibleOverlappingCourse,
-            );
-          },
-        );
-      }
-
-      const orderedOverlapGroup = [
-        ...overlapGroup,
-      ].sort((first, second) => {
-        return (
-          (courseOrderMap.get(first.id) ?? 0) -
-          (courseOrderMap.get(second.id) ?? 0)
-        );
-      });
-
-      const courseColumnMap =
-        new Map<string, number>();
-
-      orderedOverlapGroup.forEach((course) => {
-        const usedColumns = new Set<number>();
-
-        orderedOverlapGroup.forEach(
-          (otherCourse) => {
-            if (course.id === otherCourse.id) {
-              return;
-            }
-
-            const otherCourseColumn =
-              courseColumnMap.get(otherCourse.id);
-
-            if (
-              otherCourseColumn === undefined
-            ) {
-              return;
-            }
-
-            if (
-              meetingsOverlap(
-                course,
-                otherCourse,
-              )
-            ) {
-              usedColumns.add(
-                otherCourseColumn,
-              );
-            }
-          },
-        );
-
-        let columnIndex = 0;
-
-        while (usedColumns.has(columnIndex)) {
-          columnIndex += 1;
-        }
-
-        courseColumnMap.set(
-          course.id,
-          columnIndex,
-        );
-      });
-
-      const totalColumns =
-        Math.max(
-          ...Array.from(
-            courseColumnMap.values(),
-          ),
-        ) + 1;
-
-      const dayIndex = getDayIndex(day);
-
-      const courseWidth =
-        dayColumnWidth / totalColumns;
-
-      orderedOverlapGroup.forEach((course) => {
-        const columnIndex =
-          courseColumnMap.get(course.id) ?? 0;
-
-        layoutMap[course.id] = {
-          leftPercent:
-            dayIndex * dayColumnWidth +
-            columnIndex * courseWidth,
-
-          widthPercent: courseWidth,
-        };
-      });
-    }
-  });
-
-  return layoutMap;
-}
-
-function getCoursesByFaculty(
-  courseCatalog: FacultyOption[],
-  facultyCode: string,
-) {
-  return (
-    courseCatalog.find(
-      (faculty) =>
-        faculty.facultyCode === facultyCode,
-    )?.courses ?? []
-  );
-}
-
-function getCourseById(
-  courseCatalog: FacultyOption[],
-  facultyCode: string,
-  courseId: string,
-) {
-  return getCoursesByFaculty(
-    courseCatalog,
-    facultyCode,
-  ).find((course) => course.id === courseId);
-}
-
-function getSectionById(
-  course: CourseOption | undefined,
-  sectionId: string,
-) {
-  return course?.sections.find(
-    (section) => section.id === sectionId,
-  );
-}
-
 function removeCourseBlocks(
   courseBlocks: CourseBlock[],
   courseBlockIds: string[],
@@ -453,252 +91,16 @@ function removeCourseBlocks(
 
   const removedIds = new Set(courseBlockIds);
 
-  return courseBlocks.filter(
-    (courseBlock) => !removedIds.has(courseBlock.id),
-  );
-}
-
-function DragHandleIcon() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      className="h-5 w-5"
-    >
-      <path
-        d="M4 6h12M4 10h12M4 14h12"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-function SortableCourseRow({
-  selection,
-  courseCatalog,
-  isLoadingBranches,
-  isBranchLoading,
-  onFacultyChange,
-  onCourseChange,
-  onSectionChange,
-  onDelete,
-}: SortableCourseRowProps) {
-  const { t } = useLanguage();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: selection.id,
-  });
-
-  const availableCourses =
-    getCoursesByFaculty(
-      courseCatalog,
-      selection.facultyCode,
-    );
-
-  const selectedCourse = getCourseById(
-    courseCatalog,
-    selection.facultyCode,
-    selection.courseId,
-  );
-
-  const branchIsLoading = isBranchLoading(selection.facultyCode);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform:
-          CSS.Transform.toString(transform),
-
-        transition:
-          transition ??
-          "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease, box-shadow 160ms ease",
-
-        zIndex: isDragging ? 20 : undefined,
-      }}
-      className={`${sortableGridClassName} border transition-[background-color,border-color,box-shadow,opacity] duration-200 ease-out ${
-        isDragging
-          ? "border-blue-200 bg-blue-50/40 opacity-20"
-          : "border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50/70"
-      }`}
-    >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        aria-label={t("weeklyPlanner.dragCourse")}
-        title={t("weeklyPlanner.drag")}
-        className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out hover:bg-gray-100/80 hover:text-gray-600 active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
-        {...attributes}
-        {...listeners}
-      >
-        <DragHandleIcon />
-      </button>
-
-      <select
-        value={selection.facultyCode}
-        onChange={(event) =>
-          onFacultyChange(
-            selection.id,
-            event.target.value,
-          )
-        }
-        disabled={isLoadingBranches}
-        className={selectClassName}
-      >
-        <option value="">
-          {t(isLoadingBranches ? "courses.loadingPrefixes" : "courses.prefix")}
-        </option>
-
-        {courseCatalog.map((faculty) => (
-          <option
-            key={faculty.facultyCode}
-            value={faculty.facultyCode}
-          >
-            {faculty.facultyCode}
-          </option>
-        ))}
-      </select>
-
-      <select
-        value={selection.courseId}
-        onChange={(event) =>
-          onCourseChange(
-            selection.id,
-            event.target.value,
-          )
-        }
-        disabled={!selection.facultyCode || branchIsLoading}
-        className={selectClassName}
-      >
-        <option value="">
-          {t(branchIsLoading ? "courses.loadingCourses" : "courses.codeAndName")}
-        </option>
-
-        {availableCourses.map((course) => (
-          <option
-            key={course.id}
-            value={course.id}
-          >
-            {course.code} - {course.title}
-          </option>
-        ))}
-      </select>
-
-      <select
-        value={selection.sectionId}
-        onChange={(event) =>
-          onSectionChange(
-            selection.id,
-            event.target.value,
-          )
-        }
-        disabled={!selection.courseId || branchIsLoading}
-        className={selectClassName}
-      >
-        <option value="">{t("weeklyPlanner.crnSection")}</option>
-
-        {selectedCourse?.sections.map(
-          (section) => (
-            <option
-              key={section.id}
-              value={section.id}
-            >
-              {formatSectionLabel(section)}
-            </option>
-          ),
-        )}
-      </select>
-
-      <button
-        type="button"
-        onClick={() => onDelete(selection)}
-        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100"
-      >
-        {t("weeklyPlanner.delete")}
-      </button>
-    </div>
-  );
-}
-
-function DraggedCourseRow({
-  selection,
-  courseCatalog,
-}: {
-  selection: CourseSelection;
-  courseCatalog: FacultyOption[];
-}) {
-  const { t } = useLanguage();
-  const selectedCourse = getCourseById(
-    courseCatalog,
-    selection.facultyCode,
-    selection.courseId,
-  );
-
-  const selectedSection = getSectionById(
-    selectedCourse,
-    selection.sectionId,
-  );
-
-  const facultyText =
-    selection.facultyCode ||
-    t("courses.prefix");
-
-  const courseText = selectedCourse
-    ? `${selectedCourse.code} - ${selectedCourse.title}`
-    : t("courses.codeAndName");
-
-  const sectionText = selectedSection
-    ? formatSectionLabel(selectedSection)
-    : t("weeklyPlanner.crnSection");
-
-  return (
-    <div
-      className={`${sortableGridClassName} cursor-grabbing border border-blue-300 bg-white shadow-xl ring-2 ring-blue-100/80`}
-    >
-      <div className="flex h-10 w-9 items-center justify-center rounded-lg bg-transparent text-gray-500">
-        <DragHandleIcon />
-      </div>
-
-      <div className={overlayFieldClassName}>
-        <span className="truncate">
-          {facultyText}
-        </span>
-      </div>
-
-      <div className={overlayFieldClassName}>
-        <span className="truncate">
-          {courseText}
-        </span>
-      </div>
-
-      <div className={overlayFieldClassName}>
-        <span className="truncate">
-          {sectionText}
-        </span>
-      </div>
-
-      <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm">
-        {t("weeklyPlanner.delete")}
-      </div>
-    </div>
-  );
+  return courseBlocks.filter((courseBlock) => !removedIds.has(courseBlock.id));
 }
 
 type WeeklyCalendarProps = {
   view?: "planner" | "generator";
 };
 
-export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps) {
+export default function WeeklyCalendar({
+  view = "planner",
+}: WeeklyCalendarProps) {
   const { language, t } = useLanguage();
   const {
     courseCatalog,
@@ -711,30 +113,17 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     error: courseCatalogError,
   } = useItuCourseCatalog();
 
-  const [
-    weeklyPrograms,
-    setWeeklyPrograms,
-  ] = useState<WeeklyProgram[]>([]);
+  const [weeklyPrograms, setWeeklyPrograms] = useState<WeeklyProgram[]>([]);
 
-  const [
-    selectedProgramId,
-    setSelectedProgramId,
-  ] = useState("");
+  const [selectedProgramId, setSelectedProgramId] = useState("");
 
-  const [
-    programName,
-    setProgramName,
-  ] = useState("");
+  const [programName, setProgramName] = useState("");
 
-  const [
-    hasLoadedPrograms,
-    setHasLoadedPrograms,
-  ] = useState(false);
+  const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
 
-  const [
-    activeSelectionId,
-    setActiveSelectionId,
-  ] = useState<string | null>(null);
+  const [activeSelectionId, setActiveSelectionId] = useState<string | null>(
+    null,
+  );
 
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedSchedule | null>(null);
@@ -752,17 +141,14 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     }),
 
     useSensor(KeyboardSensor, {
-      coordinateGetter:
-        sortableKeyboardCoordinates,
+      coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
 
   const selectedProgram = useMemo(
     () =>
-      weeklyPrograms.find(
-        (program) =>
-          program.id === selectedProgramId,
-      ) ?? null,
+      weeklyPrograms.find((program) => program.id === selectedProgramId) ??
+      null,
 
     [weeklyPrograms, selectedProgramId],
   );
@@ -777,22 +163,15 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     [selectedProgram],
   );
 
-  const savedProgramName =
-    selectedProgram?.name ?? "";
+  const savedProgramName = selectedProgram?.name ?? "";
 
-  const hasUnsavedNameChanges =
-    programName !== savedProgramName;
+  const hasUnsavedNameChanges = programName !== savedProgramName;
 
-  const calendarHeight =
-    (timeToMinutes(END_TIME) -
-      timeToMinutes(START_TIME)) *
-    PIXELS_PER_MINUTE;
+  const calendarHeight = getCourseHeight(START_TIME, END_TIME);
 
   const activeSelection =
-    courseSelections.find(
-      (selection) =>
-        selection.id === activeSelectionId,
-    ) ?? null;
+    courseSelections.find((selection) => selection.id === activeSelectionId) ??
+    null;
 
   const displayedCourseBlocks = useMemo(
     () =>
@@ -809,8 +188,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
   );
 
   const courseLayoutMap = useMemo(
-    () =>
-      getCourseLayoutMap(displayedCourseBlocks),
+    () => getCourseLayoutMap(displayedCourseBlocks),
 
     [displayedCourseBlocks],
   );
@@ -841,14 +219,10 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     let savedPrograms: WeeklyProgram[] = [];
 
     try {
-      const storedPrograms =
-        localStorage.getItem(
-          WEEKLY_PROGRAMS_STORAGE_KEY,
-        );
+      const storedPrograms = localStorage.getItem(WEEKLY_PROGRAMS_STORAGE_KEY);
 
       if (storedPrograms) {
-        const parsedPrograms: unknown =
-          JSON.parse(storedPrograms);
+        const parsedPrograms: unknown = JSON.parse(storedPrograms);
 
         if (Array.isArray(parsedPrograms)) {
           savedPrograms = parseStoredWeeklyPrograms(parsedPrograms);
@@ -863,13 +237,15 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         ? savedPrograms
         : [createEmptyProgram("Program 1")];
 
+    const requestedProgramId = new URLSearchParams(window.location.search).get(
+      "program",
+    );
     const firstProgram =
+      initialPrograms.find((program) => program.id === requestedProgramId) ??
       initialPrograms[0];
 
     setWeeklyPrograms(initialPrograms);
-    setSelectedProgramId(
-      firstProgram.id,
-    );
+    setSelectedProgramId(firstProgram.id);
     setProgramName(firstProgram.name);
     setHasLoadedPrograms(true);
   }, []);
@@ -900,23 +276,15 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
       WEEKLY_PROGRAMS_STORAGE_KEY,
       JSON.stringify(weeklyPrograms),
     );
-  }, [
-    weeklyPrograms,
-    hasLoadedPrograms,
-  ]);
+  }, [weeklyPrograms, hasLoadedPrograms]);
 
   function updateSelectedProgram(
-    updater: (
-      program: WeeklyProgram,
-    ) => WeeklyProgram,
+    updater: (program: WeeklyProgram) => WeeklyProgram,
   ) {
-    setWeeklyPrograms(
-      (currentPrograms) =>
-        currentPrograms.map((program) =>
-          program.id === selectedProgramId
-            ? updater(program)
-            : program,
-        ),
+    setWeeklyPrograms((currentPrograms) =>
+      currentPrograms.map((program) =>
+        program.id === selectedProgramId ? updater(program) : program,
+      ),
     );
   }
 
@@ -925,17 +293,11 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
       return true;
     }
 
-    return window.confirm(
-      t("weeklyPlanner.discardName"),
-    );
+    return window.confirm(t("weeklyPlanner.discardName"));
   }
 
-  function loadProgram(
-    programId: string,
-  ) {
-    if (
-      programId === NEW_PROGRAM_VALUE
-    ) {
+  function loadProgram(programId: string) {
+    if (programId === NEW_PROGRAM_VALUE) {
       handleCreateProgram();
       return;
     }
@@ -944,23 +306,17 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
       return;
     }
 
-    const programToLoad =
-      weeklyPrograms.find(
-        (program) =>
-          program.id === programId,
-      );
+    const programToLoad = weeklyPrograms.find(
+      (program) => program.id === programId,
+    );
 
     if (!programToLoad) {
       return;
     }
 
-    setSelectedProgramId(
-      programToLoad.id,
-    );
+    setSelectedProgramId(programToLoad.id);
 
-    setProgramName(
-      programToLoad.name,
-    );
+    setProgramName(programToLoad.name);
 
     setActiveSelectionId(null);
   }
@@ -970,17 +326,11 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
       return;
     }
 
-    const newProgram =
-      createEmptyProgram(
-        t("weeklyPlanner.defaultProgram", { number: weeklyPrograms.length + 1 }),
-      );
-
-    setWeeklyPrograms(
-      (currentPrograms) => [
-        ...currentPrograms,
-        newProgram,
-      ],
+    const newProgram = createEmptyProgram(
+      t("weeklyPlanner.defaultProgram", { number: weeklyPrograms.length + 1 }),
     );
+
+    setWeeklyPrograms((currentPrograms) => [...currentPrograms, newProgram]);
 
     setSelectedProgramId(newProgram.id);
     setProgramName(newProgram.name);
@@ -993,30 +343,19 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     }
 
     const trimmedProgramName =
-      programName.trim() ||
-      t("weeklyPlanner.untitled");
+      programName.trim() || t("weeklyPlanner.untitled");
 
-    updateSelectedProgram(
-      (program) => ({
-        ...program,
-        name: trimmedProgramName,
-        updatedAt:
-          new Date().toISOString(),
-      }),
-    );
+    updateSelectedProgram((program) => ({
+      ...program,
+      name: trimmedProgramName,
+      updatedAt: new Date().toISOString(),
+    }));
 
-    setProgramName(
-      trimmedProgramName,
-    );
+    setProgramName(trimmedProgramName);
   }
 
-  function handleProgramNameKeyDown(
-    event: KeyboardEvent<HTMLInputElement>,
-  ) {
-    if (
-      event.key !== "Enter" ||
-      event.nativeEvent.isComposing
-    ) {
+  function handleProgramNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) {
       return;
     }
 
@@ -1025,50 +364,39 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
   }
 
   function handleDeleteProgram() {
-    const confirmed = window.confirm(t("weeklyPlanner.deleteConfirm", { name: selectedProgram?.name ?? t("weeklyPlanner.thisProgram") }));
+    const confirmed = window.confirm(
+      t("weeklyPlanner.deleteConfirm", {
+        name: selectedProgram?.name ?? t("weeklyPlanner.thisProgram"),
+      }),
+    );
 
     if (!confirmed) {
       return;
     }
 
-    const remainingPrograms =
-      weeklyPrograms.filter(
-        (program) =>
-          program.id !==
-          selectedProgramId,
-      );
+    const remainingPrograms = weeklyPrograms.filter(
+      (program) => program.id !== selectedProgramId,
+    );
 
-    if (
-      remainingPrograms.length === 0
-    ) {
-      const newProgram =
-        createEmptyProgram("Program 1");
+    if (remainingPrograms.length === 0) {
+      const newProgram = createEmptyProgram("Program 1");
 
       setWeeklyPrograms([newProgram]);
 
-      setSelectedProgramId(
-        newProgram.id,
-      );
+      setSelectedProgramId(newProgram.id);
 
-      setProgramName(
-        newProgram.name,
-      );
+      setProgramName(newProgram.name);
 
       setActiveSelectionId(null);
 
       return;
     }
 
-    const nextProgram =
-      remainingPrograms[0];
+    const nextProgram = remainingPrograms[0];
 
-    setWeeklyPrograms(
-      remainingPrograms,
-    );
+    setWeeklyPrograms(remainingPrograms);
 
-    setSelectedProgramId(
-      nextProgram.id,
-    );
+    setSelectedProgramId(nextProgram.id);
 
     setProgramName(nextProgram.name);
     setActiveSelectionId(null);
@@ -1083,332 +411,237 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
       courseBlockIds: [],
     };
 
-    updateSelectedProgram(
-      (program) => ({
-        ...program,
+    updateSelectedProgram((program) => ({
+      ...program,
 
-        courseSelections: [
-          ...(program.courseSelections ??
-            []),
-          newSelection,
-        ],
+      courseSelections: [...(program.courseSelections ?? []), newSelection],
 
-        updatedAt:
-          new Date().toISOString(),
-      }),
-    );
+      updatedAt: new Date().toISOString(),
+    }));
   }
 
-  function handleDeleteSelection(
-    selection: CourseSelection,
-  ) {
-    updateSelectedProgram(
-      (program) => ({
-        ...program,
+  function handleDeleteSelection(selection: CourseSelection) {
+    updateSelectedProgram((program) => ({
+      ...program,
 
-        courseBlocks:
-          removeCourseBlocks(
-            program.courseBlocks ?? [],
-            selection.courseBlockIds,
-          ),
+      courseBlocks: removeCourseBlocks(
+        program.courseBlocks ?? [],
+        selection.courseBlockIds,
+      ),
 
-        courseSelections: (
-          program.courseSelections ?? []
-        ).filter(
-          (currentSelection) =>
-            currentSelection.id !==
-            selection.id,
-        ),
+      courseSelections: (program.courseSelections ?? []).filter(
+        (currentSelection) => currentSelection.id !== selection.id,
+      ),
 
-        updatedAt:
-          new Date().toISOString(),
-      }),
-    );
+      updatedAt: new Date().toISOString(),
+    }));
   }
 
-  function handleFacultyChange(
-    selectionId: string,
-    facultyCode: string,
-  ) {
+  function handleFacultyChange(selectionId: string, facultyCode: string) {
     if (facultyCode) {
       void loadBranch(facultyCode);
     }
 
-    updateSelectedProgram(
-      (program) => {
-        const currentSelections =
-          program.courseSelections ?? [];
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
 
-        const currentSelection =
-          currentSelections.find(
-            (selection) =>
-              selection.id ===
-              selectionId,
-          );
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
+      );
 
-        return {
-          ...program,
+      return {
+        ...program,
 
-          courseBlocks:
-            removeCourseBlocks(
-              program.courseBlocks ?? [],
-              currentSelection?.courseBlockIds ?? [],
-            ),
-
-          courseSelections:
-            currentSelections.map(
-              (selection) =>
-                selection.id ===
-                selectionId
-                  ? {
-                      ...selection,
-                      facultyCode,
-                      courseId: "",
-                      sectionId: "",
-                      courseBlockIds: [],
-                    }
-                  : selection,
-            ),
-
-          updatedAt:
-            new Date().toISOString(),
-        };
-      },
-    );
-  }
-
-  function handleCourseChange(
-    selectionId: string,
-    courseId: string,
-  ) {
-    updateSelectedProgram(
-      (program) => {
-        const currentSelections =
-          program.courseSelections ?? [];
-
-        const currentSelection =
-          currentSelections.find(
-            (selection) =>
-              selection.id ===
-              selectionId,
-          );
-
-        return {
-          ...program,
-
-          courseBlocks:
-            removeCourseBlocks(
-              program.courseBlocks ?? [],
-              currentSelection?.courseBlockIds ?? [],
-            ),
-
-          courseSelections:
-            currentSelections.map(
-              (selection) =>
-                selection.id ===
-                selectionId
-                  ? {
-                      ...selection,
-                      courseId,
-                      sectionId: "",
-                      courseBlockIds: [],
-                    }
-                  : selection,
-            ),
-
-          updatedAt:
-            new Date().toISOString(),
-        };
-      },
-    );
-  }
-
-  function handleSectionChange(
-    selectionId: string,
-    sectionId: string,
-  ) {
-    updateSelectedProgram(
-      (program) => {
-        const currentSelections =
-          program.courseSelections ?? [];
-
-        const currentSelection =
-          currentSelections.find(
-            (selection) =>
-              selection.id ===
-              selectionId,
-          );
-
-        if (!currentSelection) {
-          return program;
-        }
-
-        const selectedCourse =
-          getCourseById(
-            courseCatalog,
-            currentSelection.facultyCode,
-            currentSelection.courseId,
-          );
-
-        const selectedSection =
-          getSectionById(
-            selectedCourse,
-            sectionId,
-          );
-
-        const currentCourseBlocks = removeCourseBlocks(
+        courseBlocks: removeCourseBlocks(
           program.courseBlocks ?? [],
-          currentSelection.courseBlockIds,
-        );
+          currentSelection?.courseBlockIds ?? [],
+        ),
 
-        if (
-          !selectedCourse ||
-          !selectedSection
-        ) {
-          return {
-            ...program,
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                facultyCode,
+                courseId: "",
+                sectionId: "",
+                courseBlockIds: [],
+              }
+            : selection,
+        ),
 
-            courseBlocks: currentCourseBlocks,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
 
-            courseSelections:
-              currentSelections.map(
-                (selection) =>
-                  selection.id ===
-                  selectionId
-                    ? {
-                        ...selection,
-                        sectionId,
-                        courseBlockIds: [],
-                      }
-                    : selection,
-              ),
+  function handleCourseChange(selectionId: string, courseId: string) {
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
 
-            updatedAt:
-              new Date().toISOString(),
-          };
-        }
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
+      );
 
-        const newCourseBlocks: CourseBlock[] =
-          selectedSection.meetings.map((meeting, index) => ({
-            id: `course-${selectionId}-${index}`,
-            selectionId,
-            code: selectedCourse.code,
-            title: selectedCourse.title,
-            crn: selectedSection.crn,
-            day: meeting.day,
-            startTime: meeting.startTime,
-            endTime: meeting.endTime,
-            building: meeting.building,
-            room: meeting.room,
-            instructor: selectedSection.instructor,
-          }));
+      return {
+        ...program,
 
-        const courseBlockIds = newCourseBlocks.map((block) => block.id);
+        courseBlocks: removeCourseBlocks(
+          program.courseBlocks ?? [],
+          currentSelection?.courseBlockIds ?? [],
+        ),
 
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                courseId,
+                sectionId: "",
+                courseBlockIds: [],
+              }
+            : selection,
+        ),
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  function handleSectionChange(selectionId: string, sectionId: string) {
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
+
+      const currentSelection = currentSelections.find(
+        (selection) => selection.id === selectionId,
+      );
+
+      if (!currentSelection) {
+        return program;
+      }
+
+      const selectedCourse = getCourseById(
+        courseCatalog,
+        currentSelection.facultyCode,
+        currentSelection.courseId,
+      );
+
+      const selectedSection = getSectionById(selectedCourse, sectionId);
+
+      const currentCourseBlocks = removeCourseBlocks(
+        program.courseBlocks ?? [],
+        currentSelection.courseBlockIds,
+      );
+
+      if (!selectedCourse || !selectedSection) {
         return {
           ...program,
 
-          courseBlocks:
-            [...currentCourseBlocks, ...newCourseBlocks],
+          courseBlocks: currentCourseBlocks,
 
-          courseSelections:
-            currentSelections.map(
-              (selection) =>
-                selection.id ===
-                selectionId
-                  ? {
-                      ...selection,
-                      sectionId,
-                      courseBlockIds,
-                    }
-                  : selection,
-            ),
+          courseSelections: currentSelections.map((selection) =>
+            selection.id === selectionId
+              ? {
+                  ...selection,
+                  sectionId,
+                  courseBlockIds: [],
+                }
+              : selection,
+          ),
 
-          updatedAt:
-            new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
-      },
-    );
+      }
+
+      const newCourseBlocks: CourseBlock[] = selectedSection.meetings.map(
+        (meeting, index) => ({
+          id: `course-${selectionId}-${index}`,
+          selectionId,
+          code: selectedCourse.code,
+          title: selectedCourse.title,
+          crn: selectedSection.crn,
+          day: meeting.day,
+          startTime: meeting.startTime,
+          endTime: meeting.endTime,
+          building: meeting.building,
+          room: meeting.room,
+          instructor: selectedSection.instructor,
+        }),
+      );
+
+      const courseBlockIds = newCourseBlocks.map((block) => block.id);
+
+      return {
+        ...program,
+
+        courseBlocks: [...currentCourseBlocks, ...newCourseBlocks],
+
+        courseSelections: currentSelections.map((selection) =>
+          selection.id === selectionId
+            ? {
+                ...selection,
+                sectionId,
+                courseBlockIds,
+              }
+            : selection,
+        ),
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
   }
 
-  function handleDragStart(
-    event: DragStartEvent,
-  ) {
-    setActiveSelectionId(
-      String(event.active.id),
-    );
+  function handleDragStart(event: DragStartEvent) {
+    setActiveSelectionId(String(event.active.id));
   }
 
-  function handleDragEnd(
-    event: DragEndEvent,
-  ) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
     setActiveSelectionId(null);
 
-    if (
-      !over ||
-      active.id === over.id
-    ) {
+    if (!over || active.id === over.id) {
       return;
     }
 
-    updateSelectedProgram(
-      (program) => {
-        const currentSelections =
-          program.courseSelections ?? [];
+    updateSelectedProgram((program) => {
+      const currentSelections = program.courseSelections ?? [];
 
-        const oldIndex =
-          currentSelections.findIndex(
-            (selection) =>
-              selection.id ===
-              String(active.id),
-          );
+      const oldIndex = currentSelections.findIndex(
+        (selection) => selection.id === String(active.id),
+      );
 
-        const newIndex =
-          currentSelections.findIndex(
-            (selection) =>
-              selection.id ===
-              String(over.id),
-          );
+      const newIndex = currentSelections.findIndex(
+        (selection) => selection.id === String(over.id),
+      );
 
-        if (
-          oldIndex === -1 ||
-          newIndex === -1
-        ) {
-          return program;
-        }
+      if (oldIndex === -1 || newIndex === -1) {
+        return program;
+      }
 
-        const reorderedSelections =
-          arrayMove(
-            currentSelections,
-            oldIndex,
-            newIndex,
-          );
+      const reorderedSelections = arrayMove(
+        currentSelections,
+        oldIndex,
+        newIndex,
+      );
 
-        return {
-          ...program,
+      return {
+        ...program,
 
-          courseSelections:
-            reorderedSelections,
+        courseSelections: reorderedSelections,
 
-          courseBlocks:
-            reorderCourseBlocksBySelections(
-              program.courseBlocks ?? [],
-              reorderedSelections,
-            ),
+        courseBlocks: reorderCourseBlocksBySelections(
+          program.courseBlocks ?? [],
+          reorderedSelections,
+        ),
 
-          updatedAt:
-            new Date().toISOString(),
-        };
-      },
-    );
+        updatedAt: new Date().toISOString(),
+      };
+    });
   }
 
   function handleSaveGeneratedSchedule(schedule: GeneratedSchedule) {
     const programId = createId("program");
     const generatedProgramCount = weeklyPrograms.filter((program) =>
-      program.name.startsWith("Generated Program"),
+      /^(?:Generated Program|Oluşturulan Program) /u.test(program.name),
     ).length;
     const program = generatedScheduleToWeeklyProgram(schedule, {
       id: programId,
@@ -1419,6 +652,7 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
     setSelectedProgramId(program.id);
     setProgramName(program.name);
     setActiveSelectionId(null);
+    return programId;
   }
 
   function handleExportJpeg() {
@@ -1449,279 +683,217 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
   return (
     <div className="w-full space-y-4">
       {view === "planner" ? (
-      <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
-          <div className="min-w-0">
-            <label className="mb-1 block text-xs font-semibold text-gray-600">
-              {t("weeklyPlanner.weeklyProgram")}
-            </label>
+        <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
+            <div className="min-w-0">
+              <label
+                htmlFor="weekly-program"
+                className="mb-1 block text-sm font-medium text-gray-600"
+              >
+                {t("weeklyPlanner.weeklyProgram")}
+              </label>
 
-            <select
-              value={selectedProgramId}
-              onChange={(event) =>
-                loadProgram(
-                  event.target.value,
-                )
-              }
-              disabled={
-                !hasLoadedPrograms
-              }
-              className={
-                selectClassName
-              }
-            >
-              {weeklyPrograms.map(
-                (program) => (
-                  <option
-                    key={program.id}
-                    value={program.id}
-                  >
+              <select
+                id="weekly-program"
+                value={selectedProgramId}
+                onChange={(event) => loadProgram(event.target.value)}
+                disabled={!hasLoadedPrograms}
+                className={selectClassName}
+              >
+                {weeklyPrograms.map((program) => (
+                  <option key={program.id} value={program.id}>
                     {program.name}
                   </option>
-                ),
-              )}
+                ))}
 
-              <option
-                value={
-                  NEW_PROGRAM_VALUE
-                }
-              >
-                + {t("weeklyPlanner.newProgram")}
-              </option>
-            </select>
-          </div>
-
-          <div className="min-w-0">
-            <label className="mb-1 block text-xs font-semibold text-gray-600">
-              {t("weeklyPlanner.programName")}
-            </label>
-
-            <input
-              type="text"
-              value={programName}
-              onChange={(event) =>
-                setProgramName(
-                  event.target.value,
-                )
-              }
-              onKeyDown={
-                handleProgramNameKeyDown
-              }
-              placeholder={t("weeklyPlanner.programNamePlaceholder")}
-              className={
-                inputClassName
-              }
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExportJpeg}
-            disabled={!selectedProgram}
-            className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t("weeklyPlanner.exportJpeg")}
-          </button>
-
-          <button
-            type="button"
-            onClick={
-              handleSaveProgramName
-            }
-            disabled={
-              !hasLoadedPrograms ||
-              !hasUnsavedNameChanges
-            }
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
-          >
-            {t("weeklyPlanner.save")}
-          </button>
-
-          <button
-            type="button"
-            onClick={
-              handleDeleteProgram
-            }
-            disabled={
-              !hasLoadedPrograms
-            }
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t("weeklyPlanner.deleteProgram")}
-          </button>
-        </div>
-
-        {jpegExportStatus && (
-          <div
-            className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
-              jpegExportStatus.isError
-                ? "border-red-200 bg-red-50 text-red-700"
-                : "border-green-200 bg-green-50 text-green-700"
-            }`}
-            role={jpegExportStatus.isError ? "alert" : "status"}
-            aria-live="polite"
-          >
-            {jpegExportStatus.message}
-          </div>
-        )}
-
-        <div
-          className="mb-4 text-xs text-gray-500"
-          aria-live="polite"
-        >
-          {hasUnsavedNameChanges ? (
-            <span className="font-medium text-orange-600">
-              {t("weeklyPlanner.unsavedName")}
-            </span>
-          ) : selectedProgram?.updatedAt ? (
-            <span>
-              {t("weeklyPlanner.autosave")} · {t("weeklyPlanner.lastUpdated", { date: formatDate(language, selectedProgram.updatedAt, { dateStyle: "short", timeStyle: "short" }) })}
-            </span>
-          ) : (
-            <span>
-              {t("weeklyPlanner.autosave")}
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={
-            handleAddSelectionRow
-          }
-          disabled={!selectedProgram}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-        >
-          {t("weeklyPlanner.addCourse")}
-        </button>
-
-        {(isLoadingBranches || courseCatalogError) && (
-          <div
-            className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-              courseCatalogError
-                ? "border-red-200 bg-red-50 text-red-700"
-                : "border-blue-200 bg-blue-50 text-blue-700"
-            }`}
-            role={courseCatalogError ? "alert" : "status"}
-          >
-            <span>
-              {courseCatalogError ?? t("weeklyPlanner.loadingPrefixes")}
-            </span>
-
-            {courseCatalogError && (
-              <button
-                type="button"
-                onClick={
-                  failedBranchCode ? retryFailedBranch : retryBranches
-                }
-                className="rounded-md border border-current px-2 py-1 text-xs font-semibold"
-              >
-                {t("weeklyPlanner.retry")}
-              </button>
-            )}
-          </div>
-        )}
-
-        {hasScheduleConflicts && (
-          <div
-            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-            role="status"
-          >
-            {t("weeklyPlanner.conflict")}
-          </div>
-        )}
-
-        {courseSelections.length >
-          0 && (
-          <div className="mt-4 space-y-3">
-            <div className="text-xs text-gray-500">
-              {t("weeklyPlanner.dragHelp")}
+                <option value={NEW_PROGRAM_VALUE}>
+                  + {t("weeklyPlanner.newProgram")}
+                </option>
+              </select>
             </div>
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={
-                closestCenter
-              }
-              onDragStart={
-                handleDragStart
-              }
-              onDragEnd={
-                handleDragEnd
-              }
-              onDragCancel={() =>
-                setActiveSelectionId(
-                  null,
-                )
-              }
-            >
-              <SortableContext
-                items={courseSelections.map(
-                  (selection) =>
-                    selection.id,
-                )}
-                strategy={
-                  verticalListSortingStrategy
-                }
+            <div className="min-w-0">
+              <label
+                htmlFor="weekly-program-name"
+                className="mb-1 block text-sm font-medium text-gray-600"
               >
-                <div className="space-y-2">
-                  {courseSelections.map(
-                    (selection) => (
-                      <SortableCourseRow
-                        key={
-                          selection.id
-                        }
-                        selection={
-                          selection
-                        }
-                        courseCatalog={
-                          courseCatalog
-                        }
-                        isLoadingBranches={
-                          isLoadingBranches
-                        }
-                        isBranchLoading={
-                          isBranchLoading
-                        }
-                        onFacultyChange={
-                          handleFacultyChange
-                        }
-                        onCourseChange={
-                          handleCourseChange
-                        }
-                        onSectionChange={
-                          handleSectionChange
-                        }
-                        onDelete={
-                          handleDeleteSelection
-                        }
-                      />
-                    ),
-                  )}
-                </div>
-              </SortableContext>
+                {t("weeklyPlanner.programName")}
+              </label>
 
-              <DragOverlay
-                adjustScale={false}
-                dropAnimation={
-                  dropAnimation
-                }
-              >
-                {activeSelection ? (
-                  <DraggedCourseRow
-                    selection={
-                      activeSelection
-                    }
-                    courseCatalog={
-                      courseCatalog
-                    }
-                  />
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+              <input
+                id="weekly-program-name"
+                type="text"
+                value={programName}
+                onChange={(event) => setProgramName(event.target.value)}
+                onKeyDown={handleProgramNameKeyDown}
+                placeholder={t("weeklyPlanner.programNamePlaceholder")}
+                className={inputClassName}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportJpeg}
+              disabled={!selectedProgram}
+              className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("weeklyPlanner.exportJpeg")}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveProgramName}
+              disabled={!hasLoadedPrograms || !hasUnsavedNameChanges}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              {t("weeklyPlanner.save")}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeleteProgram}
+              disabled={!hasLoadedPrograms}
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("weeklyPlanner.deleteProgram")}
+            </button>
           </div>
-        )}
-      </div>
+
+          {jpegExportStatus && (
+            <div
+              className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
+                jpegExportStatus.isError
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-green-200 bg-green-50 text-green-700"
+              }`}
+              role={jpegExportStatus.isError ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {localizeRuntimeMessage(language, jpegExportStatus.message)}
+            </div>
+          )}
+
+          {hasUnsavedNameChanges ? (
+            <p
+              role="status"
+              className="mb-4 text-sm text-amber-700 dark:text-amber-300"
+            >
+              {t("weeklyPlanner.unsavedName")}
+            </p>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleAddSelectionRow}
+            disabled={!selectedProgram}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
+            {t("weeklyPlanner.addCourse")}
+          </button>
+
+          {(isLoadingBranches || courseCatalogError) && (
+            <div
+              className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                courseCatalogError
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+              }`}
+              role={courseCatalogError ? "alert" : "status"}
+            >
+              <span>
+                {localizeRuntimeMessage(
+                  language,
+                  courseCatalogError ?? undefined,
+                ) ?? t("weeklyPlanner.loadingPrefixes")}
+              </span>
+
+              {courseCatalogError && (
+                <button
+                  type="button"
+                  onClick={failedBranchCode ? retryFailedBranch : retryBranches}
+                  className="rounded-md border border-current px-2 py-1 text-xs font-semibold"
+                >
+                  {t("weeklyPlanner.retry")}
+                </button>
+              )}
+            </div>
+          )}
+
+          {hasScheduleConflicts && (
+            <div
+              className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              role="status"
+            >
+              {t("weeklyPlanner.conflict")}
+            </div>
+          )}
+
+          {courseSelections.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <OptionalHelp summary={t("weeklyPlanner.reorderHelp")}>
+                <p>{t("weeklyPlanner.dragHelp")}</p>
+              </OptionalHelp>
+
+              <DndContext
+                accessibility={{
+                  screenReaderInstructions: {
+                    draggable: t("weeklyPlanner.dragHelp"),
+                  },
+                  announcements: {
+                    onDragStart: () => t("weeklyPlanner.dragStarted"),
+                    onDragOver: ({ over }) =>
+                      over
+                        ? t("weeklyPlanner.dragPosition", {
+                            position:
+                              courseSelections.findIndex(
+                                (selection) => selection.id === over.id,
+                              ) + 1,
+                            count: courseSelections.length,
+                          })
+                        : t("weeklyPlanner.dragOutside"),
+                    onDragEnd: () => t("weeklyPlanner.dragEnded"),
+                    onDragCancel: () => t("weeklyPlanner.dragCancelled"),
+                  },
+                }}
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={() => setActiveSelectionId(null)}
+              >
+                <SortableContext
+                  items={courseSelections.map((selection) => selection.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {courseSelections.map((selection) => (
+                      <SortableCourseRow
+                        key={selection.id}
+                        selection={selection}
+                        courseCatalog={courseCatalog}
+                        isLoadingBranches={isLoadingBranches}
+                        isBranchLoading={isBranchLoading}
+                        onFacultyChange={handleFacultyChange}
+                        onCourseChange={handleCourseChange}
+                        onSectionChange={handleSectionChange}
+                        onDelete={handleDeleteSelection}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+
+                <DragOverlay adjustScale={false} dropAnimation={dropAnimation}>
+                  {activeSelection ? (
+                    <DraggedCourseRow
+                      selection={activeSelection}
+                      courseCatalog={courseCatalog}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
+          )}
+        </div>
       ) : (
         <ScheduleGeneratorPanel
           courseCatalog={courseCatalog}
@@ -1734,8 +906,13 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
         />
       )}
 
-      <div className="w-full rounded-xl border border-gray-200 bg-transparent shadow-sm">
-        <div className="w-full">
+      <div
+        className="w-full overflow-x-auto rounded-xl border border-gray-200 bg-white"
+        tabIndex={0}
+        role="region"
+        aria-label={t("weeklyPlanner.weeklyProgram")}
+      >
+        <div className="min-w-[840px]">
           <div className="ml-12 grid grid-cols-7 border-b border-gray-200">
             {days.map((day) => (
               <div
@@ -1750,37 +927,30 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
           <div
             className="relative ml-12"
             style={{
-              height:
-                calendarHeight,
+              height: calendarHeight,
             }}
           >
-            {timeLabels.map(
-              (time) => (
-                <div
-                  key={time}
-                  className="absolute left-0 w-full border-t border-gray-200"
-                  style={{
-                    top: getGridLineTop(
-                      time,
-                    ),
-                  }}
-                >
-                  {time !== END_TIME && (
-                    <span
-                      className={
-                        time.endsWith(
-                          ":00",
-                        )
-                          ? "absolute -left-11 w-10 -translate-y-1/2 pr-1 text-right text-xs font-medium text-gray-600"
-                          : "absolute -left-11 w-10 -translate-y-1/2 pr-1 text-right text-xs text-gray-400"
-                      }
-                    >
-                      {time}
-                    </span>
-                  )}
-                </div>
-              ),
-            )}
+            {timeLabels.map((time) => (
+              <div
+                key={time}
+                className="absolute left-0 w-full border-t border-gray-200"
+                style={{
+                  top: getTimeTop(time),
+                }}
+              >
+                {time !== END_TIME && (
+                  <span
+                    className={
+                      time.endsWith(":00")
+                        ? "absolute -left-11 w-10 -translate-y-1/2 pr-1 text-right text-xs font-medium text-gray-600"
+                        : "absolute -left-11 w-10 -translate-y-1/2 pr-1 text-right text-xs text-gray-400"
+                    }
+                  >
+                    {time}
+                  </span>
+                )}
+              </div>
+            ))}
 
             <div className="grid h-full grid-cols-7">
               {days.map((day) => (
@@ -1791,89 +961,67 @@ export default function WeeklyCalendar({ view = "planner" }: WeeklyCalendarProps
               ))}
             </div>
 
-            {displayedCourseBlocks.map(
-              (course) => {
-                const top =
-                  getCourseTop(
-                    course.startTime,
-                  );
+            {displayedCourseBlocks.map((course) => {
+              const top = getTimeTop(course.startTime);
 
-                const height =
-                  getCourseHeight(
-                    course.startTime,
-                    course.endTime,
-                  );
+              const height = getCourseHeight(course.startTime, course.endTime);
 
-                const layout =
-                  courseLayoutMap[
-                    course.id
-                  ];
+              const layout = courseLayoutMap[course.id];
 
-                const colorStyle = getCourseColorStyle(
-                  course.selectionId ?? course.id,
-                  orderedSelectionIds,
-                );
+              const colorStyle = getCourseColorStyle(
+                course.selectionId ?? course.id,
+                orderedSelectionIds,
+              );
 
-                if (
-                  !layout ||
-                  height <= 0
-                ) {
-                  return null;
-                }
+              if (!layout || height <= 0) {
+                return null;
+              }
 
-                return (
+              return (
+                <div
+                  key={course.id}
+                  className="absolute z-10 px-[1px] transition-[top,left,width,height] duration-200 ease-out"
+                  style={{
+                    top,
+                    height,
+
+                    left: `${layout.leftPercent}%`,
+
+                    width: `${layout.widthPercent}%`,
+                  }}
+                >
                   <div
-                    key={course.id}
-                    className="absolute z-10 px-[1px] transition-[top,left,width,height] duration-200 ease-out"
-                    style={{
-                      top,
-                      height,
-
-                      left: `${layout.leftPercent}%`,
-
-                      width: `${layout.widthPercent}%`,
-                    }}
+                    className={`h-full overflow-hidden rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
                   >
-                    <div
-                      className={`h-full overflow-hidden rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
-                    >
-                      <div className={`font-semibold ${colorStyle.heading}`}>
-                        {course.code}
-                        {course.crn ? ` · ${course.crn}` : ""}
-                      </div>
-
-                      <div className={`mt-1 ${colorStyle.body}`}>
-                        {
-                          course.title
-                        }
-                      </div>
-
-                      <div className={`mt-1 ${colorStyle.body}`}>
-                        {
-                          course.startTime
-                        }{" "}
-                        -{" "}
-                        {
-                          course.endTime
-                        }
-                      </div>
-
-                      <div className={`mt-1 font-medium ${colorStyle.body}`}>
-                        {t("weeklyPlanner.instructor")}: {course.instructor ?? t("weeklyPlanner.tba")}
-                      </div>
-
-                      {(course.building || course.room) && (
-                        <div className={`mt-1 ${colorStyle.body}`}>
-                          {[course.building, course.room]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </div>
-                      )}
+                    <div className={`font-semibold ${colorStyle.heading}`}>
+                      {course.code}
+                      {course.crn ? ` · ${course.crn}` : ""}
                     </div>
+
+                    <div className={`mt-1 ${colorStyle.body}`}>
+                      {course.title}
+                    </div>
+
+                    <div className={`mt-1 ${colorStyle.body}`}>
+                      {course.startTime} - {course.endTime}
+                    </div>
+
+                    <div className={`mt-1 font-medium ${colorStyle.body}`}>
+                      {t("weeklyPlanner.instructor")}:{" "}
+                      {course.instructor ?? t("weeklyPlanner.tba")}
+                    </div>
+
+                    {(course.building || course.room) && (
+                      <div className={`mt-1 ${colorStyle.body}`}>
+                        {[course.building, course.room]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
                   </div>
-                );
-              },
-            )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

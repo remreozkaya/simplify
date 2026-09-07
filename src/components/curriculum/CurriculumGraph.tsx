@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 import {
   getVisibleCourseConnections,
@@ -10,11 +16,13 @@ import {
 import type { CourseDerivedStatus } from "@/lib/curriculum/types";
 import type { ItuPlanType } from "@/lib/itu/curriculum/types";
 import { useLanguage } from "@/lib/i18n/client";
-import { localizedCurriculumSection } from "@/lib/i18n";
+import { localizedAcademicName, localizedCurriculumSection } from "@/lib/i18n";
 
 const STATUS_STYLE: Record<CourseDerivedStatus, string> = {
-  "not-taken": "border-slate-500 bg-slate-200/80 text-black hover:bg-slate-300/85",
-  passed: "border-emerald-700 bg-emerald-200/80 text-emerald-950 hover:bg-emerald-300/85",
+  "not-taken":
+    "border-slate-500 bg-slate-200/80 text-black hover:bg-slate-300/85",
+  passed:
+    "border-emerald-700 bg-emerald-200/80 text-emerald-950 hover:bg-emerald-300/85",
   failed: "border-red-700 bg-red-200/80 text-red-950 hover:bg-red-300/85",
 };
 
@@ -47,7 +55,14 @@ export default function CurriculumGraph({
   planType,
 }: Props) {
   const { language, t } = useLanguage();
-  const statusLabel = (status: CourseDerivedStatus) => t(status === "not-taken" ? "curriculum.notTaken" : status === "passed" ? "curriculum.passed" : "curriculum.failed");
+  const statusLabel = (status: CourseDerivedStatus) =>
+    t(
+      status === "not-taken"
+        ? "curriculum.notTaken"
+        : status === "passed"
+          ? "curriculum.passed"
+          : "curriculum.failed",
+    );
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   const [curves, setCurves] = useState<Curve[]>([]);
@@ -99,28 +114,39 @@ export default function CurriculumGraph({
         const targetRect = target.getBoundingClientRect();
         const sameRow = Math.abs(sourceRect.top - targetRect.top) < 8;
         const sourceBeforeTarget = sourceRect.left < targetRect.left;
-        const sourceX = sameRow ? (sourceBeforeTarget ? sourceRect.right : sourceRect.left) - boardRect.left : sourceRect.left - boardRect.left + sourceRect.width / 2;
-        const sourceY = sameRow ? sourceRect.top - boardRect.top + sourceRect.height / 2 : sourceRect.bottom - boardRect.top - 2;
-        const targetX = sameRow ? (sourceBeforeTarget ? targetRect.left : targetRect.right) - boardRect.left : targetRect.left - boardRect.left + targetRect.width / 2;
-        const targetY = sameRow ? targetRect.top - boardRect.top + targetRect.height / 2 : targetRect.top - boardRect.top + 2;
+        const sourceX = sameRow
+          ? (sourceBeforeTarget ? sourceRect.right : sourceRect.left) -
+            boardRect.left
+          : sourceRect.left - boardRect.left + sourceRect.width / 2;
+        const sourceY = sameRow
+          ? sourceRect.top - boardRect.top + sourceRect.height / 2
+          : sourceRect.bottom - boardRect.top - 2;
+        const targetX = sameRow
+          ? (sourceBeforeTarget ? targetRect.left : targetRect.right) -
+            boardRect.left
+          : targetRect.left - boardRect.left + targetRect.width / 2;
+        const targetY = sameRow
+          ? targetRect.top - boardRect.top + targetRect.height / 2
+          : targetRect.top - boardRect.top + 2;
         const distance = Math.max(64, Math.abs(targetY - sourceY) * 0.48);
         const midpointX = (sourceX + targetX) / 2;
 
-        return [{
-          ...connection,
-          path: sameRow
-            ? `M ${sourceX} ${sourceY} C ${midpointX} ${sourceY - 76}, ${midpointX} ${targetY - 76}, ${targetX} ${targetY}`
-            : `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + distance}, ${targetX} ${targetY - distance}, ${targetX} ${targetY}`,
-          highlighted:
-            Boolean(selectedNodeId) && (
-              connection.source === selectedNodeId ||
-              connection.target === selectedNodeId ||
-              (Boolean(prerequisiteNodeIds?.has(connection.source)) &&
-                Boolean(prerequisiteNodeIds?.has(connection.target))) ||
-              (Boolean(dependentNodeIds?.has(connection.source)) &&
-                Boolean(dependentNodeIds?.has(connection.target)))
-            ),
-        }];
+        return [
+          {
+            ...connection,
+            path: sameRow
+              ? `M ${sourceX} ${sourceY} C ${midpointX} ${sourceY - 76}, ${midpointX} ${targetY - 76}, ${targetX} ${targetY}`
+              : `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + distance}, ${targetX} ${targetY - distance}, ${targetX} ${targetY}`,
+            highlighted:
+              Boolean(selectedNodeId) &&
+              (connection.source === selectedNodeId ||
+                connection.target === selectedNodeId ||
+                (Boolean(prerequisiteNodeIds?.has(connection.source)) &&
+                  Boolean(prerequisiteNodeIds?.has(connection.target))) ||
+                (Boolean(dependentNodeIds?.has(connection.source)) &&
+                  Boolean(dependentNodeIds?.has(connection.target)))),
+          },
+        ];
       });
 
       setBoardSize({
@@ -139,14 +165,20 @@ export default function CurriculumGraph({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [connections, dependentNodeIds, prerequisiteNodeIds, selectedNodeId]);
+  }, [
+    connections,
+    dependentNodeIds,
+    language,
+    prerequisiteNodeIds,
+    selectedNodeId,
+  ]);
 
   return (
-    <div className="w-full overflow-hidden pb-2" aria-label={t("curriculum.graphLabel")}>
-      <div
-        ref={boardRef}
-        className="relative space-y-8 py-1"
-      >
+    <div
+      className="w-full overflow-hidden pb-2"
+      aria-label={t("curriculum.graphLabel")}
+    >
+      <div ref={boardRef} className="relative space-y-8 py-1">
         <svg
           className="pointer-events-none absolute left-0 top-0 z-10 overflow-visible"
           width={boardSize.width}
@@ -156,7 +188,15 @@ export default function CurriculumGraph({
           aria-hidden="true"
         >
           <defs>
-            <marker id="curriculum-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+            <marker
+              id="curriculum-arrow"
+              markerWidth="8"
+              markerHeight="8"
+              refX="6"
+              refY="3"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
               <path d="M0,0 L0,6 L7,3 z" fill="#64748b" />
             </marker>
           </defs>
@@ -183,7 +223,7 @@ export default function CurriculumGraph({
         {semesters.map(({ semester, columnCount, nodes }) => (
           <section
             key={semester}
-            className="relative min-h-[184px] rounded-[28px] bg-slate-100 px-3 pb-4 pt-10 sm:px-4"
+            className="relative min-h-[184px] rounded-xl bg-slate-50 px-3 pb-4 pt-10 sm:px-4"
             aria-labelledby={`semester-heading-${semester}`}
           >
             <h3
@@ -193,16 +233,21 @@ export default function CurriculumGraph({
               {localizedCurriculumSection(language, planType, semester)}
             </h3>
             {nodes.length ? (
-              <div
-                className="flex items-stretch justify-center gap-2"
-              >
+              <div className="flex flex-wrap items-stretch justify-center gap-2">
                 {nodes.map((node) => {
                   const status = statuses[node.id] ?? "not-taken";
                   const elective = node.kind === "elective-slot";
                   const prerequisiteRelated = prerequisiteNodeIds?.has(node.id);
                   const dependentRelated = dependentNodeIds?.has(node.id);
                   const [code, ...titleParts] = node.label.split("\n");
-                  const title = titleParts.join(" ") || code;
+                  const title = localizedAcademicName(
+                    {
+                      name: titleParts.join(" ") || code,
+                      nameTr: node.nameTr,
+                      nameEn: node.nameEn,
+                    },
+                    language,
+                  );
                   const cardWidth = `calc(${100 / columnCount}% - ${((columnCount - 1) * 8) / columnCount}px)`;
 
                   return (
@@ -215,8 +260,12 @@ export default function CurriculumGraph({
                       type="button"
                       onClick={() => onSelectNode(node.id)}
                       aria-pressed={selectedNodeId === node.id}
-                      style={{ flexBasis: cardWidth, maxWidth: cardWidth }}
-                      className={`relative z-20 flex min-h-[136px] min-w-0 shrink-0 flex-col items-center justify-center rounded-[20px] border-2 p-2 text-center shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-300 sm:min-h-[144px] sm:p-3 ${
+                      style={
+                        {
+                          "--course-width": `max(140px, ${cardWidth})`,
+                        } as CSSProperties
+                      }
+                      className={`relative z-20 flex basis-[calc(50%-4px)] max-w-[calc(50%-4px)] sm:basis-[var(--course-width)] sm:max-w-[var(--course-width)] min-h-[136px] min-w-0 shrink-0 flex-col items-center justify-center rounded-lg border p-2 text-center shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-300 sm:min-h-[144px] sm:p-3 ${
                         elective && status === "not-taken"
                           ? "border-dashed border-violet-600 bg-violet-100/80 text-violet-950 hover:bg-violet-200/85"
                           : STATUS_STYLE[status]
@@ -234,10 +283,14 @@ export default function CurriculumGraph({
                         {elective ? title : code}
                       </span>
                       {!elective && (
-                        <p className="mt-2 max-w-full break-words text-[10px] font-bold leading-snug sm:text-[11px] lg:text-xs">{title}</p>
+                        <p className="mt-2 max-w-full break-words text-xs font-medium leading-snug">
+                          {title}
+                        </p>
                       )}
-                      <span className="mt-2 max-w-full rounded-full border border-current bg-white/75 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide sm:mt-3 sm:px-2 sm:text-[8px]">
-                        {elective && status === "not-taken" ? t("curriculum.electiveRequirement") : statusLabel(status)}
+                      <span className="mt-2 max-w-full text-xs font-medium">
+                        {elective && status === "not-taken"
+                          ? t("curriculum.electiveRequirement")
+                          : statusLabel(status)}
                       </span>
                       {takeableNodeIds?.has(node.id) && (
                         <span className="absolute -right-1 -top-2 rounded-full bg-blue-700 px-2 py-1 text-[7px] font-black uppercase tracking-wide text-white shadow-md sm:text-[8px]">
@@ -245,7 +298,12 @@ export default function CurriculumGraph({
                         </span>
                       )}
                       {node.externalPrerequisiteCodes?.length ? (
-                        <span className="mt-2 rounded-full bg-amber-950 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-amber-100" title={t("curriculum.externalCodes", { codes: node.externalPrerequisiteCodes.join(", ") })}>
+                        <span
+                          className="mt-2 rounded-full bg-amber-950 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-amber-100"
+                          title={t("curriculum.externalCodes", {
+                            codes: node.externalPrerequisiteCodes.join(", "),
+                          })}
+                        >
                           {t("curriculum.externalPrerequisite")}
                         </span>
                       ) : null}

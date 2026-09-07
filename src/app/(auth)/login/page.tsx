@@ -13,12 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
 
   return (
-    <AuthCard
-      title="Welcome back"
-      description="Log in to continue to your Simplify workspace."
-      titleKey="authentication.welcome"
-      descriptionKey="authentication.welcomeDescription"
-    >
+    <AuthCard titleKey="authentication.welcome">
       <LoginForm nextPath={getSafeNextPath(rawNext)} />
     </AuthCard>
   );
