@@ -26,7 +26,7 @@ npm run build
 
 | Route                    | Purpose                                                                     |
 | ------------------------ | --------------------------------------------------------------------------- |
-| `/`                      | Links to the planning tools                                                 |
+| `/`                      | Profile programs, planning steps, and links to all tools                     |
 | `/semester-planner`      | Recommend courses across the profile’s active programs                      |
 | `/generator`             | Generate and compare schedules using course, day, time, and CRN preferences |
 | `/weekly-planner`        | Manage named schedules, reorder courses, view overlaps, and export JPEGs    |
@@ -34,9 +34,9 @@ npm run build
 | `/graduation-calculator` | Import transcripts and audit graduation requirements and GPA                |
 | `/profile`               | Manage personal details, main major, double majors, minors, and password    |
 
-The semester planner accepts a local-credit target, maximum course count (0 means unlimited), program priority, and the currently published semester. Recommendations retain prerequisite, availability, and registration warnings, with detailed reasoning available on demand. A confirmed schedule can be sent to the generator while preserving its day/time preferences, then saved and opened in the weekly planner.
+The semester planner accepts a local-credit target, maximum course count (0 means unlimited), program priority, and the currently published semester. Recommendations retain prerequisite, availability, and registration warnings, with detailed reasoning available on demand. A confirmed schedule can be sent to the generator while preserving its day/time preferences, then saved and opened in the weekly planner. The planner considers recognized Turkish/English offering sections together while retaining the selected CRN and section identity. Candidate and section search have finite work limits; when reached, the interface explicitly reports that comparison is incomplete and shows only proven conflict-free selections.
 
-Transcript imports accumulate across semesters. Reimporting a course retains the most recent attempt; older input cannot overwrite a newer result. Each main-major, double-major, and minor enrollment is audited independently against its exact curriculum. Program GPA uses transcript credit weights for matched, numerically graded courses, counting each course once. Courses without numeric grades do not contribute to GPA.
+Transcript imports accumulate across semesters. Reimporting a course retains the most recent attempt; older input cannot overwrite a newer result. Each main-major, double-major, and minor enrollment is audited independently against its exact curriculum. Program GPA uses transcript credit weights for matched, numerically graded courses, counting each course once. Courses without numeric grades do not contribute to GPA. A course is allocated once per program audit; manual completions follow direct-course priority before elective slots. Shared transcript grades and credits remain authoritative for prerequisite eligibility, including courses outside the active degree requirements. Resetting the shared transcript clears transcript-derived progress in all saved plans, including inactive enrollments, while preserving manual completions. An intentionally empty transcript does not reimport legacy plan records.
 
 Profile details and enrollments are stored in Supabase user metadata. Weekly schedules, generator preferences, transcripts, curriculum progress, language, and theme are stored in this browser’s `localStorage`. They are not synchronized across devices and remain after logout. Cleanup must preserve existing storage keys and migrations. Official academic names use the requested language when supplied by OBS, with the source name as fallback.
 
@@ -44,45 +44,94 @@ Public İTÜ data is advisory. Unknown availability, registration limits, and un
 
 ## Structure
 
+The repository uses the App Router with authenticated and public authentication route groups. The `@/` import alias resolves to `src/`. Domain calculations live in `src/lib/`; React components handle rendering, interaction, and browser persistence.
+
 ```text
-src/
-  app/
-    (app)/                 # authenticated tool pages and profile actions
-    (auth)/                # login, signup, verification, and recovery pages
-    api/itu/               # authenticated OBS data endpoints
-    auth/                  # authentication actions and callback
-  components/
-    auth/                  # account forms and shared input controls
-    calendar/              # weekly calendar, course rows, schedule generator
-    curriculum/            # curriculum graph, audit, and program tabs
-    profile/               # profile form and enrollment context
-    semester-planner/      # recommendation interface
-    PageShell.tsx          # shared tool-page layout
-    AppNavigation.tsx      # navigation and account controls
-    OptionalHelp.tsx       # expandable secondary guidance
-  hooks/                   # live course catalog loading
-  lib/
-    auth/, supabase/        # validation, session cookies, provider clients
-    calendar/              # layout, catalog lookup, persistence, JPEG export
-    curriculum/            # transcript, equivalency, eligibility, audit logic
-    http/                  # shared JSON response handling
-    i18n/                  # Turkish/English dictionaries and runtime messages
-    itu/                   # clients, parsers, schemas, catalog services
-    profile/               # enrollment and profile validation
-    schedule/              # constraints, conflicts, scoring, generator handoff
-    semester-planner/      # recommendation engine
-    navigation.ts          # shared tool links
-  data/itu/                # imported official curriculum/equivalence snapshots
-  types/calendar.ts        # shared calendar types
-scripts/                   # controlled official-data importers
-tests/                     # unit/regression tests and source fixtures
+simplify/
+├── src/
+│   ├── app/
+│   │   ├── (app)/             # protected layout, home, and tool pages
+│   │   │   ├── curriculum/
+│   │   │   ├── generator/
+│   │   │   ├── graduation-calculator/
+│   │   │   ├── profile/       # profile page and server actions
+│   │   │   ├── semester-planner/
+│   │   │   └── weekly-planner/
+│   │   ├── (auth)/            # login, signup, verify-email, forgot/reset-password
+│   │   ├── api/itu/           # branches, courses, curriculum catalog/detail APIs
+│   │   ├── auth/              # shared auth actions and callback route
+│   │   ├── layout.tsx         # Geist fonts, language/theme initialization
+│   │   ├── globals.css        # Tailwind, theme fallbacks, focus/motion styles
+│   │   ├── error.tsx
+│   │   └── not-found.tsx
+│   ├── components/
+│   │   ├── auth/              # account forms and shared input controls
+│   │   ├── calendar/          # weekly calendar, course rows, schedule generator
+│   │   ├── curriculum/        # curriculum graph, audit, and program tabs
+│   │   ├── profile/           # profile form and enrollment context
+│   │   ├── semester-planner/  # recommendation interface
+│   │   ├── AppNavigation.tsx  # tool navigation and account preview
+│   │   ├── PageShell.tsx      # shared page layout and skip-link target
+│   │   ├── OptionalHelp.tsx   # expandable secondary guidance
+│   │   ├── LocalizedText.tsx
+│   │   ├── LanguageToggle.tsx
+│   │   └── ThemeToggle.tsx
+│   ├── hooks/                # useItuCourseCatalog: live offering loading
+│   ├── lib/
+│   │   ├── auth/              # validation, redirects, cookies, verified users
+│   │   ├── supabase/          # server client and Proxy session refresh
+│   │   ├── calendar/          # layout, catalog lookup, persistence, JPEG export
+│   │   ├── curriculum/        # transcript, equivalencies, eligibility, GPA/audits
+│   │   ├── http/              # shared JSON response handling
+│   │   ├── i18n/              # TR/EN dictionaries and runtime messages
+│   │   ├── itu/               # OBS clients, parsers, schemas, and adapters
+│   │   │   ├── curriculum/    # catalog, detail, elective, prerequisite services
+│   │   │   └── equivalence/   # importer parsing and state management
+│   │   ├── profile/           # enrollment and profile validation
+│   │   ├── schedule/          # constraints, conflicts, scoring, generator session
+│   │   ├── semester-planner/  # bounded recommendation search
+│   │   └── navigation.ts      # shared tool links
+│   ├── data/itu/
+│   │   ├── curriculum-catalog.json
+│   │   ├── equivalence-targets.json
+│   │   └── equivalences.json
+│   ├── types/calendar.ts      # shared calendar types
+│   └── proxy.ts               # Next.js request Proxy entry point
+├── scripts/                   # controlled OBS snapshot importers
+├── tests/
+│   ├── auth/, profile/, i18n/, http/
+│   ├── calendar/, schedule/, semester-planner/
+│   ├── curriculum/, itu/
+│   └── fixtures/              # OBS HTML and sample transcript records
+├── .codex/agents/             # architecture, academic, design, reviewer TOML
+├── docs/superpowers/plans/    # implementation scope and verification evidence
+├── AGENTS.md                  # Next.js-generated agent guidance
+├── CLAUDE.md                  # reference to AGENTS.md
+├── .env.example               # public Supabase/site configuration placeholders
+├── package.json
+├── package-lock.json          # pinned npm dependency tree
+├── next.config.ts
+├── tsconfig.json
+├── eslint.config.mjs
+├── postcss.config.mjs
+└── vitest.config.ts
 ```
 
-Keep generated snapshots, importer caches, dependencies, and build output separate from manual source cleanup. Refresh official snapshots through the import commands below.
+The project agent definitions are read-only audit/review roles. Their TOML syntax has been validated; discovery and loading depend on the Codex client. They are not application runtime dependencies.
+
+Keep the committed official snapshots separate from importer caches and live-page captures. `.gitignore` excludes `.env.local`, `node_modules/`, `.next/`, coverage, TypeScript build metadata, and temporary importer files. Refresh snapshots through the import commands below.
+
+### Data flow and ownership
+
+- The protected layout validates the Supabase user and provides profile enrollments through `ProfileProvider`. Profile actions update user metadata.
+- ITU API routes serve catalog selectors and live OBS course/plan data. Server clients, parsing, and validation stay under `src/lib/itu/`; the UI uses the calendar adapter and catalog hook.
+- Curriculum and graduation views share a cumulative transcript, while each plan keeps its own manual progress and requirement allocation. The semester planner uses that evidence to evaluate eligibility across active programs.
+- Semester recommendations hand actual course/section identities to the schedule generator. Generated schedules can be saved into named weekly plans.
+- Browser storage retains schedules, transcript/progress, generator state, language, and theme. It is shared by accounts using the same browser profile; account-scoped storage and cloud synchronization are not implemented.
 
 ## Authentication
 
-Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and secure cookie-backed sessions. Application pages and ITU API routes are protected by the Next.js request Proxy; the protected server layout also validates the current verified user before rendering. Personal details and academic-program enrollments from the Profile page are stored in the authenticated user's Supabase metadata. Planner, curriculum progress, the shared transcript, and theme data remain in `localStorage` and are not deleted or uploaded by authentication.
+Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and cookie-backed sessions. The Next.js request Proxy checks session claims for application pages and ITU API routes; the protected server layout additionally validates the current user's email confirmation before rendering. ITU API routes do not independently recheck email confirmation, so **Confirm email** must remain enabled in Supabase. Personal details and academic-program enrollments from the Profile page are stored in the authenticated user's Supabase metadata. Planner, curriculum progress, the shared transcript, and theme data remain in `localStorage` and are not deleted or uploaded by authentication.
 
 ### 1. Create and configure Supabase
 
@@ -138,7 +187,7 @@ Use a test inbox or local Supabase/Mailpit environment; automated tests never se
 
 Provider-dependent email delivery, verification, and old-password invalidation require a configured Supabase project and cannot be completed with placeholder environment values.
 
-### Official course-equivalence data
+## Official course-equivalence data
 
 Course-equivalence rules are imported at build/development time from İTÜ OBS and stored in `src/data/itu/equivalences.json`; the browser never scrapes OBS for equivalences. Import targets are explicit so program and plan scope cannot be lost:
 
@@ -161,7 +210,7 @@ At resolution time, Turkish and English offerings of the same course are treated
 
 ## Curriculum catalog refresh
 
-The Profile, Curriculum, and Graduation Calculator use the server-side snapshot at `src/data/itu/curriculum-catalog.json`. Refresh it from the official İTÜ OBS faculty and plan selectors with:
+Profile and academic program selectors use the server-side snapshot at `src/data/itu/curriculum-catalog.json`. Curriculum detail, elective pools and prerequisites are fetched from OBS when an academic tool loads a plan; the selector snapshot does not provide offline degree audits. Refresh it from the official İTÜ OBS faculty and plan selectors with:
 
 ```bash
 npm run curricula:import
