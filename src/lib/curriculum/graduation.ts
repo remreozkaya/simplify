@@ -219,7 +219,44 @@ export function reconcileImportedProgress(curriculum: ItuCurriculum, current: Cu
   }).progress;
 }
 
-export function progressForRequirement(item: ItuCurriculumItem, progress: CurriculumProgress): RequirementProgress | null {
+/** Allocate unassigned manual completions once within this curriculum. */
+function allocateManualProgress(curriculum: ItuCurriculum, progress: CurriculumProgress): CurriculumProgress {
+  const courses = { ...progress.courses };
+  const items = [...allItems(curriculum)].sort((a, b) => a.semester - b.semester);
+  const occupied = new Set(Object.values(progress.requirementSatisfactions ?? {}).map((value) => value.requirementId));
+  const used = new Set(Object.values(progress.requirementSatisfactions ?? {}).flatMap((value) => value.satisfiedByCourseCodes.map(normalizeCourseCode)));
+  Object.entries(courses).forEach(([code, course]) => {
+    if (!course.matchedRequirementId) return;
+    used.add(normalizeCourseCode(code));
+    if (course.state === "passed") occupied.add(course.matchedRequirementId);
+  });
+  const manual = Object.entries(courses).filter(([code, course]) =>
+    course.source !== "transcript" && course.state === "passed" && !used.has(normalizeCourseCode(code)),
+  ).sort(([a], [b]) => a.localeCompare(b));
+
+  function assign(item: ItuCurriculumItem, code: string, course: CourseProgress) {
+    courses[code] = { ...course, courseCode: course.courseCode ?? code, matchedRequirementId: item.id };
+    occupied.add(item.id);
+    used.add(normalizeCourseCode(code));
+  }
+  // Compulsory/direct requirements keep priority over elective choices.
+  [true, false].forEach((exact) => manual.forEach(([code, course]) => {
+    if (used.has(normalizeCourseCode(code))) return;
+    const item = items.find((item) => item.kind === "course" && !occupied.has(item.id) && (
+      exact ? normalizeCourseCode(item.code) === normalizeCourseCode(code) : courseLanguageVariants(item.code).includes(normalizeCourseCode(code))
+    ));
+    if (item) assign(item, code, course);
+  }));
+  manual.forEach(([code, course]) => {
+    if (used.has(normalizeCourseCode(code))) return;
+    const item = items.find((item) => item.kind === "elective-slot" && !occupied.has(item.id) && item.courses.some((choice) => courseLanguageVariants(choice.code).includes(normalizeCourseCode(code))));
+    if (item) assign(item, code, course);
+  });
+  return { ...progress, courses };
+}
+
+export function progressForRequirement(item: ItuCurriculumItem, progress: CurriculumProgress, curriculum?: ItuCurriculum): RequirementProgress | null {
+  if (curriculum) progress = allocateManualProgress(curriculum, progress);
   const satisfaction = progress.requirementSatisfactions?.[item.id];
   if (satisfaction) {
     const resolvedCourses = satisfaction.satisfiedByCourseCodes.map((code) => progress.courses[normalizeCourseCode(code)]).filter((course): course is CourseProgress => Boolean(course));
@@ -236,7 +273,11 @@ export function progressForRequirement(item: ItuCurriculumItem, progress: Curric
   }
   if (item.kind === "course") {
     const targetCode = normalizeCourseCode(item.code);
-    const actualCode = courseLanguageVariants(targetCode).find((code) => progress.courses[code]);
+    const eligibleCodes = courseLanguageVariants(targetCode).filter((code) => {
+      const course = progress.courses[code];
+      return course && (!course.matchedRequirementId || course.matchedRequirementId === item.id);
+    });
+    const actualCode = eligibleCodes.find((code) => progress.courses[code].state === "passed") ?? eligibleCodes[0];
     const course = actualCode ? progress.courses[actualCode] : undefined;
     if (!course || !actualCode) return null;
     const languageEquivalent = actualCode !== targetCode;
@@ -250,7 +291,8 @@ export function progressForRequirement(item: ItuCurriculumItem, progress: Curric
       },
     };
   }
-  const assigned = Object.values(progress.courses).find((course) => course.matchedRequirementId === item.id);
+  const assignedCourses = Object.values(progress.courses).filter((course) => course.matchedRequirementId === item.id);
+  const assigned = assignedCourses.find((course) => course.state === "passed") ?? assignedCourses[0];
   if (assigned) {
     const choice = item.courses.find((course) => normalizeCourseCode(course.code) === normalizeCourseCode(assigned.courseCode ?? ""));
     return {
@@ -260,11 +302,12 @@ export function progressForRequirement(item: ItuCurriculumItem, progress: Curric
       satisfaction: { requirementId: item.id, requirementCourseCode: item.title, satisfiedByCourseCodes: [normalizeCourseCode(assigned.courseCode ?? choice?.code ?? "")], satisfactionType: "elective" },
     };
   }
+  if (curriculum) return null;
   const manuallyCompleted = [...new Map(item.courses.flatMap((choice) => {
     const expected = normalizeCourseCode(choice.code);
     const actualCode = courseLanguageVariants(expected).find((code) => progress.courses[code]?.state === "passed");
     const course = actualCode ? progress.courses[actualCode] : undefined;
-    return course && actualCode ? [[actualCode, { choice, course, actualCode, languageEquivalent: actualCode !== expected }] as const] : [];
+    return course && actualCode && course.source !== "transcript" && !course.matchedRequirementId ? [[actualCode, { choice, course, actualCode, languageEquivalent: actualCode !== expected }] as const] : [];
   })).values()];
   if (manuallyCompleted.length !== 1) return null;
   const { choice, course, actualCode, languageEquivalent } = manuallyCompleted[0];
@@ -284,7 +327,7 @@ export function resolvedCourseProgress(curriculum: ItuCurriculum, progress: Curr
   });
   allItems(curriculum).forEach((item) => {
     if (item.kind !== "course") return;
-    const completion = progressForRequirement(item, progress);
+    const completion = progressForRequirement(item, progress, curriculum);
     if (completion?.course.state === "passed") resolved[normalizeCourseCode(item.code)] = completion.course;
   });
   return resolved;
@@ -297,7 +340,7 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
     const requiredCredit = item.creditOptions[0] ?? 0;
     const requiredLanguage = item.kind === "course" ? item.language : item.courses.length && item.courses.every((course) => course.language === "EN") ? "EN" : undefined;
     if (requiredLanguage === "EN") requiredEnglishCredit += requiredCredit;
-    const completed = progressForRequirement(item, progress);
+    const completed = progressForRequirement(item, progress, curriculum);
     if (completed?.course.state !== "passed") return;
     earnedCourses += 1;
     // Degree audits count the target requirement's credit. Transcript credit is
@@ -323,7 +366,7 @@ export function calculateProgramGpa(curriculum: ItuCurriculum, progress: Curricu
   let credits = 0;
 
   allItems(curriculum).forEach((item) => {
-    const matched = progressForRequirement(item, progress);
+    const matched = progressForRequirement(item, progress, curriculum);
     matched?.courses.forEach((course) => {
       if (!course.grade) return;
       const points = gradePoint(course.grade);

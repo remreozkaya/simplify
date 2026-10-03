@@ -41,59 +41,60 @@ textarea {
   transition-duration: 180ms;
 }
 
-.dark .bg-white,
-.dark .bg-white\/95 {
+/* Legacy fallbacks apply only when a component has no explicit dark variant. */
+.dark .bg-white:not([class*="dark:bg-"]),
+.dark .bg-white\/95:not([class*="dark:bg-"]) {
   background-color: #0f172a;
 }
 
-.dark .bg-gray-100,
-.dark .bg-slate-100 {
+.dark .bg-gray-100:not([class*="dark:bg-"]),
+.dark .bg-slate-100:not([class*="dark:bg-"]) {
   background-color: #020617;
 }
 
-.dark .bg-gray-50,
-.dark .bg-slate-50 {
+.dark .bg-gray-50:not([class*="dark:bg-"]),
+.dark .bg-slate-50:not([class*="dark:bg-"]) {
   background-color: #111827;
 }
 
-.dark .text-gray-900,
-.dark .text-slate-900,
-.dark .text-slate-950 {
+.dark .text-gray-900:not([class*="dark:text-"]),
+.dark .text-slate-900:not([class*="dark:text-"]),
+.dark .text-slate-950:not([class*="dark:text-"]) {
   color: #f8fafc;
 }
 
-.dark .text-gray-700,
-.dark .text-slate-700,
-.dark .text-gray-600,
-.dark .text-slate-600 {
+.dark .text-gray-700:not([class*="dark:text-"]),
+.dark .text-slate-700:not([class*="dark:text-"]),
+.dark .text-gray-600:not([class*="dark:text-"]),
+.dark .text-slate-600:not([class*="dark:text-"]) {
   color: #cbd5e1;
 }
 
-.dark .text-gray-500,
-.dark .text-slate-500 {
+.dark .text-gray-500:not([class*="dark:text-"]),
+.dark .text-slate-500:not([class*="dark:text-"]) {
   color: #94a3b8;
 }
 
-.dark .border-gray-200,
-.dark .border-gray-300,
-.dark .border-slate-100,
-.dark .border-slate-200,
-.dark .border-slate-300 {
+.dark .border-gray-200:not([class*="dark:border-"]),
+.dark .border-gray-300:not([class*="dark:border-"]),
+.dark .border-slate-100:not([class*="dark:border-"]),
+.dark .border-slate-200:not([class*="dark:border-"]),
+.dark .border-slate-300:not([class*="dark:border-"]) {
   border-color: #334155;
 }
 
-.dark input,
-.dark select,
-.dark textarea {
+.dark input:not([class*="dark:bg-"]),
+.dark select:not([class*="dark:bg-"]),
+.dark textarea:not([class*="dark:bg-"]) {
   background-color: #0f172a;
   color: #e2e8f0;
 }
 
-.dark .app-navigation {
+.dark .app-navigation:not([class*="dark:bg-"]) {
   background-color: rgba(2, 6, 23, 0.94);
 }
 
-.dark .theme-toggle {
+.dark .theme-toggle:not([class*="dark:bg-"]) {
   background-color: #111827;
   color: #e2e8f0;
 }

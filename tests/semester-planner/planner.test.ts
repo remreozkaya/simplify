@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { curriculumTotals, applyTranscriptImport } from "@/lib/curriculum/graduation";
+import { parseTranscriptMarkdown } from "@/lib/curriculum/transcript";
 import { emptyProgress } from "@/lib/curriculum/progress";
-import { buildSemesterPlan } from "@/lib/semester-planner/planner";
+import { generateConflictFreeSchedules } from "@/lib/schedule/generator";
+import { parseGeneratorSession } from "@/lib/schedule/session";
+import { hasMeetingConflicts } from "@/lib/schedule/conflicts";
+import { buildSemesterPlan, MAX_PLANNER_CANDIDATE_VISITS, MAX_PLANNER_SCHEDULE_NODES } from "@/lib/semester-planner/planner";
 import type { SemesterPlannerProgram } from "@/lib/semester-planner/types";
 import type { ItuCurriculum, ItuCurriculumItem, PrerequisiteExpression } from "@/lib/itu/curriculum/types";
 import type { EnrollmentType, ProfilePlanType } from "@/lib/profile/types";
@@ -113,6 +118,108 @@ function options(overrides: Partial<Parameters<typeof buildSemesterPlan>[1]> = {
 }
 
 describe("smart semester planner", () => {
+  it("bounds exploration of many incompatible candidates and keeps only proven compatible results", () => {
+    const codes = Array.from({ length: 80 }, (_, index) => `BLG ${100 + index}`);
+    const main = makeProgram("main24", "main", "undergraduate", codes.map(code => course(code, code)));
+    const courseOfferings = codes.map(code => offering(code));
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 18, maxCourses: 6, courseOfferings, offeredCourseCodes: new Set(codes) }));
+    expect(plan.searchLimited).toBe(true);
+    expect(plan.notices).toContainEqual({ kind: "search-limited" });
+    expect(plan.searchStats.candidateVisits).toBeLessThanOrEqual(MAX_PLANNER_CANDIDATE_VISITS);
+    expect(plan.searchStats.scheduleVisitedNodes).toBeLessThanOrEqual(MAX_PLANNER_SCHEDULE_NODES);
+    expect(plan.recommendations).toHaveLength(1);
+    const regenerated = generateConflictFreeSchedules(plan.compatibleSectionConstraints.map(constraint => ({ ...courseOfferings.find(value => value.courseId === constraint.courseId)!, pinnedSectionId: constraint.sectionId })));
+    expect(regenerated.schedules).toHaveLength(1);
+    expect(hasMeetingConflicts(regenerated.schedules[0].meetings)).toBe(false);
+  });
+
+  it("reports an exhausted section search as partial instead of claiming a collision shortfall", () => {
+    const main = makeProgram("main25", "main", "undergraduate", [course("a", "BLG 101"), course("b", "MAT 101")]);
+    const courseOfferings = [offering("BLG 101"), offering("MAT 101")].map(value => ({
+      ...value,
+      sections: Array.from({ length: 501 }, (_, index) => ({ ...value.sections[0], id: `${value.courseId}:${index}`, crn: String(index) })),
+    }));
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, courseOfferings }));
+    expect(plan.searchLimited).toBe(true);
+    expect(plan.notices).toContainEqual({ kind: "search-limited" });
+    expect(plan.notices).not.toContainEqual({ kind: "collision-shortfall" });
+    expect(plan.recommendations).toHaveLength(1);
+  });
+
+  it.each(["BLG 101", "BLG 101E"])("keeps shared transcript grades authoritative over manual %s across programs", (manualCode) => {
+    const main = makeProgram("main21", "main", "undergraduate", [course("advanced", "BLG 202")], {
+      "BLG 202": { courseCode: "BLG 202", expression: { kind: "course", courseCode: "BLG 101", minimumGrade: "BB" } },
+    });
+    main.prerequisiteProgress = { "BLG 101": { state: "passed", source: "transcript", grade: "CC", courseCode: "BLG 101", countedCredit: 3 } };
+    const minor = makeProgram("minor22", "minor", "yandal", []);
+    main.progress.courses[manualCode] = { state: "passed", source: "manual", grade: "AA", courseCode: manualCode, countedCredit: 6 };
+    minor.progress.courses[manualCode] = { state: "passed", source: "manual", grade: "AA", courseCode: manualCode, countedCredit: 6 };
+    for (const programs of [[main, minor], [minor, main]]) {
+      expect(buildSemesterPlan(programs, options({ desiredCredits: 3 })).recommendations).toEqual([]);
+    }
+    main.prerequisiteProgress["BLG 101"] = { state: "failed", source: "transcript", grade: "FF", courseCode: "BLG 101", countedCredit: 3 };
+    expect(buildSemesterPlan([main, minor], options({ desiredCredits: 3 })).recommendations).toEqual([]);
+  });
+
+  it("uses canonical transcript credits instead of inflated stale manual credits", () => {
+    const main = makeProgram("main23", "main", "undergraduate", [course("advanced", "BLG 202")], {
+      "BLG 202": { courseCode: "BLG 202", minimumCredits: 6 },
+    });
+    main.prerequisiteProgress = { "BLG 101": { state: "passed", source: "transcript", grade: "AA", courseCode: "BLG 101", countedCredit: 3, transcriptCredit: 3 } };
+    main.progress.courses["BLG 101E"] = { state: "passed", source: "manual", grade: "AA", courseCode: "BLG 101E", countedCredit: 6 };
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 3 }));
+    expect(plan.recommendations).toEqual([]);
+    expect(plan.notices).toContainEqual({ kind: "eligibility-unknown" });
+  });
+
+  it("uses external passed grades and credits for prerequisites without degree completion", () => {
+    const main = makeProgram("main20", "main", "undergraduate", [course("advanced", "BLG 202")], {
+      "BLG 202": { courseCode: "BLG 202", minimumCredits: 6, expression: { kind: "course", courseCode: "BLG 101", minimumGrade: "BB" } },
+    });
+    main.prerequisiteProgress = {
+      "BLG 101": { state: "passed", grade: "BA", courseCode: "BLG 101", countedCredit: 3, transcriptCredit: 4 },
+      "MAT 101": { state: "passed", grade: "AA", courseCode: "MAT 101", countedCredit: 3, transcriptCredit: 3 },
+    };
+    expect(curriculumTotals(main.curriculum, main.progress).earnedCredit).toBe(0);
+    expect(buildSemesterPlan([main], options({ desiredCredits: 3 })).recommendations.map(value => value.code)).toEqual(["BLG 202"]);
+    main.prerequisiteProgress["BLG 101"].grade = "CC";
+    expect(buildSemesterPlan([main], options({ desiredCredits: 3 })).recommendations).toEqual([]);
+    main.prerequisiteProgress["BLG 101"].grade = "BA";
+    main.prerequisiteProgress["MAT 101"].countedCredit = 2;
+    const insufficient = buildSemesterPlan([main], options({ desiredCredits: 3 }));
+    expect(insufficient.recommendations).toEqual([]);
+    expect(insufficient.notices).toContainEqual({ kind: "eligibility-unknown" });
+  });
+
+  it("keeps a remaining elective slot after one shared choice is completed", () => {
+    const main = makeProgram("main18", "main", "undergraduate", [
+      elective("first", "Elective", ["BLG 301", "BLG 303"]),
+      elective("second", "Elective", ["BLG 301", "BLG 303"]),
+    ]);
+    main.progress = applyTranscriptImport(main.curriculum, main.progress, parseTranscriptMarkdown(
+      "| Completed English Courses | | | | | |\n| 202610 | 1 | BLG 301 | First | 3 | AA |"
+    )).progress;
+    const courseOfferings = [offering("BLG 303")];
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 3, courseOfferings, offeredCourseCodes: new Set(["BLG 303"]) }));
+    expect(plan.recommendations.map(value => value.code)).toEqual(["BLG 303"]);
+    expect(plan.programSummaries[0].remainingCredits).toBe(3);
+    expect(plan.recommendations[0].contributions.map(value => value.requirementId)).toEqual(["second"]);
+  });
+
+  it("considers all language offerings regardless of order and retains the chosen section identity", () => {
+    const main = makeProgram("main19", "main", "undergraduate", [course("math", "MAT 101"), course("intro", "BLG 101")]);
+    const courseOfferings = [offering("MAT 101"), offering("MAT 101E", "Tuesday"), offering("BLG 101")];
+    for (const offerings of [courseOfferings, [...courseOfferings].reverse()]) {
+      const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 2, courseOfferings: offerings, offeredCourseCodes: new Set(["MAT 101", "MAT 101E", "BLG 101"]) }));
+      expect(plan.recommendations.map(value => value.code).sort()).toEqual(["BLG 101", "MAT 101"]);
+      expect(plan.compatibleSectionConstraints.find(value => value.courseCode === "MAT 101")).toMatchObject({ courseId: "MAT 101E", sectionId: "MAT 101E:1", crn: "MAT 101E:1" });
+      const handoff = parseGeneratorSession({ version: 2, courses: plan.compatibleSectionConstraints.map((constraint, index) => ({ id: String(index), branchCode: constraint.branchCode, courseId: constraint.courseId, courseCode: constraint.courseCode, pinnedSectionId: constraint.sectionId })), earliestStartTime: "", latestEndTime: "", excludedDays: [], source: "semester-planner" });
+      const generated = generateConflictFreeSchedules(handoff!.courses.map(value => ({ ...offerings.find(offering => offering.courseId === value.courseId)!, pinnedSectionId: value.pinnedSectionId })));
+      expect(generated.schedules).toHaveLength(1);
+      expect(generated.schedules[0].selections.find(value => value.courseId === "MAT 101E")?.sectionId).toBe("MAT 101E:1");
+    }
+  });
+
   it("counts one shared compulsory course once while crediting both programs", () => {
     const main = makeProgram("main1", "main", "undergraduate", [course("main-mat", "MAT 101", 1, 4)]);
     const cap = makeProgram("cap2", "double-major", "cap", [course("cap-mat", "MAT 101", 99, 4), course("cap-eko", "EKO 201")]);

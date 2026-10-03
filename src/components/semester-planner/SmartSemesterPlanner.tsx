@@ -15,7 +15,9 @@ import {
   parseCurriculumProgress,
 } from "@/lib/curriculum/progress";
 import {
-  parseSharedTranscript,
+  loadSharedTranscript,
+  persistSharedTranscript,
+  sharedCourseProgress,
   SHARED_TRANSCRIPT_STORAGE_KEY,
   transcriptParseResult,
 } from "@/lib/curriculum/transcriptStore";
@@ -111,9 +113,12 @@ export default function SmartSemesterPlanner() {
   useEffect(() => {
     if (!enrollments.length) return;
     const controller = new AbortController();
-    const transcript = parseSharedTranscript(
+    const loadedTranscript = loadSharedTranscript(
       localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+      localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
     );
+    const transcript = loadedTranscript.courses;
+    if (loadedTranscript.migrated) persistSharedTranscript(transcript);
     void Promise.all(
       enrollments.map(async (enrollment) => {
         const parameters = new URLSearchParams({
@@ -145,6 +150,7 @@ export default function SmartSemesterPlanner() {
           enrollment,
           curriculum,
           progress: { ...evaluated, importedCourses: [] },
+          prerequisiteProgress: sharedCourseProgress(transcript),
         };
       }),
     )
@@ -179,32 +185,22 @@ export default function SmartSemesterPlanner() {
     [courseCatalog],
   );
 
-  function plannerOptions(
-    values: {
-      desiredCredits: number;
-      maxCourses: number;
-      priority: ProgramPriority;
-    },
-    knownBranches = loadedBranchCodes,
-  ) {
-    return {
-      desiredCredits: values.desiredCredits,
-      maxCourses: values.maxCourses,
-      priority: values.priority,
-      availabilityMode: "published" as const,
-      knownBranchCodes: knownBranches,
+  const plan = useMemo<SemesterPlan | null>(() => {
+    if (!request) return null;
+    return buildSemesterPlan(programs, {
+      desiredCredits: request.desiredCredits,
+      maxCourses: request.maxCourses,
+      priority: request.priority,
+      availabilityMode: "published",
+      knownBranchCodes: loadedBranchCodes,
       offeredCourseCodes: new Set(
         courseCatalog.flatMap((branch) =>
           branch.courses.map((course) => normalizeCourseCode(course.code)),
         ),
       ),
       courseOfferings,
-    };
-  }
-
-  const plan: SemesterPlan | null = request
-    ? buildSemesterPlan(programs, plannerOptions(request))
-    : null;
+    });
+  }, [request, programs, loadedBranchCodes, courseCatalog, courseOfferings]);
 
   async function generateRecommendations() {
     setError("");
@@ -562,7 +558,7 @@ export default function SmartSemesterPlanner() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700">
-                {t("semesterPlanner.noRecommendations")}
+                {t(plan.searchLimited ? "semesterPlanner.searchLimited" : "semesterPlanner.noRecommendations")}
               </div>
             )}
           </section>
@@ -655,7 +651,9 @@ function Notice({ notice }: { notice: PlannerNotice }) {
   return (
     <div className="text-sm text-amber-900 dark:text-amber-200">
       {t(
-        `semesterPlanner.notice_${notice.kind.replaceAll("-", "_")}`,
+        notice.kind === "search-limited"
+          ? "semesterPlanner.searchLimited"
+          : `semesterPlanner.notice_${notice.kind.replaceAll("-", "_")}`,
         parameters,
       )}
     </div>

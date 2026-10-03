@@ -42,11 +42,9 @@ import {
   resolvedCourseProgress,
 } from "@/lib/curriculum/graduation";
 import {
-  parseSharedTranscript,
+  loadSharedTranscript,
   persistSharedTranscript,
   SHARED_TRANSCRIPT_STORAGE_KEY,
-  transcriptFromLegacyProgress,
-  transcriptFromLegacyProgressStore,
   transcriptParseResult,
   sharedCourseProgress,
 } from "@/lib/curriculum/transcriptStore";
@@ -381,18 +379,12 @@ export default function CurriculumExplorer() {
           localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
           loaded.planId,
         );
-        let sharedTranscript = parseSharedTranscript(
+        const loadedTranscript = loadSharedTranscript(
           localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
         );
-        if (!sharedTranscript.length) {
-          sharedTranscript = transcriptFromLegacyProgressStore(
-            localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
-          );
-          if (!sharedTranscript.length)
-            sharedTranscript = transcriptFromLegacyProgress([storedProgress]);
-          if (sharedTranscript.length)
-            persistSharedTranscript(sharedTranscript);
-        }
+        const sharedTranscript = loadedTranscript.courses;
+        if (loadedTranscript.migrated) persistSharedTranscript(sharedTranscript);
         setSharedCompletedCourses(sharedCourseProgress(sharedTranscript));
         const evaluated = sharedTranscript.length
           ? applyTranscriptImport(
@@ -542,7 +534,7 @@ export default function CurriculumExplorer() {
         } else {
           const item = itemById.get(node.id);
           const completion = item
-            ? progressForRequirement(item, progress)
+            ? progressForRequirement(item, progress, curriculum)
             : null;
           statuses[node.id] =
             completion?.course.state === "passed"
@@ -557,7 +549,7 @@ export default function CurriculumExplorer() {
       } else if (node.kind === "elective-slot") {
         const item = itemById.get(node.id);
         const resolved = item
-          ? progressForRequirement(item, progress)?.course
+          ? progressForRequirement(item, progress, curriculum)?.course
           : undefined;
         statuses[node.id] =
           resolved?.state === "passed"
@@ -692,7 +684,7 @@ export default function CurriculumExplorer() {
     : undefined;
   const selectedCompletion =
     selectedItem && progress
-      ? progressForRequirement(selectedItem, progress)
+      ? progressForRequirement(selectedItem, progress, curriculum ?? undefined)
       : null;
   const prerequisiteNodeIds = useMemo(() => {
     if (!graph || !selectedNodeId) return undefined;
@@ -1111,6 +1103,20 @@ export default function CurriculumExplorer() {
             )}
 
             <div className="space-y-4">
+              {selectedNodeId && (
+                <div>
+                  <span role="status" className="sr-only">
+                    {t("curriculum.courseDetails")}: {selectedCode ?? selectedItem?.title}
+                  </span>
+                  <a
+                    href="#curriculum-course-details"
+                    onClick={() => document.getElementById("curriculum-course-details")?.focus()}
+                    className="inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 underline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-blue-300"
+                  >
+                    {t("curriculum.courseDetails")}
+                  </a>
+                </div>
+              )}
               <div className="min-w-0">
                 <CurriculumGraph
                   graph={graph}
@@ -1123,13 +1129,16 @@ export default function CurriculumExplorer() {
                   takeableNodeIds={
                     !offeringsLoading ? takeableNodeIds : undefined
                   }
+                  selectedDetailsId={selectedNodeId ? "curriculum-course-details" : undefined}
                   onSelectNode={setSelectedNodeId}
                 />
               </div>
 
               {selectedNodeId && (
                 <aside
-                  className="h-fit border-t border-slate-200 pt-5"
+                  id="curriculum-course-details"
+                  tabIndex={-1}
+                  className="h-fit border-t border-slate-200 pt-5 focus-visible:outline-2 focus-visible:outline-blue-600"
                   aria-label={t("curriculum.courseDetails")}
                 >
                   {selectedItem?.kind === "elective-slot" ? (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EquivalenceRule } from "@/lib/curriculum/equivalence";
-import { applyTranscriptImport, calculateProgramGpa, curriculumTotals, reconcileImportedProgress } from "@/lib/curriculum/graduation";
+import { applyTranscriptImport, calculateProgramGpa, curriculumTotals, progressForRequirement, reconcileImportedProgress } from "@/lib/curriculum/graduation";
 import { getStoredEquivalenceRules } from "@/lib/curriculum/equivalenceStore";
 import { emptyProgress, parseCurriculumProgress, resetImportedProgress, updateStoredCurriculumProgress } from "@/lib/curriculum/progress";
 import { calculateGpa, parseTranscriptMarkdown } from "@/lib/curriculum/transcript";
@@ -36,6 +36,73 @@ function withRules(...rules: EquivalenceRule[]): ItuCurriculum {
 }
 
 describe("graduation progress", () => {
+  it("keeps the exact manual language code on its direct requirement before elective allocation", () => {
+    const shared = structuredClone(curriculum);
+    const slot = shared.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    slot.courses = [{ code: "MAT 103E", title: "Math", creditOptions: [3], ectsOptions: [5] }];
+    const progress = emptyProgress(10);
+    progress.courses["MAT 103"] = { state: "passed", source: "manual", grade: "BB" };
+    progress.courses["MAT 103E"] = { state: "passed", source: "manual", grade: "AA" };
+    expect(progressForRequirement(shared.semesters[0].items[0], progress, shared)?.code).toBe("MAT 103E");
+    expect(progressForRequirement(shared.semesters[0].items[0], progress, shared)?.course.state).toBe("passed");
+  });
+
+  it("prefers a passed manual elective alternative over an earlier failed imported attempt", () => {
+    const multi = structuredClone(curriculum);
+    const slot = multi.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    slot.courses.push({ code: "BLG 479E", title: "Other", creditOptions: [3], ectsOptions: [5] });
+    const progress = applyTranscriptImport(multi, emptyProgress(10), transcript("| 202620 | 1 | BLG 478E | Security | 3 | FF |")).progress;
+    expect(progressForRequirement(slot, progress, multi)?.course.state).toBe("failed");
+    progress.courses["BLG 479E"] = { state: "passed", source: "manual", grade: "BB" };
+    expect(progressForRequirement(slot, progress, multi)?.code).toBe("BLG 479E");
+    expect(curriculumTotals(multi, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3 });
+    expect(progress.courses["BLG 478E"].state).toBe("failed");
+  });
+
+  it("allocates each unassigned manual completion to one elective slot per program", () => {
+    const multi = structuredClone(curriculum);
+    const slot = multi.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    multi.semesters[0].items = [slot, { ...slot, id: "elective-b", semester: 2 }];
+    const progress = emptyProgress(10);
+    progress.courses["BLG 478E"] = { state: "passed", source: "manual", grade: "BB" };
+    expect(curriculumTotals(multi, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3 });
+    expect(progressForRequirement(slot, progress, multi)?.course.state).toBe("passed");
+    expect(progressForRequirement(multi.semesters[0].items[1], progress, multi)).toBeNull();
+    const other = { ...multi, planId: 11 };
+    expect(curriculumTotals(other, { ...progress, planId: 11 })).toMatchObject({ earnedCourses: 1, earnedCredit: 3 });
+  });
+
+  it("does not reuse direct manual or official equivalent completion for an elective", () => {
+    const shared = structuredClone(curriculum);
+    const slot = shared.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    slot.courses = [{ code: "MAT 103E", title: "Math", creditOptions: [4], ectsOptions: [6] }];
+    const manual = emptyProgress(10);
+    manual.courses["MAT 103E"] = { state: "passed", source: "manual" };
+    expect(curriculumTotals(shared, manual)).toMatchObject({ earnedCourses: 1, earnedCredit: 4 });
+    const equivalent = withRules(rule("MAT 103E", [["BLG 478E"]]));
+    const imported = applyTranscriptImport(equivalent, emptyProgress(10), transcript("| 202620 | 1 | BLG 478E | Security | 3 | AA |")).progress;
+    expect(curriculumTotals(equivalent, imported)).toMatchObject({ earnedCourses: 1, earnedCredit: 4 });
+  });
+
+  it("allocates distinct passed manual choices to distinct slots and keeps failed attempts visible", () => {
+    const multi = structuredClone(curriculum);
+    const slot = multi.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    slot.courses.push({ code: "BLG 479E", title: "Other", creditOptions: [3], ectsOptions: [5] });
+    multi.semesters[0].items = [slot, { ...slot, id: "elective-b" }];
+    const progress = emptyProgress(10);
+    progress.courses["BLG 478E"] = { state: "passed", source: "manual" };
+    progress.courses["BLG 479E"] = { state: "passed", source: "manual" };
+    expect(curriculumTotals(multi, progress)).toMatchObject({ earnedCourses: 2, earnedCredit: 6 });
+    const failed = applyTranscriptImport(multi, emptyProgress(10), transcript("| 202620 | 1 | BLG 478E | Security | 3 | FF |")).progress;
+    expect(progressForRequirement(slot, failed, multi)?.course.state).toBe("failed");
+    expect(curriculumTotals(multi, failed).earnedCredit).toBe(0);
+  });
+
   it("matches exact and eligible elective requirements once and totals semesters", () => {
     const result = applyTranscriptImport(curriculum, emptyProgress(10), transcript("| 202520 | 1 | mat103e | Math | 4 | AA |\n| 202620 | 2 | BLG478E | Security | 2 / 3 | BB+ |"));
     expect(result.matched).toHaveLength(2);
@@ -70,6 +137,8 @@ describe("graduation progress", () => {
     multiSlotCurriculum.semesters.push({ semester: 2, items: [{ ...slot, semester: 2, id: "elective-b" }] });
     multiSlotCurriculum.semesters.push({ semester: 3, items: [{ ...slot, semester: 3, id: "elective-c" }] });
     const result = applyTranscriptImport(multiSlotCurriculum, emptyProgress(10), transcript("| 202620 | 2 | BLG 478E | Security | 2 / 3 | BB+ |\n| 202620 | 3 | XXX 100 | Other | 3 | AA |"));
+    expect(curriculumTotals(multiSlotCurriculum, result.progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3 });
+    expect(progressForRequirement(multiSlotCurriculum.semesters[1].items[0], result.progress, multiSlotCurriculum)).toBeNull();
     expect(result.ambiguous).toEqual([]);
     expect(result.unmatched[0].record.courseCode).toBe("XXX 100");
     expect(result.progress.courses["BLG 478E"].matchedRequirementId).toBe("elective-a");

@@ -85,6 +85,24 @@ export function resetImportedProgress(progress: CurriculumProgress): CurriculumP
     ...progress,
     courses: Object.fromEntries(Object.entries(progress.courses).filter(([, course]) => course.source !== "transcript")),
     importedCourses: [],
-    requirementSatisfactions: Object.fromEntries(Object.entries(progress.requirementSatisfactions ?? {}).filter(([, satisfaction]) => satisfaction.satisfiedByCourseCodes.some((code) => progress.courses[code]?.source !== "transcript"))),
+    requirementSatisfactions: Object.fromEntries(Object.entries(progress.requirementSatisfactions ?? {}).filter(([, satisfaction]) => satisfaction.satisfiedByCourseCodes.every((code) => progress.courses[code] && progress.courses[code].source !== "transcript"))),
   };
+}
+
+
+/** Clears every stored plan, including enrollments no longer in the profile. */
+export function resetStoredCurriculumProgress(storedValue: string | null): string {
+  let plans: Record<string, CurriculumProgress> = {};
+  if (storedValue) {
+    try {
+      const parsed = storeSchema.safeParse(JSON.parse(storedValue));
+      if (parsed.success) plans = Object.fromEntries(Object.entries(parsed.data.plans).map(([id, plan]) => [id, resetImportedProgress(normalizeProgress(plan))]));
+    } catch { /* Invalid stores contain no usable progress. */ }
+  }
+  return JSON.stringify({ version: 3, plans });
+}
+
+export function resetAllImportedProgress(): void {
+  localStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, resetStoredCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY)));
+  window.dispatchEvent(new CustomEvent(CURRICULUM_PROGRESS_EVENT));
 }

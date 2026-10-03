@@ -31,6 +31,7 @@ type Props = {
   statuses: Record<string, CourseDerivedStatus>;
   visibleNodeIds: Set<string>;
   selectedNodeId?: string;
+  selectedDetailsId?: string;
   prerequisiteNodeIds?: Set<string>;
   dependentNodeIds?: Set<string>;
   takeableNodeIds?: Set<string>;
@@ -48,6 +49,7 @@ export default function CurriculumGraph({
   statuses,
   visibleNodeIds,
   selectedNodeId,
+  selectedDetailsId,
   prerequisiteNodeIds,
   dependentNodeIds,
   takeableNodeIds,
@@ -171,6 +173,7 @@ export default function CurriculumGraph({
     language,
     prerequisiteNodeIds,
     selectedNodeId,
+  selectedDetailsId,
   ]);
 
   return (
@@ -260,6 +263,7 @@ export default function CurriculumGraph({
                       type="button"
                       onClick={() => onSelectNode(node.id)}
                       aria-pressed={selectedNodeId === node.id}
+                      aria-controls={selectedNodeId === node.id ? selectedDetailsId : undefined}
                       style={
                         {
                           "--course-width": `max(140px, ${cardWidth})`,
@@ -293,13 +297,13 @@ export default function CurriculumGraph({
                           : statusLabel(status)}
                       </span>
                       {takeableNodeIds?.has(node.id) && (
-                        <span className="absolute -right-1 -top-2 rounded-full bg-blue-700 px-2 py-1 text-[7px] font-black uppercase tracking-wide text-white shadow-md sm:text-[8px]">
+                        <span className="absolute -right-1 -top-2 rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white shadow-sm">
                           {t("curriculum.available")}
                         </span>
                       )}
                       {node.externalPrerequisiteCodes?.length ? (
                         <span
-                          className="mt-2 rounded-full bg-amber-950 px-2 py-1 text-[8px] font-black uppercase tracking-wide text-amber-100"
+                          className="mt-2 rounded-full bg-amber-950 px-2 py-1 text-xs font-semibold text-amber-100"
                           title={t("curriculum.externalCodes", {
                             codes: node.externalPrerequisiteCodes.join(", "),
                           })}

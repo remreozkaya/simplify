@@ -167,6 +167,15 @@ const tr = {
     hidePassword: "{label} alanını gizle",
   },
   home: {
+    description: "Akademik ilerlemenizi inceleyin, dönem derslerinizi seçin ve haftalık programınızı oluşturun.",
+    yourPrograms: "Akademik programlarınız",
+    programsDescription: "Her programın müfredatı ve mezuniyet gereklilikleri ayrı değerlendirilir.",
+    workflow: "Planlama adımları",
+    setup: "Profilinizi hazırlayın",
+    setupDescription: "Ana programınızı, ÇAP veya Yandal müfredatınızı seçin.",
+    import: "Transkriptinizi ekleyin",
+    importDescription: "Geçmiş dönemleri birleştirin ve program ilerlemenizi inceleyin.",
+    localWorkspace: "Transkript ve planlar bu tarayıcıda saklanır; çıkış yaptıktan sonra da kalır ve cihazlar arasında eşitlenmez. Kayıt kararlarınızı OBS üzerinden doğrulayın.",
     title: "Planlama araçları",
     tools: "Simplify araçları",
     plannerDescription: "Derslerinizi haftalık takvime yerleştirin.",
@@ -230,6 +239,7 @@ const tr = {
     gpaHelp: "GNO hesabı",
   },
   semesterPlanner: {
+    searchLimited: "Arama işlem sınırına ulaştı; bulunan çakışmasız seçenekler gösteriliyor. Tüm kombinasyonlar karşılaştırılmadı. Daha az ders veya daha düşük kredi hedefiyle yeniden deneyin.",
     loading: "Akademik programlarınız ve güncel ders kataloğu yükleniyor…",
     completeProfile: "Akademik profilinizi tamamlayın",
     completeProfileDescription:

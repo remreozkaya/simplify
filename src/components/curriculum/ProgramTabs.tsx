@@ -46,7 +46,7 @@ export default function ProgramTabs({
   }
 
   return (
-    <div role="tablist" aria-label={t("academicPrograms.programViews")} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <div role="tablist" aria-label={t("academicPrograms.programViews")} className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {enrollments.map((enrollment, index) => {
         const active = enrollment.id === resolvedActiveId;
         return (
@@ -60,7 +60,7 @@ export default function ProgramTabs({
             tabIndex={active ? 0 : -1}
             onClick={() => onSelect(enrollment.id)}
             onKeyDown={(event) => selectFromKeyboard(event, index)}
-            className={`rounded-lg border-b-2 px-3 py-2 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${active ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : "border-transparent hover:border-blue-300"}`}
+            className={`min-w-0 w-full rounded-lg border-b-2 px-3 py-2 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${active ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : "border-transparent hover:border-blue-300"}`}
           >
             <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
               {t(enrollment.type === "main" ? "academicPrograms.main" : enrollment.type === "double-major" ? "academicPrograms.doubleMajor" : "academicPrograms.minor")}

@@ -32,14 +32,26 @@ const legacyProgressStoreSchema = z.object({
   plans: z.record(z.string(), z.object({ importedCourses: z.array(recordSchema).optional() }).passthrough()),
 }).passthrough();
 
-export function parseSharedTranscript(value: string | null): TranscriptCourseRecord[] {
-  if (!value) return [];
+function parseSharedTranscriptStore(value: string | null): TranscriptCourseRecord[] | null {
+  if (!value) return null;
   try {
     const parsed = storeSchema.safeParse(JSON.parse(value));
-    return parsed.success ? parsed.data.courses : [];
+    return parsed.success ? parsed.data.courses : null;
   } catch {
-    return [];
+    return null;
   }
+}
+
+export function parseSharedTranscript(value: string | null): TranscriptCourseRecord[] {
+  return parseSharedTranscriptStore(value) ?? [];
+}
+
+/** A valid empty store is an explicit reset, not a missing migration target. */
+export function loadSharedTranscript(value: string | null, legacyProgress: string | null) {
+  const stored = parseSharedTranscriptStore(value);
+  if (stored !== null) return { courses: stored, migrated: false };
+  const courses = transcriptFromLegacyProgressStore(legacyProgress);
+  return { courses, migrated: courses.length > 0 };
 }
 
 export function transcriptFromLegacyProgress(progresses: readonly CurriculumProgress[]) {
@@ -118,6 +130,9 @@ export function sharedCourseProgress(courses: readonly TranscriptCourseRecord[])
     crn: course.crn,
     courseCode: normalizeCourseCode(course.courseCode),
     courseName: course.courseName,
+    courseLanguage: course.courseLanguage,
+    countedCredit: course.countedCredit,
+    transcriptCredit: course.transcriptCredit,
     source: "transcript" as const,
   }]));
 }

@@ -1,4 +1,4 @@
-import type { CurriculumProgress, MissingRequirement } from "@/lib/curriculum/types";
+import type { CourseProgress, CurriculumProgress, MissingRequirement } from "@/lib/curriculum/types";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 import type { EnrollmentType, ProgramEnrollment } from "@/lib/profile/types";
 import type { GeneratorCourse } from "@/lib/schedule/types";
@@ -11,6 +11,7 @@ export type SemesterPlannerProgram = {
   enrollment: ProgramEnrollment;
   curriculum: ItuCurriculum;
   progress: CurriculumProgress;
+  prerequisiteProgress?: Record<string, CourseProgress>;
 };
 
 export type PlannerContribution = {
@@ -76,6 +77,7 @@ export type PlannerNotice =
   | { kind: "target-shortfall"; credits: number }
   | { kind: "target-overage"; credits: number }
   | { kind: "collision-shortfall" }
+  | { kind: "search-limited" }
   | { kind: "max-courses"; count: number }
   | { kind: "availability-unknown" }
   | { kind: "eligibility-unknown" }
@@ -83,6 +85,8 @@ export type PlannerNotice =
   | { kind: "corequisites-unknown" };
 
 export type SemesterPlan = {
+  searchLimited: boolean;
+  searchStats: { candidateVisits: number; scheduleVisitedNodes: number };
   recommendations: SemesterCourseCandidate[];
   alternatives: SemesterCourseCandidate[];
   programSummaries: PlannerProgramSummary[];

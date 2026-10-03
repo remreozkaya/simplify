@@ -23,6 +23,7 @@ import {
   parseCurriculumProgress,
   persistCurriculumProgress,
   resetImportedProgress,
+  resetAllImportedProgress,
 } from "@/lib/curriculum/progress";
 import {
   parseSavedCurriculum,
@@ -35,11 +36,9 @@ import {
 } from "@/lib/curriculum/transcript";
 import {
   mergeTranscriptCourses,
-  parseSharedTranscript,
+  loadSharedTranscript,
   persistSharedTranscript,
   SHARED_TRANSCRIPT_STORAGE_KEY,
-  transcriptFromLegacyProgress,
-  transcriptFromLegacyProgressStore,
   transcriptParseResult,
 } from "@/lib/curriculum/transcriptStore";
 import type {
@@ -221,7 +220,7 @@ function ProgramAuditSection({
       {curriculum.semesters.map((semester) => {
         const semesterRows = semester.items.map((item) => ({
           item,
-          completed: progressForRequirement(item, progress),
+          completed: progressForRequirement(item, progress, curriculum),
         }));
         const passed = semesterRows.filter(
           ({ completed }) => completed?.course.state === "passed",
@@ -257,7 +256,12 @@ function ProgramAuditSection({
                 })}
               </span>
             </summary>
-            <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
+            <div
+              role="region"
+              tabIndex={0}
+              aria-label={`${localizedCurriculumSection(language, curriculum.planType, semester.semester)}: ${t("curriculum.courseDetails")}`}
+              className="overflow-x-auto border-t border-slate-200 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-700"
+            >
               <table className="w-full min-w-[1080px] border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -437,17 +441,12 @@ export default function GraduationCalculator() {
             curriculum.planId,
           ),
         );
-        let transcript = parseSharedTranscript(
+        const loadedTranscript = loadSharedTranscript(
           localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
         );
-        if (!transcript.length) {
-          transcript = transcriptFromLegacyProgressStore(
-            localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
-          );
-          if (!transcript.length)
-            transcript = transcriptFromLegacyProgress(stored);
-          if (transcript.length) persistSharedTranscript(transcript);
-        }
+        const transcript = loadedTranscript.courses;
+        if (loadedTranscript.migrated) persistSharedTranscript(transcript);
         const parsed = transcriptParseResult(transcript);
         const nextAudits = curriculumResponses.map(({ curriculum }, index) => {
           const evaluated = transcript.length
@@ -562,13 +561,11 @@ export default function GraduationCalculator() {
 
   function resetImported() {
     if (!window.confirm(t("graduationCalculator.resetConfirm"))) return;
-    const nextAudits = audits.map((audit) => {
-      const progress = withoutTranscriptCopy(
-        resetImportedProgress(audit.progress),
-      );
-      persistCurriculumProgress(progress);
-      return { ...audit, progress };
-    });
+    resetAllImportedProgress();
+    const nextAudits = audits.map((audit) => ({
+      ...audit,
+      progress: withoutTranscriptCopy(resetImportedProgress(audit.progress)),
+    }));
     persistSharedTranscript([]);
     setSharedTranscript([]);
     setAudits(nextAudits);

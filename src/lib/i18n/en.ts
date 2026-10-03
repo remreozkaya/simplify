@@ -170,6 +170,15 @@ const en = {
     hidePassword: "Hide {label}",
   },
   home: {
+    description: "Review your academic progress, choose semester courses and build your weekly schedule.",
+    yourPrograms: "Your academic programs",
+    programsDescription: "Each program is evaluated against its own curriculum and graduation requirements.",
+    workflow: "Planning steps",
+    setup: "Set up your profile",
+    setupDescription: "Choose your main, double major or minor curriculum.",
+    import: "Add your transcript",
+    importDescription: "Combine previous terms and review your program progress.",
+    localWorkspace: "Transcripts and plans are stored in this browser, remain after logout and do not sync across devices. Verify registration decisions in OBS.",
     title: "Planning tools",
     tools: "Simplify tools",
     plannerDescription: "Arrange your classes on a weekly calendar.",
@@ -235,6 +244,7 @@ const en = {
     gpaHelp: "GPA calculation",
   },
   semesterPlanner: {
+    searchLimited: "The search reached its work limit; found conflict-free options are shown. Not every combination was compared. Try fewer courses or a lower credit target.",
     loading: "Loading your academic programs and the current course catalog…",
     completeProfile: "Complete your academic profile",
     completeProfileDescription:
