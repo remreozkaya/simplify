@@ -2,6 +2,8 @@
 
 import { responseJson } from "@/lib/http/responseJson";
 
+import { recordPlanningMilestone } from "@/lib/planning/checklist";
+
 import OptionalHelp from "@/components/OptionalHelp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,6 +39,7 @@ import { orderedEnrollments } from "@/lib/profile/validation";
 import {
   GENERATOR_SESSION_STORAGE_KEY,
   parseGeneratorSession,
+  persistGeneratorSession,
 } from "@/lib/schedule/session";
 import {
   MAX_PLANNER_COURSES,
@@ -202,6 +205,10 @@ export default function SmartSemesterPlanner() {
     });
   }, [request, programs, loadedBranchCodes, courseCatalog, courseOfferings]);
 
+  useEffect(() => {
+    if (plan?.recommendations.length) recordPlanningMilestone("semester");
+  }, [plan]);
+
   async function generateRecommendations() {
     setError("");
     setValidationError("");
@@ -281,21 +288,22 @@ export default function SmartSemesterPlanner() {
         pinnedSectionId: constraint?.sectionId ?? "",
       };
     });
-    localStorage.setItem(
-      GENERATOR_SESSION_STORAGE_KEY,
-      JSON.stringify({
-        version: 2,
-        courses,
-        earliestStartTime: previous?.earliestStartTime ?? "",
-        latestEndTime: previous?.latestEndTime ?? "",
-        excludedDays: previous?.excludedDays ?? [],
-        source: "semester-planner",
-        targetSemester,
-        plannerAlternatives: plan.alternatives
-          .slice(0, 8)
-          .map((course) => course.code),
-      }),
-    );
+    const saved = persistGeneratorSession({
+      version: 2,
+      courses,
+      earliestStartTime: previous?.earliestStartTime ?? "",
+      latestEndTime: previous?.latestEndTime ?? "",
+      excludedDays: previous?.excludedDays ?? [],
+      source: "semester-planner",
+      targetSemester,
+      plannerAlternatives: plan.alternatives
+        .slice(0, 8)
+        .map((course) => course.code),
+    });
+    if (!saved) {
+      setError(t("home.planningStorageError"));
+      return;
+    }
     router.push("/generator#schedule-generator");
   }
 

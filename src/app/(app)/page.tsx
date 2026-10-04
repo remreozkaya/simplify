@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PlanningChecklist from "@/components/planning/PlanningChecklist";
 import PageShell from "@/components/PageShell";
 import { useProfile } from "@/components/profile/ProfileProvider";
 import { useLanguage } from "@/lib/i18n/client";
@@ -8,14 +9,6 @@ import { localizedAcademicName } from "@/lib/i18n";
 import { planningTools } from "@/lib/navigation";
 import { isProfileComplete } from "@/lib/profile/types";
 import { orderedEnrollments } from "@/lib/profile/validation";
-
-const workflow = [
-  { href: "/profile", label: "home.setup", description: "home.setupDescription" },
-  { href: "/graduation-calculator", label: "home.import", description: "home.importDescription" },
-  { href: "/semester-planner", label: "navigation.semesterPlanner", description: "home.semesterDescription" },
-  { href: "/generator", label: "navigation.scheduleGenerator", description: "home.generatorDescription" },
-  { href: "/weekly-planner", label: "navigation.weeklyPlanner", description: "home.plannerDescription" },
-];
 
 function ToolIcon({ index }: { index: number }) {
   const paths = [
@@ -53,15 +46,7 @@ export default function Home() {
         </ul> : null}
       </section>
 
-      <section aria-labelledby="planning-workflow" className="mb-8">
-        <h2 id="planning-workflow" className="mb-3 text-base font-semibold text-slate-950 dark:text-white">{t("home.workflow")}</h2>
-        <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {workflow.map((step, index) => <li key={step.href} className="min-w-0"><Link href={step.href} className="flex h-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-400 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-500 dark:hover:bg-slate-800">
-            <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{index + 1}</span>
-            <div><p className="text-sm font-semibold text-slate-900 dark:text-white">{t(step.label)}</p><p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{t(step.description)}</p></div>
-          </Link></li>)}
-        </ol>
-      </section>
+      <PlanningChecklist />
 
       <section aria-labelledby="planning-tools">
         <h2 id="planning-tools" className="mb-3 text-base font-semibold text-slate-950 dark:text-white">{t("home.tools")}</h2>

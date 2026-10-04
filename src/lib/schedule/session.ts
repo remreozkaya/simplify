@@ -10,6 +10,9 @@ export type GeneratorSessionCourse = {
   courseCode?: string;
 };
 
+export const PLANNING_PROGRESS_EVENT = "simplify:planning-progress";
+export type PlanningMilestone = "semester" | "generator";
+
 export type GeneratorSession = {
   version: 1 | 2;
   courses: GeneratorSessionCourse[];
@@ -19,6 +22,7 @@ export type GeneratorSession = {
   source?: "semester-planner";
   targetSemester?: string;
   plannerAlternatives?: string[];
+  completedPlanningSteps?: PlanningMilestone[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,6 +85,9 @@ export function parseGeneratorSession(value: unknown): GeneratorSession | null {
   return {
     version: value.version,
     courses: courses as GeneratorSessionCourse[],
+    ...(Array.isArray(value.completedPlanningSteps)
+      ? { completedPlanningSteps: [...new Set(value.completedPlanningSteps.filter((step): step is PlanningMilestone => step === "semester" || step === "generator"))] }
+      : {}),
     earliestStartTime: value.earliestStartTime,
     latestEndTime: value.latestEndTime,
     excludedDays: [...new Set(value.excludedDays)],
@@ -92,4 +99,23 @@ export function parseGeneratorSession(value: unknown): GeneratorSession | null {
       ? { plannerAlternatives: value.plannerAlternatives }
       : {}),
   };
+}
+
+/** Keep successful onboarding milestones when course selections/preferences change. */
+export function persistGeneratorSession(session: GeneratorSession, storage?: Pick<Storage, "getItem" | "setItem">) {
+  try {
+    const browser = storage ?? window.localStorage;
+    let previous: GeneratorSession | null = null;
+    try {
+      const value = browser.getItem(GENERATOR_SESSION_STORAGE_KEY);
+      previous = value ? parseGeneratorSession(JSON.parse(value)) : null;
+    } catch { /* Replace malformed sessions with the current valid session. */ }
+    const legacySemester: PlanningMilestone[] = previous?.source === "semester-planner" && previous.courses.length ? ["semester"] : [];
+    const completedPlanningSteps = [...new Set([...legacySemester, ...(previous?.completedPlanningSteps ?? []), ...(session.completedPlanningSteps ?? [])])];
+    browser.setItem(GENERATOR_SESSION_STORAGE_KEY, JSON.stringify({ ...session, ...(completedPlanningSteps.length ? { completedPlanningSteps } : {}) }));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(PLANNING_PROGRESS_EVENT));
+    return true;
+  } catch {
+    return false;
+  }
 }

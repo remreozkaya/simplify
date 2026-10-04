@@ -1,5 +1,7 @@
 "use client";
 
+import { recordPlanningMilestone } from "@/lib/planning/checklist";
+
 import { getCoursesByFaculty } from "@/lib/calendar/catalog";
 import Link from "next/link";
 import {
@@ -20,6 +22,7 @@ import { calculateScheduleRating } from "@/lib/schedule/scoring";
 import {
   GENERATOR_SESSION_STORAGE_KEY,
   parseGeneratorSession,
+  persistGeneratorSession,
   type GeneratorSessionCourse,
 } from "@/lib/schedule/session";
 import { minutesToTime } from "@/lib/schedule/time";
@@ -206,23 +209,16 @@ export default function ScheduleGeneratorPanel({
       return;
     }
 
-    try {
-      localStorage.setItem(
-        GENERATOR_SESSION_STORAGE_KEY,
-        JSON.stringify({
-          version: 2,
-          courses: rows,
-          earliestStartTime,
-          latestEndTime,
-          excludedDays,
-          ...(plannerAlternatives.length
-            ? { source: "semester-planner", plannerAlternatives }
-            : {}),
-        }),
-      );
-    } catch {
-      // Generation remains usable when storage is blocked or full.
-    }
+    persistGeneratorSession({
+      version: 2,
+      courses: rows,
+      earliestStartTime,
+      latestEndTime,
+      excludedDays,
+      ...(plannerAlternatives.length
+        ? { source: "semester-planner", plannerAlternatives }
+        : {}),
+    });
   }, [
     earliestStartTime,
     excludedDays,
@@ -433,6 +429,7 @@ export default function ScheduleGeneratorPanel({
               : t("courses.noSchedule"),
           );
         } else {
+          recordPlanningMilestone("generator");
           setStatus("success");
           setMessage(
             result.truncated
