@@ -194,6 +194,9 @@ export function generateConflictFreeSchedules(
           sectionId: section.id,
           crn: section.crn,
           instructor: section.instructor,
+          teachingMethod: section.teachingMethod,
+          capacity: section.capacity,
+          enrolled: section.enrolled,
         }),
       );
 

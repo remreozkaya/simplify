@@ -21,6 +21,9 @@ describe("toCalendarCatalog", () => {
               courseCode: "BLG 102E",
               courseTitle: "Computer Programming",
               instructor: "Ali Çakmak",
+              teachingMethod: "Face to face",
+              capacity: 40,
+              enrolled: 0,
               meetings: [
                 {
                   day: "Monday",
@@ -47,6 +50,9 @@ describe("toCalendarCatalog", () => {
     expect(result.courses[0].sections[0]).toMatchObject({
       crn: "23713",
       instructor: "Ali Çakmak",
+      teachingMethod: "Face to face",
+      capacity: 40,
+      enrolled: 0,
     });
     expect(result.courses[0].sections[0].meetings).toHaveLength(2);
   });

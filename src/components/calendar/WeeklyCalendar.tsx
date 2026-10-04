@@ -28,8 +28,9 @@ import { getCourseById, getSectionById } from "@/lib/calendar/catalog";
 import {
   SortableCourseRow,
   DraggedCourseRow,
+  courseRowGridClassName,
 } from "@/components/calendar/CourseRows";
-import OptionalHelp from "@/components/OptionalHelp";
+import CourseDetails from "@/components/calendar/CourseDetails";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
 import { localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
@@ -125,6 +126,8 @@ export default function WeeklyCalendar({
     null,
   );
 
+  const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
+
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedSchedule | null>(null);
 
@@ -186,6 +189,30 @@ export default function WeeklyCalendar({
         : courseBlocks,
     [courseBlocks, generatedPreview, view],
   );
+
+  const detailsCourse = displayedCourseBlocks.find(
+    (course) => course.id === detailsCourseId,
+  );
+  const detailsSelection = courseSelections.find(
+    (selection) => selection.id === detailsCourse?.selectionId,
+  );
+  const detailsSection = detailsSelection
+    ? getSectionById(
+        getCourseById(
+          courseCatalog,
+          detailsSelection.facultyCode,
+          detailsSelection.courseId,
+        ),
+        detailsSelection.sectionId,
+      )
+    : undefined;
+  const detailsMeetings = detailsCourse
+    ? displayedCourseBlocks.filter((course) =>
+        detailsCourse.selectionId
+          ? course.selectionId === detailsCourse.selectionId
+          : course.id === detailsCourse.id,
+      )
+    : [];
 
   const courseLayoutMap = useMemo(
     () => getCourseLayoutMap(displayedCourseBlocks),
@@ -564,6 +591,9 @@ export default function WeeklyCalendar({
           building: meeting.building,
           room: meeting.room,
           instructor: selectedSection.instructor,
+          teachingMethod: selectedSection.teachingMethod,
+          capacity: selectedSection.capacity,
+          enrolled: selectedSection.enrolled,
         }),
       );
 
@@ -682,6 +712,15 @@ export default function WeeklyCalendar({
 
   return (
     <div className="w-full space-y-4">
+      {detailsCourse && (
+        <CourseDetails
+          key={detailsCourse.id}
+          course={detailsCourse}
+          section={detailsSection ?? undefined}
+          meetings={detailsMeetings}
+          onClose={() => setDetailsCourseId(null)}
+        />
+      )}
       {view === "planner" ? (
         <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
@@ -829,68 +868,74 @@ export default function WeeklyCalendar({
           )}
 
           {courseSelections.length > 0 && (
-            <div className="mt-4 space-y-3">
-              <OptionalHelp summary={t("weeklyPlanner.reorderHelp")}>
-                <p>{t("weeklyPlanner.dragHelp")}</p>
-              </OptionalHelp>
+            <div className="mt-4 overflow-x-auto">
+              <div className="min-w-[640px] space-y-2">
+                <div className={`${courseRowGridClassName} border border-transparent text-sm font-medium text-slate-700`}>
+                  <span aria-hidden="true" />
+                  <span>{t("courses.prefix")}</span>
+                  <span>{t("courses.desired")}</span>
+                  <span>{t("weeklyPlanner.crnSection")}</span>
+                  <span aria-hidden="true" />
+                </div>
 
-              <DndContext
-                accessibility={{
-                  screenReaderInstructions: {
-                    draggable: t("weeklyPlanner.dragHelp"),
-                  },
-                  announcements: {
-                    onDragStart: () => t("weeklyPlanner.dragStarted"),
-                    onDragOver: ({ over }) =>
-                      over
-                        ? t("weeklyPlanner.dragPosition", {
-                            position:
-                              courseSelections.findIndex(
-                                (selection) => selection.id === over.id,
-                              ) + 1,
-                            count: courseSelections.length,
-                          })
-                        : t("weeklyPlanner.dragOutside"),
-                    onDragEnd: () => t("weeklyPlanner.dragEnded"),
-                    onDragCancel: () => t("weeklyPlanner.dragCancelled"),
-                  },
-                }}
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragCancel={() => setActiveSelectionId(null)}
-              >
-                <SortableContext
-                  items={courseSelections.map((selection) => selection.id)}
-                  strategy={verticalListSortingStrategy}
+                <DndContext
+                  accessibility={{
+                    screenReaderInstructions: {
+                      draggable: t("weeklyPlanner.dragHelp"),
+                    },
+                    announcements: {
+                      onDragStart: () => t("weeklyPlanner.dragStarted"),
+                      onDragOver: ({ over }) =>
+                        over
+                          ? t("weeklyPlanner.dragPosition", {
+                              position:
+                                courseSelections.findIndex(
+                                  (selection) => selection.id === over.id,
+                                ) + 1,
+                              count: courseSelections.length,
+                            })
+                          : t("weeklyPlanner.dragOutside"),
+                      onDragEnd: () => t("weeklyPlanner.dragEnded"),
+                      onDragCancel: () => t("weeklyPlanner.dragCancelled"),
+                    },
+                  }}
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragCancel={() => setActiveSelectionId(null)}
                 >
-                  <div className="space-y-2">
-                    {courseSelections.map((selection) => (
-                      <SortableCourseRow
-                        key={selection.id}
-                        selection={selection}
-                        courseCatalog={courseCatalog}
-                        isLoadingBranches={isLoadingBranches}
-                        isBranchLoading={isBranchLoading}
-                        onFacultyChange={handleFacultyChange}
-                        onCourseChange={handleCourseChange}
-                        onSectionChange={handleSectionChange}
-                        onDelete={handleDeleteSelection}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
+                  <SortableContext
+                    items={courseSelections.map((selection) => selection.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {courseSelections.map((selection) => (
+                        <SortableCourseRow
+                          key={selection.id}
+                          selection={selection}
+                          courseCatalog={courseCatalog}
+                          isLoadingBranches={isLoadingBranches}
+                          isBranchLoading={isBranchLoading}
+                          onFacultyChange={handleFacultyChange}
+                          onCourseChange={handleCourseChange}
+                          onSectionChange={handleSectionChange}
+                          onDelete={handleDeleteSelection}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
 
-                <DragOverlay adjustScale={false} dropAnimation={dropAnimation}>
-                  {activeSelection ? (
-                    <DraggedCourseRow
-                      selection={activeSelection}
-                      courseCatalog={courseCatalog}
-                    />
-                  ) : null}
-                </DragOverlay>
-              </DndContext>
+                  <DragOverlay adjustScale={false} dropAnimation={dropAnimation}>
+                    {activeSelection ? (
+                      <DraggedCourseRow
+                        selection={activeSelection}
+                        courseCatalog={courseCatalog}
+                      />
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              </div>
             </div>
           )}
         </div>
@@ -907,7 +952,7 @@ export default function WeeklyCalendar({
       )}
 
       <div
-        className="w-full overflow-x-auto rounded-xl border border-gray-200 bg-white"
+        className="w-full overflow-x-auto overflow-y-hidden rounded-xl border border-gray-200 bg-white"
         tabIndex={0}
         role="region"
         aria-label={t("weeklyPlanner.weeklyProgram")}
@@ -990,35 +1035,36 @@ export default function WeeklyCalendar({
                     width: `${layout.widthPercent}%`,
                   }}
                 >
-                  <div
-                    className={`h-full overflow-hidden rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
+                  <button
+                    type="button"
+                    onClick={() => setDetailsCourseId(course.id)}
+                    aria-haspopup="dialog"
+                    className={`h-full w-full cursor-pointer overflow-hidden text-left focus-visible:outline-2 focus-visible:outline-blue-500 rounded-lg border p-2 text-xs shadow-sm ${colorStyle.block}`}
                   >
-                    <div className={`font-semibold ${colorStyle.heading}`}>
+                    <span className={`block font-semibold ${colorStyle.heading}`}>
                       {course.code}
                       {course.crn ? ` · ${course.crn}` : ""}
-                    </div>
+                    </span>
 
-                    <div className={`mt-1 ${colorStyle.body}`}>
+                    <span className={`mt-1 block ${colorStyle.body}`}>
                       {course.title}
-                    </div>
+                    </span>
 
-                    <div className={`mt-1 ${colorStyle.body}`}>
+                    <span className={`mt-1 block ${colorStyle.body}`}>
                       {course.startTime} - {course.endTime}
-                    </div>
+                    </span>
 
-                    <div className={`mt-1 font-medium ${colorStyle.body}`}>
-                      {t("weeklyPlanner.instructor")}:{" "}
-                      {course.instructor ?? t("weeklyPlanner.tba")}
-                    </div>
+                    <span className={`mt-1 block font-medium ${colorStyle.body}`}>
+                      {t("weeklyPlanner.instructor")}: {course.instructor ?? t("weeklyPlanner.tba")}
+                    </span>
 
                     {(course.building || course.room) && (
-                      <div className={`mt-1 ${colorStyle.body}`}>
-                        {[course.building, course.room]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </div>
+                      <span className={`mt-1 block ${colorStyle.body}`}>
+                        {[course.building, course.room].filter(Boolean).join(" · ")}
+                      </span>
                     )}
-                  </div>
+                  </button>
+
                 </div>
               );
             })}

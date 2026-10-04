@@ -14,6 +14,9 @@ export function toCalendarCatalog(
         id: section.id,
         crn: section.crn,
         instructor: section.instructor,
+        teachingMethod: section.teachingMethod,
+        capacity: section.capacity,
+        enrolled: section.enrolled,
         meetings: section.meetings.map((meeting, index) => ({
           id: `${section.id}:meeting:${index}`,
           day: meeting.day,

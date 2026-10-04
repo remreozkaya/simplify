@@ -22,6 +22,9 @@ export type CourseBlock = {
   building?: string;
   room?: string;
   instructor?: string;
+  teachingMethod?: string;
+  capacity?: number;
+  enrolled?: number;
 };
 
 export type CourseMeetingOption = {
@@ -37,6 +40,9 @@ export type CourseSectionOption = {
   id: string;
   crn: string;
   instructor?: string;
+  teachingMethod?: string;
+  capacity?: number;
+  enrolled?: number;
   meetings: CourseMeetingOption[];
 };
 

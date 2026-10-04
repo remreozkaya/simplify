@@ -17,8 +17,8 @@ const selectClassName =
 const overlayFieldClassName =
   "flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm";
 
-const sortableGridClassName =
-  "grid w-full min-w-0 grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_auto] items-end gap-3 rounded-xl p-2";
+export const courseRowGridClassName =
+  "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_5rem] items-end gap-3 rounded-xl p-2";
 
 type SortableCourseRowProps = {
   selection: CourseSelection;
@@ -93,10 +93,10 @@ export function SortableCourseRow({
 
         zIndex: isDragging ? 20 : undefined,
       }}
-      className={`${sortableGridClassName} border transition-[background-color,border-color,box-shadow,opacity] duration-200 ease-out ${
+      className={`${courseRowGridClassName} border transition-[background-color,border-color,box-shadow,opacity] duration-200 ease-out ${
         isDragging
           ? "border-blue-200 bg-blue-50/40 opacity-20"
-          : "border-transparent bg-transparent hover:border-gray-200 hover:bg-gray-50/70"
+          : "border-transparent bg-transparent"
       }`}
     >
       <button
@@ -104,7 +104,7 @@ export function SortableCourseRow({
         type="button"
         aria-label={t("weeklyPlanner.dragCourse")}
         title={t("weeklyPlanner.drag")}
-        className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out hover:bg-gray-100/80 hover:text-gray-600 active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+        className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
         {...attributes}
         {...listeners}
         aria-roledescription={t("courses.desired")}
@@ -113,7 +113,7 @@ export function SortableCourseRow({
       </button>
 
       <label className="min-w-0">
-        <span className="mb-1 block text-sm font-medium text-slate-700">
+        <span className="sr-only">
           {t("courses.prefix")}
         </span>
         <select
@@ -139,7 +139,7 @@ export function SortableCourseRow({
       </label>
 
       <label className="min-w-0">
-        <span className="mb-1 block text-sm font-medium text-slate-700">
+        <span className="sr-only">
           {t("courses.desired")}
         </span>
         <select
@@ -165,7 +165,7 @@ export function SortableCourseRow({
       </label>
 
       <label className="min-w-0">
-        <span className="mb-1 block text-sm font-medium text-slate-700">
+        <span className="sr-only">
           {t("weeklyPlanner.crnSection")}
         </span>
         <select
@@ -189,7 +189,7 @@ export function SortableCourseRow({
       <button
         type="button"
         onClick={() => onDelete(selection)}
-        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 hover:bg-red-100"
+        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200"
       >
         {t("weeklyPlanner.delete")}
       </button>
@@ -225,7 +225,7 @@ export function DraggedCourseRow({
 
   return (
     <div
-      className={`${sortableGridClassName} cursor-grabbing border border-blue-300 bg-white shadow-xl ring-2 ring-blue-100/80`}
+      className={`${courseRowGridClassName} cursor-grabbing border border-blue-300 bg-white shadow-xl ring-2 ring-blue-100/80`}
     >
       <div className="flex h-10 w-9 items-center justify-center rounded-lg bg-transparent text-gray-500">
         <DragHandleIcon />

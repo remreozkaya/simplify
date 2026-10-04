@@ -52,6 +52,9 @@ export function generatedScheduleToWeeklyProgram(
         building: meeting.building,
         room: meeting.room,
         instructor: meeting.instructor,
+        teachingMethod: meeting.teachingMethod,
+        capacity: meeting.capacity,
+        enrolled: meeting.enrolled,
       });
     });
   });

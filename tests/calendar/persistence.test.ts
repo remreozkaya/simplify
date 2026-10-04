@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
 
 describe("parseStoredWeeklyPrograms", () => {
+  it("retains course details through saving and rejects invalid counts", () => {
+    const block = {
+      id: "course-1", code: "BLG 102E", title: "Programming",
+      day: "Monday", startTime: "13:00", endTime: "14:59",
+      teachingMethod: "Face to face", capacity: 40, enrolled: 0,
+    };
+    const [program] = parseStoredWeeklyPrograms(JSON.parse(JSON.stringify([
+      { id: "program-1", name: "Saved", courseBlocks: [block,
+        { ...block, id: "invalid", capacity: -1, enrolled: "20" }], courseSelections: [] },
+    ])));
+    expect(program.courseBlocks[0]).toMatchObject({
+      teachingMethod: "Face to face", capacity: 40, enrolled: 0,
+    });
+    expect(program.courseBlocks[1]).toMatchObject({ capacity: undefined, enrolled: undefined });
+  });
+
   it("migrates the former single-session selection shape", () => {
     const programs = parseStoredWeeklyPrograms([
       {

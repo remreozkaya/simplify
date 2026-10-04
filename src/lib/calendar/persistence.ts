@@ -22,6 +22,12 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
+function optionalCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+
 function parseCourseBlock(value: unknown): CourseBlock | null {
   if (
     !isRecord(value) ||
@@ -47,6 +53,9 @@ function parseCourseBlock(value: unknown): CourseBlock | null {
     building: optionalString(value.building),
     room: optionalString(value.room),
     instructor: optionalString(value.instructor),
+    teachingMethod: optionalString(value.teachingMethod),
+    capacity: optionalCount(value.capacity),
+    enrolled: optionalCount(value.enrolled),
   };
 }
 

@@ -49,6 +49,9 @@ export type GeneratedMeeting = CourseMeetingOption & {
   sectionId: string;
   crn: string;
   instructor?: string;
+  teachingMethod?: string;
+  capacity?: number;
+  enrolled?: number;
 };
 
 export type GeneratedSchedule = {
