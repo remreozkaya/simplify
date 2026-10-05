@@ -1,3 +1,4 @@
+import { parseProgramRestriction } from "@/lib/program-restrictions/eligibility";
 import {
   ITU_EMPTY_CELL_VALUES,
   ITU_WEEKDAY_ALIASES,
@@ -40,17 +41,21 @@ function parseOptionalInteger(value: string | undefined): number | undefined {
   return Number(normalized);
 }
 
+function weekdayTokens(value: string): string[] {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[.,()[\]]/g, " ")
+    .split(/[\s/;|,-]+/)
+    .filter(Boolean);
+}
+
 export function normalizeWeekdays(value: string | undefined): ItuWeekday[] {
   if (!cleanOptionalText(value)) {
     return [];
   }
 
   const days: ItuWeekday[] = [];
-  const tokens = value!
-    .toLocaleLowerCase("tr-TR")
-    .replace(/[.,()[\]]/g, " ")
-    .split(/[\s/;|,-]+/)
-    .filter(Boolean);
+  const tokens = weekdayTokens(value!);
 
   for (const token of tokens) {
     const day = ITU_WEEKDAY_ALIASES[token];
@@ -133,6 +138,19 @@ export function normalizeMeetings(row: ItuCourseTableRow): ItuCourseMeeting[] {
     return [];
   }
 
+  // A partially parsed row cannot certify all recurring meetings. Repeating
+  // one explicitly stated time across days remains supported, but not when
+  // another time/day is unresolved or the source cardinalities disagree.
+  const remainingTimeText = row.time!.replace(TIME_RANGE_PATTERN, "").replace(/[\s,;|]+/g, "");
+  if (
+    weekdayTokens(row.day!).some((token) => !ITU_WEEKDAY_ALIASES[token]) ||
+    remainingTimeText ||
+    Array.from(row.time!.matchAll(TIME_RANGE_PATTERN)).length !== times.length ||
+    (days.length > 1 && times.length > 1 && days.length !== times.length)
+  ) {
+    return [];
+  }
+
   const meetingCount =
     days.length === 1
       ? times.length
@@ -207,7 +225,8 @@ function createSection(
     capacity: parseOptionalInteger(row.capacity),
     enrolled: parseOptionalInteger(row.enrolled),
     reserved: parseOptionalInteger(row.reserved),
-    majorRestriction: cleanOptionalText(row.majorRestriction),
+    majorRestriction: row.majorRestriction,
+    programRestriction: parseProgramRestriction(row.majorRestriction),
     classRestriction: cleanOptionalText(row.classRestriction),
     prerequisites: cleanOptionalText(row.prerequisites),
   };
@@ -218,15 +237,20 @@ export function normalizeCoursePage(
   branchId: number,
   branchCode: string,
   fetchedAt = new Date().toISOString(),
+  semester?: string,
 ): ItuCourseCatalog {
   const sections = new Map<string, ItuCourseSection>();
+  const incompleteCrns = new Set<string>();
 
   for (const row of rows) {
     const meetings = normalizeMeetings(row);
 
-    // The weekly planner catalog intentionally excludes unscheduled and exam
-    // rows. They cannot produce a truthful recurring calendar block.
+    // Explicit exam rows are not weekly sessions. Any other unresolved row
+    // invalidates the whole CRN, even if a lecture row was parsed successfully.
     if (meetings.length === 0) {
+      const examOnly = normalizeWeekdays(row.day).length === 0 &&
+        /^(?:(?:final|midterm)\s+exam|exam|(?:final|vize|bütünleme)\s+sınavı|sınav)$/iu.test(row.day?.trim() ?? "");
+      if (!examOnly) incompleteCrns.add(row.crn);
       continue;
     }
 
@@ -234,15 +258,21 @@ export function normalizeCoursePage(
 
     if (existing) {
       existing.meetings = mergeMeetings(existing.meetings, meetings);
+      if (existing.majorRestriction !== row.majorRestriction) {
+        const raw = [existing.majorRestriction, row.majorRestriction].filter((value) => value !== undefined).join("\n");
+        existing.majorRestriction = raw;
+        existing.programRestriction = { raw, state: "unknown", codes: [], reason: "conflicting-source-values" };
+      }
       continue;
     }
 
-    sections.set(row.crn, createSection(row, branchCode, meetings));
+    sections.set(row.crn, { ...createSection(row, branchCode, meetings), semester });
   }
 
   const courseMap = new Map<string, ItuCourse>();
 
   for (const section of sections.values()) {
+    if (incompleteCrns.has(section.crn)) continue;
     const key = `${section.courseCode}|${section.courseTitle}`;
     const course = courseMap.get(key);
 
@@ -274,5 +304,6 @@ export function normalizeCoursePage(
     branchCode,
     courses,
     fetchedAt,
+    semester,
   });
 }

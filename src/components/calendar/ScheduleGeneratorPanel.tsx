@@ -1,5 +1,7 @@
 "use client";
 
+import type { ProgramMembership } from "@/lib/program-restrictions/eligibility";
+
 import { recordPlanningMilestone } from "@/lib/planning/checklist";
 
 import { getCoursesByFaculty } from "@/lib/calendar/catalog";
@@ -26,6 +28,7 @@ import {
   type GeneratorSessionCourse,
 } from "@/lib/schedule/session";
 import { minutesToTime } from "@/lib/schedule/time";
+import { scheduleGenerationContextKey } from "@/lib/schedule/context";
 import { useLanguage } from "@/lib/i18n/client";
 import {
   formatNumber,
@@ -46,6 +49,7 @@ type GeneratorStatus =
   "idle" | "ready" | "generating" | "success" | "no-results" | "error";
 
 type ScheduleGeneratorPanelProps = {
+  programMemberships: readonly ProgramMembership[];
   courseCatalog: FacultyOption[];
   isLoadingBranches: boolean;
   isBranchLoading: (branchCode: string) => boolean;
@@ -57,6 +61,9 @@ type ScheduleGeneratorPanelProps = {
 
 const selectClassName =
   "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
+
+const desiredCourseRowGridClassName =
+  "grid grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_5rem] items-end gap-3";
 
 const inputClassName =
   "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -133,6 +140,7 @@ function resolveGeneratorCourses(
 }
 
 export default function ScheduleGeneratorPanel({
+  programMemberships,
   courseCatalog,
   isLoadingBranches,
   isBranchLoading,
@@ -171,7 +179,10 @@ export default function ScheduleGeneratorPanel({
   const combinationCount = resolvedCourses
     ? calculateCombinationCount(resolvedCourses)
     : 0;
-  const currentSchedule = schedules[currentIndex] ?? null;
+  const generationContextKey = scheduleGenerationContextKey(resolvedCourses, programMemberships);
+  const [resultContextKey, setResultContextKey] = useState(generationContextKey);
+  const contextChanged = resultContextKey !== generationContextKey;
+  const currentSchedule = contextChanged ? null : schedules[currentIndex] ?? null;
   const currentRating = currentSchedule
     ? calculateScheduleRating(currentSchedule, schedules[0])
     : 0;
@@ -273,7 +284,23 @@ export default function ScheduleGeneratorPanel({
     [],
   );
 
+  useEffect(() => {
+    if (!contextChanged) return;
+    if (generationTimer.current) clearTimeout(generationTimer.current);
+    /* eslint-disable react-hooks/set-state-in-effect -- Profile or catalog changes invalidate
+     * recommendations only; saved weekly programs are managed separately. */
+    setSchedules([]);
+    setCurrentIndex(0);
+    setTruncated(false);
+    setSavedProgramId("");
+    setMessage("");
+    setStatus("idle");
+    setResultContextKey(generationContextKey);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [generationContextKey, contextChanged]);
+
   function invalidateResults(nextStatus: GeneratorStatus = "idle") {
+    if (generationTimer.current) clearTimeout(generationTimer.current);
     setSavedProgramId("");
     setSchedules([]);
     setCurrentIndex(0);
@@ -414,6 +441,7 @@ export default function ScheduleGeneratorPanel({
       try {
         const result = generateSchedules(resolvedCourses, {
           constraints,
+          programMemberships,
           maxResults: MAX_GENERATED_SCHEDULES,
         });
 
@@ -424,7 +452,9 @@ export default function ScheduleGeneratorPanel({
         if (result.schedules.length === 0) {
           setStatus("no-results");
           setMessage(
-            result.searchLimitReached
+            result.restrictionBlockedCourses?.length
+              ? t("courses.restrictionNoSchedule", { courses: result.restrictionBlockedCourses.join(", ") })
+              : result.searchLimitReached
               ? t("courses.searchLimit")
               : t("courses.noSchedule"),
           );
@@ -458,7 +488,9 @@ export default function ScheduleGeneratorPanel({
     }
   }
 
-  const visibleStatus: GeneratorStatus = isLoadingBranches
+  const visibleStatus: GeneratorStatus = contextChanged
+    ? "idle"
+    : isLoadingBranches
     ? "idle"
     : isLoadingSelectedCourses
       ? "idle"
@@ -493,118 +525,126 @@ export default function ScheduleGeneratorPanel({
           {t("courses.emptyDesired")}
         </div>
       ) : (
-        <div className="mt-4 space-y-2">
-          {rows.map((row) => {
-            const branchIsLoading = isBranchLoading(row.branchCode);
-            const courses = getCoursesByFaculty(courseCatalog, row.branchCode);
-            const selectedCourse = courses.find(
-              (course) => course.id === row.courseId,
-            );
+        <div className="mt-4 overflow-x-auto">
+          <div className="min-w-[640px] space-y-2">
+            <div className={`${desiredCourseRowGridClassName} text-sm font-medium text-slate-700`}>
+              <span>{t("courses.prefix")}</span>
+              <span>{t("courses.desired")}</span>
+              <span>{t("courses.pinnedCrn")}</span>
+              <span aria-hidden="true" />
+            </div>
+            {rows.map((row) => {
+              const branchIsLoading = isBranchLoading(row.branchCode);
+              const courses = getCoursesByFaculty(courseCatalog, row.branchCode);
+              const selectedCourse = courses.find(
+                (course) => course.id === row.courseId,
+              );
 
-            return (
-              <div
-                key={row.id}
-                className="grid items-end gap-3 border-b border-slate-200 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,2.3fr)_auto]"
-              >
-                <label className="min-w-0">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    {t("courses.prefix")}
-                  </span>
-                  <select
-                    aria-label={t("courses.prefix")}
-                    value={row.branchCode}
-                    onChange={(event) =>
-                      handleBranchChange(row.id, event.target.value)
-                    }
-                    disabled={isLoadingBranches}
-                    className={selectClassName}
-                  >
-                    <option value="">
-                      {t(
-                        isLoadingBranches
-                          ? "courses.loadingPrefixes"
-                          : "courses.prefix",
-                      )}
-                    </option>
-                    {courseCatalog.map((branch) => (
-                      <option
-                        key={branch.facultyCode}
-                        value={branch.facultyCode}
-                      >
-                        {branch.facultyCode}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="min-w-0">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    {t("courses.desired")}
-                  </span>
-                  <select
-                    aria-label={t("courses.desired")}
-                    value={row.courseId}
-                    onChange={(event) =>
-                      handleCourseChange(row.id, event.target.value)
-                    }
-                    disabled={!row.branchCode || branchIsLoading}
-                    className={selectClassName}
-                  >
-                    <option value="">
-                      {t(
-                        branchIsLoading
-                          ? "courses.loadingCourses"
-                          : "courses.codeAndName",
-                      )}
-                    </option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.code} - {course.title} ({course.sections.length}{" "}
-                        CRN)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="min-w-0">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    {t("courses.pinnedCrn")}
-                  </span>
-                  <select
-                    aria-label={t("courses.pinnedCrn")}
-                    value={row.pinnedSectionId}
-                    onChange={(event) =>
-                      handlePinnedSectionChange(row.id, event.target.value)
-                    }
-                    disabled={!selectedCourse || branchIsLoading}
-                    className={selectClassName}
-                  >
-                    <option value="">{t("courses.anyCrn")}</option>
-                    {selectedCourse?.sections.map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {t("courses.pin")} {section.crn} ·{" "}
-                        {section.meetings
-                          .map(
-                            (meeting) =>
-                              `${localizedWeekday(language, meeting.day, "short")} ${meeting.startTime}–${meeting.endTime}`,
-                          )
-                          .join(", ")}
-                        {section.instructor ? ` · ${section.instructor}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => handleRemoveCourse(row.id)}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-100"
+              return (
+                <div
+                  key={row.id}
+                  className={`${desiredCourseRowGridClassName} border-b border-slate-200 py-4`}
                 >
-                  {t("common.remove")}
-                </button>
-              </div>
-            );
-          })}
+                  <label className="min-w-0">
+                    <span className="sr-only">
+                      {t("courses.prefix")}
+                    </span>
+                    <select
+                      aria-label={t("courses.prefix")}
+                      value={row.branchCode}
+                      onChange={(event) =>
+                        handleBranchChange(row.id, event.target.value)
+                      }
+                      disabled={isLoadingBranches}
+                      className={selectClassName}
+                    >
+                      <option value="">
+                        {t(
+                          isLoadingBranches
+                            ? "courses.loadingPrefixes"
+                            : "courses.prefix",
+                        )}
+                      </option>
+                      {courseCatalog.map((branch) => (
+                        <option
+                          key={branch.facultyCode}
+                          value={branch.facultyCode}
+                        >
+                          {branch.facultyCode}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="min-w-0">
+                    <span className="sr-only">
+                      {t("courses.desired")}
+                    </span>
+                    <select
+                      aria-label={t("courses.desired")}
+                      value={row.courseId}
+                      onChange={(event) =>
+                        handleCourseChange(row.id, event.target.value)
+                      }
+                      disabled={!row.branchCode || branchIsLoading}
+                      className={selectClassName}
+                    >
+                      <option value="">
+                        {t(
+                          branchIsLoading
+                            ? "courses.loadingCourses"
+                            : "courses.codeAndName",
+                        )}
+                      </option>
+                      {courses.map((course) => (
+                        <option key={course.id} value={course.id}>
+                          {course.code} - {course.title} ({course.sections.length}{" "}
+                          CRN)
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="min-w-0">
+                    <span className="sr-only">
+                      {t("courses.pinnedCrn")}
+                    </span>
+                    <select
+                      aria-label={t("courses.pinnedCrn")}
+                      value={row.pinnedSectionId}
+                      onChange={(event) =>
+                        handlePinnedSectionChange(row.id, event.target.value)
+                      }
+                      disabled={!selectedCourse || branchIsLoading}
+                      className={selectClassName}
+                    >
+                      <option value="">{t("courses.anyCrn")}</option>
+                      {selectedCourse?.sections.map((section) => (
+                        <option key={section.id} value={section.id}>
+                          {t("courses.pin")} {section.crn} ·{" "}
+                          {section.meetings
+                            .map(
+                              (meeting) =>
+                                `${localizedWeekday(language, meeting.day, "short")} ${meeting.startTime}–${meeting.endTime}`,
+                            )
+                            .join(", ")}
+                          {section.instructor ? ` · ${section.instructor}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCourse(row.id)}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-100"
+                  >
+                    {t("common.remove")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -718,19 +758,21 @@ export default function ScheduleGeneratorPanel({
               ? t("courses.loadingSelected")
               : catalogError
                 ? localizeRuntimeMessage(language, catalogError)
-                : localizeRuntimeMessage(language, message)}
+                : contextChanged
+                  ? ""
+                  : localizeRuntimeMessage(language, message)}
         </div>
       </div>
 
       {visibleStatus === "no-results" && plannerAlternatives.length > 0 ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-black">{t("courses.plannerReplacements")}</p>
+          <p className="font-semibold">{t("courses.plannerReplacements")}</p>
           <p className="mt-2 font-semibold">
             {plannerAlternatives.join(" · ")}
           </p>
           <Link
             href="/semester-planner"
-            className="mt-3 inline-flex rounded-lg bg-amber-700 px-3 py-2 font-black text-white"
+            className="mt-3 inline-flex rounded-lg bg-amber-700 px-3 py-2 font-semibold text-white"
           >
             {t("courses.returnToPlanner")}
           </Link>
@@ -771,6 +813,12 @@ export default function ScheduleGeneratorPanel({
               {t("courses.next")} →
             </button>
           </div>
+
+          {Boolean(currentSchedule.unknownRestrictionCount) && (
+            <p className="mt-3 text-sm text-amber-900">
+              {t("courses.unknownProgramRestrictions", { count: currentSchedule.unknownRestrictionCount ?? 0 })}
+            </p>
+          )}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
             <div>

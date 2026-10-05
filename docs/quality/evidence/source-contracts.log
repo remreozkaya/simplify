@@ -1,0 +1,136 @@
+
+> simplify@0.1.0 test:run
+> vitest run tests/quality/official-enrollment.test.ts tests/quality/minor-program-codes.test.ts
+
+
+ RUN  v4.1.9 /Users/remreozkaya/Desktop/Portfolio/simplify
+
+(node:17191) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/quality/official-enrollment.test.ts (1 test | 1 failed) 20ms
+   × retains the published enrolled count under the official Yazılan header 19ms
+ ❯ tests/quality/minor-program-codes.test.ts (1 test | 1 failed) 7ms
+   × accepts the exact minor identities supplied by the official curriculum catalog 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/quality/minor-program-codes.test.ts > accepts the exact minor identities supplied by the official curriculum catalog
+AssertionError: expected [ 'FIZ_YD', 'BTK_YD', 'KIM_YD', …(73) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "FIZ_YD",
++   "BTK_YD",
++   "KIM_YD",
++   "MAT_YD",
++   "MAT_YD_EC",
++   "MAT_YD_TE",
++   "MAT_YD_UY",
++   "BIO_YD",
++   "EUT_YD",
++   "ENT_YD",
++   "ICM_YD",
++   "PEM_YD",
++   "SBP_YD",
++   "MKN_YD_EL",
++   "IML_YD",
++   "MAK_YD",
++   "MKN_YD_MK",
++   "NUM_YD",
++   "CHZ_YD",
++   "JEF_YD",
++   "JEO_YD",
++   "MAD_YD",
++   "PET_YD",
++   "EGC_YD",
++   "ALG_YD",
++   "GID_YD",
++   "KMM_YD",
++   "YAN_YD",
++   "GEM_YD",
++   "OSN_YD",
++   "SOR_YD",
++   "BHB_YD",
++   "ECN_YD",
++   "SUS_YD",
++   "IBM_YD",
++   "MTO_YD",
++   "SAV_YD",
++   "UCK_YD",
++   "UZB_YD",
++   "CGM1_YD",
++   "CGM5_YD",
++   "CGM2_YD",
++   "CGM3_YD",
++   "CGM4_YD",
++   "CGM8_YD",
++   "CGM6_YD",
++   "CGM7_YD",
++   "MTMM_YD",
++   "MTMS_YD",
++   "MTMY_YD",
++   "MTR_YD",
++   "ETMM_YD",
++   "SEMH_YD",
++   "SEMS_YD",
++   "SMKM_YD",
++   "THMA_YD",
++   "THMB_YD",
++   "THMR_YD",
++   "THMH_YD",
++   "THMN_YD",
++   "THMK_YD",
++   "THMD_YD",
++   "THMZ_YD",
++   "THMT_YD",
++   "TMKM_YD",
++   "TEK_YD",
++   "KHE_YD",
++   "MTM_YD",
++   "CEN_YD",
++   "MMD_YD",
++   "EFN_YD",
++   "IND_YD",
++   "NAE_YD",
++   "MEN_YD",
++   "IAD_YD",
++   "ARC_YD",
++ ]
+
+ ❯ tests/quality/minor-program-codes.test.ts:10:20
+      8|   const rejected = minors.filter(program=>!curriculumProgramCodeSchema…
+      9|   // The selector and the plans/detail APIs must agree on program iden…
+     10|   expect(rejected).toEqual([]);
+       |                    ^
+     11| });
+     12|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/quality/official-enrollment.test.ts > retains the published enrolled count under the official Yazılan header
+AssertionError: expected undefined to be 90 // Object.is equality
+
+- Expected:
+90
+
++ Received:
+undefined
+
+ ❯ tests/quality/official-enrollment.test.ts:13:29
+     11|   const section = catalog.courses.find(x=>x.code==="BLG 231E")?.sectio…
+     12|   expect(section?.capacity).toBe(95);
+     13|   expect(section?.enrolled).toBe(90);
+       |                             ^
+     14| });
+     15|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed (2)
+   Start at  17:29:49
+   Duration  10.72s (transform 4.68s, setup 0ms, import 10.99s, tests 27ms, environment 0ms)

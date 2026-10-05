@@ -1,0 +1,187 @@
+
+> simplify@0.1.0 test:run
+> vitest run tests/quality/incomplete-meetings.test.ts
+
+
+ RUN  v4.1.9 /Users/remreozkaya/Desktop/Portfolio/simplify
+
+(node:17111) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/quality/incomplete-meetings.test.ts (2 tests | 2 failed) 9ms
+   × does not certify a schedule when 'separate laboratory row has a missing…' 7ms
+   × does not certify a schedule when 'one time in a multi-session row is un…' 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/quality/incomplete-meetings.test.ts > does not certify a schedule when 'separate laboratory row has a missing…'
+AssertionError: expected [ { …(7) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "conflictCount": 0,
++     "id": "BLG:BLG:BLG 101E:90001",
++     "meetings": [
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Monday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:0",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++     ],
++     "metrics": {
++       "campusDays": 1,
++       "earliestStartMinutes": 540,
++       "latestEndMinutes": 600,
++       "totalGapMinutes": 0,
++     },
++     "score": 315,
++     "selections": [
++       {
++         "branchCode": "BLG",
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "crn": "90001",
++         "sectionId": "BLG:90001",
++       },
++     ],
++     "totalConflictMinutes": 0,
++   },
++ ]
+
+ ❯ tests/quality/incomplete-meetings.test.ts:20:62
+     18|   // Removing all incomplete sections, or rejecting the offering expli…
+     19|   // would satisfy this contract. Returning one verified schedule woul…
+     20|   expect(generateConflictFreeSchedules(offerings).schedules).toEqual([…
+       |                                                              ^
+     21| });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/quality/incomplete-meetings.test.ts > does not certify a schedule when 'one time in a multi-session row is un…'
+AssertionError: expected [ { …(7) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "conflictCount": 0,
++     "id": "BLG:BLG:BLG 101E:90001",
++     "meetings": [
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Monday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:0",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Wednesday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:1",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++     ],
++     "metrics": {
++       "campusDays": 2,
++       "earliestStartMinutes": 540,
++       "latestEndMinutes": 600,
++       "totalGapMinutes": 0,
++     },
++     "score": 615,
++     "selections": [
++       {
++         "branchCode": "BLG",
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "crn": "90001",
++         "sectionId": "BLG:90001",
++       },
++     ],
++     "totalConflictMinutes": 0,
++   },
++ ]
+
+ ❯ tests/quality/incomplete-meetings.test.ts:20:62
+     18|   // Removing all incomplete sections, or rejecting the offering expli…
+     19|   // would satisfy this contract. Returning one verified schedule woul…
+     20|   expect(generateConflictFreeSchedules(offerings).schedules).toEqual([…
+       |                                                              ^
+     21| });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  17:27:47
+   Duration  266ms (transform 82ms, setup 0ms, import 122ms, tests 9ms, environment 0ms)

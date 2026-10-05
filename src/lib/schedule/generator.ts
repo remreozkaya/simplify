@@ -1,3 +1,4 @@
+import { evaluateProgramEligibility } from "@/lib/program-restrictions/eligibility";
 import { satisfiesConstraints } from "@/lib/schedule/constraints";
 import {
   hasMeetingConflicts,
@@ -44,7 +45,7 @@ export function calculateCombinationCount(
   }, 1);
 }
 
-export function generateConflictFreeSchedules(
+function searchConflictFreeSchedules(
   courses: readonly GeneratorCourse[],
   options: GenerateScheduleOptions = {},
 ): GenerateScheduleResult {
@@ -83,6 +84,9 @@ export function generateConflictFreeSchedules(
         )
         .sort(
           (first, second) =>
+            (options.programMemberships?.length ?
+              Number(evaluateProgramEligibility(first.programRestriction ?? first.majorRestriction, options.programMemberships).status !== "eligible") -
+              Number(evaluateProgramEligibility(second.programRestriction ?? second.majorRestriction, options.programMemberships).status !== "eligible") : 0) ||
             first.crn.localeCompare(second.crn, undefined, {
               numeric: true,
             }) || first.id.localeCompare(second.id),
@@ -139,6 +143,7 @@ export function generateConflictFreeSchedules(
           courseCode: selection.courseCode,
           sectionId: selection.sectionId,
           crn: selection.crn,
+          ...(selection.programEligibility ? { programEligibility: selection.programEligibility } : {}),
         }));
       const metrics = calculateScheduleMetrics(meetings);
 
@@ -154,6 +159,7 @@ export function generateConflictFreeSchedules(
         conflictCount: 0,
         totalConflictMinutes: 0,
         metrics,
+        ...(options.programMemberships?.length ? { unknownRestrictionCount: orderedSelections.filter((selection) => selection.programEligibility === "unknown").length } : {}),
         score: scoreSchedule(metrics, weights),
       });
 
@@ -183,6 +189,7 @@ export function generateConflictFreeSchedules(
         courseCode: course.courseCode,
         sectionId: section.id,
         crn: section.crn,
+        ...(options.programMemberships?.length ? { programEligibility: evaluateProgramEligibility(section.programRestriction ?? section.majorRestriction, options.programMemberships).status } : {}),
       };
       const sectionMeetings: GeneratedMeeting[] = section.meetings.map(
         (meeting) => ({
@@ -197,6 +204,9 @@ export function generateConflictFreeSchedules(
           teachingMethod: section.teachingMethod,
           capacity: section.capacity,
           enrolled: section.enrolled,
+          majorRestriction: section.majorRestriction,
+          programRestriction: section.programRestriction,
+          semester: section.semester,
         }),
       );
 
@@ -220,6 +230,30 @@ export function generateConflictFreeSchedules(
     visitedNodes,
     searchLimitReached,
   };
+}
+
+/** First search verified sections; unknown sections are an explicit fallback. */
+export function generateConflictFreeSchedules(
+  courses: readonly GeneratorCourse[],
+  options: GenerateScheduleOptions = {},
+): GenerateScheduleResult {
+  const memberships = options.programMemberships ?? [];
+  if (!memberships.length) return searchConflictFreeSchedules(courses, options);
+  const status = (section: GeneratorCourse["sections"][number]) =>
+    evaluateProgramEligibility(section.programRestriction ?? section.majorRestriction, memberships).status;
+  const allowed = courses.map((course) => ({ ...course, sections: course.sections.filter((section) => status(section) !== "ineligible") }));
+  const restrictionBlockedCourses = courses.filter((course) => {
+    const considered = course.sections.filter((section) => !course.pinnedSectionId || section.id === course.pinnedSectionId);
+    return considered.length > 0 && considered.every((section) => status(section) === "ineligible");
+  }).map((course) => course.courseCode);
+  if (restrictionBlockedCourses.length) return { schedules: [], truncated: false, visitedNodes: 0, restrictionBlockedCourses };
+  const verified = allowed.map((course) => ({ ...course, sections: course.sections.filter((section) => status(section) === "eligible") }));
+  const preferred = searchConflictFreeSchedules(verified, options);
+  if (preferred.schedules.length || preferred.searchLimitReached || preferred.truncated) return { ...preferred, restrictionBlockedCourses };
+  const remainingNodes = (options.maxVisitedNodes ?? MAX_GENERATION_VISITED_NODES) - preferred.visitedNodes;
+  if (remainingNodes <= 0) return { ...preferred, searchLimitReached: true, restrictionBlockedCourses };
+  const fallback = searchConflictFreeSchedules(allowed, { ...options, maxVisitedNodes: remainingNodes });
+  return { ...fallback, visitedNodes: preferred.visitedNodes + fallback.visitedNodes, restrictionBlockedCourses };
 }
 
 export function generateSchedules(

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CollectionNotice from "@/components/legal/CollectionNotice";
 import { useActionState } from "react";
 
 import { signupAction } from "@/app/auth/actions";
@@ -11,14 +12,18 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import { INITIAL_AUTH_STATE } from "@/lib/auth/types";
 import { useLanguage } from "@/lib/i18n/client";
 
+function TermsLabel() { const { language } = useLanguage(); return <>{language === "tr" ? "Kullanım Koşulları" : "Terms of Use"}</>; }
+
 export default function SignupForm() {
   const { t } = useLanguage();
   const [state, action] = useActionState(signupAction, INITIAL_AUTH_STATE);
 
   return (
     <div className="space-y-6">
+      <Link href="/legal/terms" className="text-sm font-semibold text-blue-700 underline dark:text-blue-300"><TermsLabel /></Link>
       <form action={action} className="space-y-5" noValidate>
         <AuthMessage message={state.message} />
+        <CollectionNotice kind="account" />
         <EmailInput error={state.fieldErrors?.email} />
         <PasswordInput
           id="password"
@@ -42,7 +47,7 @@ export default function SignupForm() {
         {t("authentication.haveAccount")}{" "}
         <Link
           href="/login"
-          className="font-black text-blue-700 hover:underline dark:text-blue-300"
+          className="font-semibold text-blue-700 hover:underline dark:text-blue-300"
         >
           {t("authentication.login")}
         </Link>

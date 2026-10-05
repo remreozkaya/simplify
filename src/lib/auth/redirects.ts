@@ -37,6 +37,7 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/verify-email",
   "/auth/callback",
+  "/legal",
 ];
 
 function isPublicAuthPath(pathname: string) {

@@ -27,8 +27,19 @@ export default function Home() {
   const enrollments = orderedEnrollments(profile.programEnrollments);
   const complete = isProfileComplete(profile);
   return (
-    <PageShell title={t("home.title")} description={t("home.description")}>
-      <section aria-labelledby="workspace-programs" className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+    <PageShell title={t("home.title")} home header={
+      <header className="mx-auto max-w-3xl pb-12 pt-6 text-center sm:pb-16 sm:pt-12">
+        <h1 className="text-4xl font-bold leading-[1.05] tracking-[-0.045em] text-slate-950 dark:text-white sm:text-6xl lg:text-7xl">
+          {t("home.heroTitleLine1")}<br />{t("home.heroTitleLine2")}
+        </h1>
+        <p className="mx-auto mt-6 max-w-xl text-lg leading-7 text-slate-600 dark:text-slate-300">{t("home.description")}</p>
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <Link href={complete ? "/semester-planner" : "/profile"} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">{t("home.startPlanning")} <span aria-hidden="true">→</span></Link>
+          <Link href="/curriculum" className="rounded-lg bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700">{t("home.exploreCurriculum")}</Link>
+        </div>
+      </header>
+    }>
+      <section aria-labelledby="workspace-programs" className="mb-12 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="workspace-programs" className="font-semibold text-slate-950 dark:text-white">{t("home.yourPrograms")}</h2>
@@ -49,16 +60,19 @@ export default function Home() {
       <PlanningChecklist />
 
       <section aria-labelledby="planning-tools">
-        <h2 id="planning-tools" className="mb-3 text-base font-semibold text-slate-950 dark:text-white">{t("home.tools")}</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {planningTools.map((tool, index) => <Link key={tool.href} href={tool.href} className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-500 dark:hover:bg-slate-800 sm:p-6">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><ToolIcon index={index} /></span>
-            <div className="min-w-0 flex-1"><h3 className="text-base font-semibold text-slate-950 dark:text-white">{t(tool.label)}</h3><p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{t(tool.description)}</p></div>
+        <h2 id="planning-tools" className="mb-5 text-2xl font-semibold text-slate-950 dark:text-white">{t("home.tools")}</h2>
+        <div className="grid gap-x-10 md:grid-cols-2">
+          {planningTools.map((tool, index) => <Link key={tool.href} href={tool.href} className="group flex items-start gap-4 border-t border-slate-200 py-7 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-200"><ToolIcon index={index} /></span>
+            <div className="min-w-0 flex-1"><h3 className="text-lg font-semibold text-slate-950 dark:text-white">{t(tool.label)}</h3></div>
             <span aria-hidden="true" className="mt-2 text-lg text-blue-700 dark:text-blue-300">→</span>
           </Link>)}
         </div>
       </section>
-      <p className="mt-6 text-xs leading-5 text-slate-500 dark:text-slate-400">{t("home.localWorkspace")}</p>
+      <section className="mt-14 rounded-xl bg-slate-50 px-5 py-16 text-center dark:bg-slate-900 sm:py-20">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">{t("home.closingTitle")}</h2>
+        <Link href={complete ? "/semester-planner" : "/profile"} className="mt-6 inline-block rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">{t("home.startPlanning")} <span aria-hidden="true">→</span></Link>
+      </section>
     </PageShell>
   );
 }

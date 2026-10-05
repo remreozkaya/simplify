@@ -109,6 +109,10 @@ export function parseCoursePage(html: string): ItuCourseTableRow[] {
     bodyRows.each((__, rowElement) => {
       const cells = $(rowElement).find("td").toArray();
 
+      // OBS may render an empty-table message as one spanning cell.
+      if (cells.length === 1 && Number($(cells[0]).attr("colspan")) > 1) return;
+      if (cells.every((cell) => getCellText($(cell)) === "")) return;
+
       if (cells.length === 0) {
         return;
       }
@@ -139,9 +143,10 @@ export function parseCoursePage(html: string): ItuCourseTableRow[] {
         prerequisites: read("prerequisites"),
       });
 
-      if (result.success) {
-        parsedRows.push(result.data);
+      if (!result.success) {
+        throw new Error("Invalid İTÜ course schedule row was returned.");
       }
+      parsedRows.push(result.data);
     });
   });
 

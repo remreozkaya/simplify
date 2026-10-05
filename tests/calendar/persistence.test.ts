@@ -65,3 +65,16 @@ describe("parseStoredWeeklyPrograms", () => {
     ]);
   });
 });
+
+it("preserves restriction raw text, semester and conflicting-source unknown across saved-data round trips", () => {
+  const block = {id:"course",code:"BLG 101",title:"Course",day:"Monday",startTime:"09:00",endTime:"10:00",majorRestriction:"BLG_LS\nBLGE_LS",semester:"2026-2027 Güz Dönemi",programRestriction:{raw:"BLG_LS\nBLGE_LS",state:"unknown",codes:[],reason:"conflicting-source-values"}};
+  const value = parseStoredWeeklyPrograms(JSON.parse(JSON.stringify([{id:"program",name:"Saved",courseBlocks:[block],courseSelections:[]}])))[0];
+  expect(value.courseBlocks[0]).toMatchObject({majorRestriction:block.majorRestriction,semester:block.semester,programRestriction:block.programRestriction});
+});
+
+it("retains an explicitly verified unrestricted state rather than inferring it from raw blank text", () => {
+  const block = {id:"course",code:"BLG 101",title:"Course",day:"Monday",startTime:"09:00",endTime:"10:00",programRestriction:{state:"unrestricted",codes:[],reason:"verified-source"}};
+  const value = parseStoredWeeklyPrograms([{id:"program",name:"Saved",courseBlocks:[block],courseSelections:[]}])[0];
+  expect(value.courseBlocks[0].programRestriction?.state).toBe("unrestricted");
+  expect(parseStoredWeeklyPrograms([{id:"program",name:"Saved",courseBlocks:[{...block,programRestriction:undefined}],courseSelections:[]}])[0].courseBlocks[0].programRestriction?.state).toBe("unknown");
+});

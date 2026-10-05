@@ -42,7 +42,7 @@ export default function ResetPasswordForm() {
         <p className="text-center text-sm">
           <Link
             href="/forgot-password"
-            className="font-black text-blue-700 hover:underline dark:text-blue-300"
+            className="font-semibold text-blue-700 hover:underline dark:text-blue-300"
           >
             {t("authentication.requestAnother")}
           </Link>

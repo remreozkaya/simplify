@@ -1,0 +1,14 @@
+{
+  "version": "2026-10-03.1",
+  "effectiveDate": null,
+  "controllerName": null,
+  "postalAddress": null,
+  "privacyEmail": null,
+  "kepAddress": null,
+  "hosting": { "name": null, "locations": null },
+  "authentication": { "name": "Supabase Auth", "locations": null },
+  "email": { "name": null, "locations": null },
+  "retention": { "account": { "tr": null, "en": null }, "logs": { "tr": null, "en": null }, "requests": { "tr": null, "en": null }, "backups": { "tr": null, "en": null } },
+  "transferDisclosure": { "tr": null, "en": null },
+  "reviews": { "legalBases": false, "providerContracts": false, "internationalTransfers": false, "verbis": false, "law5651": false, "requestChannelTested": false, "requestOwnerAssigned": false, "incidentResponse": false, "retentionAndDeletion": false, "universityPermissions": false, "dependencyLicenses": false }
+}

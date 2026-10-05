@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -80,7 +81,7 @@ function ProfileControl() {
         aria-label={t("navigation.profilePreview")}
         aria-controls={open ? "profile-preview" : undefined}
         aria-expanded={open}
-        className="inline-grid size-9 sm:size-10 place-items-center rounded-xl border border-slate-200 bg-white font-black text-slate-700 transition hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        className="inline-grid size-9 sm:size-10 place-items-center rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
       >
         {initials ? (
           <span className="text-xs" aria-hidden="true">
@@ -100,7 +101,7 @@ function ProfileControl() {
         >
           {complete ? (
             <>
-              <p className="font-black text-slate-950 dark:text-white">
+              <p className="font-semibold text-slate-950 dark:text-white">
                 {profileFullName(profile)}
               </p>
               {profile.nickname ? (
@@ -111,7 +112,7 @@ function ProfileControl() {
               <div className="mt-3 space-y-2">
                 {enrollments.map((enrollment) => (
                   <div key={enrollment.id} className="text-xs">
-                    <span className="font-black text-blue-700 dark:text-blue-300">
+                    <span className="font-semibold text-blue-700 dark:text-blue-300">
                       {enrollmentLabel(enrollment.type)}
                     </span>
                     <span className="block truncate text-slate-600 dark:text-slate-300">
@@ -130,17 +131,14 @@ function ProfileControl() {
             </>
           ) : (
             <>
-              <p className="font-black text-slate-950 dark:text-white">
+              <p className="font-semibold text-slate-950 dark:text-white">
                 {t("navigation.profileIncomplete")}
-              </p>
-              <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                {t("navigation.profileIncompleteDescription")}
               </p>
             </>
           )}
           <Link
             href="/profile"
-            className="mt-4 inline-flex text-sm font-black text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300"
+            className="mt-4 inline-flex text-sm font-semibold text-blue-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300"
           >
             {t("navigation.viewProfile")}
           </Link>
@@ -168,14 +166,12 @@ export default function AppNavigation() {
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-lg font-black tracking-tight text-slate-950 dark:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
         >
-          <span className="grid size-8 place-items-center rounded-xl bg-blue-600 text-sm text-white shadow-sm">
-            S
-          </span>
+          <BrandMark />
           Simplify
         </Link>
-        <div className="order-3 flex w-full flex-wrap gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:text-sm xl:order-none xl:w-auto xl:flex-1">
+        <div className="order-3 flex w-full gap-1 overflow-x-auto text-xs font-semibold text-slate-600 dark:text-slate-300 sm:text-sm xl:order-none xl:w-auto xl:flex-1">
           {planningTools.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
@@ -183,7 +179,7 @@ export default function AppNavigation() {
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-lg px-3 py-2 transition ${active ? "bg-blue-600 text-white shadow-sm" : "hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white"}`}
+                className={`shrink-0 rounded-lg px-3 py-2 transition ${active ? "bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white" : "hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white"}`}
               >
                 {t(link.label)}
               </Link>

@@ -6,5 +6,5 @@ export default async function ProfileRoute() {
   const user = await requireUser("/profile");
   const canChangePassword = providerSupportsPassword(user.app_metadata);
 
-  return <ProfilePage email={user.email ?? ""} canChangePassword={canChangePassword} />;
+  return <ProfilePage email={user.email ?? ""} canChangePassword={canChangePassword} deletionAvailable={Boolean(process.env.SUPABASE_SECRET_KEY?.trim())} />;
 }

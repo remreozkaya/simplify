@@ -1,3 +1,5 @@
+import type { ProgramRestriction } from "@/lib/program-restrictions/eligibility";
+
 /**
  * Domain models used by the İTÜ OBS integration.
  *
@@ -78,6 +80,8 @@ export type ItuCourseSection = {
   teachingMethod?: string;
   instructor?: string;
   meetings: ItuCourseMeeting[];
+  programRestriction?: ProgramRestriction;
+  semester?: string;
   capacity?: number;
   enrolled?: number;
   reserved?: number;
@@ -104,6 +108,7 @@ export type ItuCourseCatalog = {
   branchCode: string;
   courses: ItuCourse[];
   fetchedAt: string;
+  semester?: string;
 };
 
 /**

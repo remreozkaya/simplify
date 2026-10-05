@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 
 import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { normalizeCourseLanguage } from "@/lib/itu/curriculum/language";
 import { firstNumericValue, parseNumericOptions } from "@/lib/itu/curriculum/parsers/numbers";
 import type {
   ItuCurriculumItem,
@@ -61,7 +62,7 @@ export function parseCurriculumDetail(
         if (!rawCode) return;
         const code = normalizeCourseCode(rawCode);
         const requirement = clean($(cells[3]).text()).toLocaleUpperCase("tr-TR");
-        const language = clean($(cells[2]).text()) || undefined;
+        const language = normalizeCourseLanguage($(cells[2]).text());
         const theoryHours = firstNumericValue($(cells[6]).text());
         const tutorialHours = firstNumericValue($(cells[7]).text());
         const labHours = firstNumericValue($(cells[8]).text());

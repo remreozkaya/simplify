@@ -2,13 +2,14 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { getSupabaseConfig } from "@/lib/auth/config";
-import { applySessionPersistence } from "@/lib/auth/cookies";
+import { applySessionPersistence, REMEMBER_COOKIE } from "@/lib/auth/cookies";
 
 type ServerClientOptions = { remember?: boolean };
 
 export async function createClient(options: ServerClientOptions = {}) {
   const cookieStore = await cookies();
   const { url, publishableKey } = getSupabaseConfig();
+  const remember = options.remember ?? (cookieStore.get(REMEMBER_COOKIE)?.value !== "0");
 
   return createServerClient(url, publishableKey, {
     cookies: {
@@ -21,7 +22,7 @@ export async function createClient(options: ServerClientOptions = {}) {
             cookieStore.set(
               name,
               value,
-              applySessionPersistence(cookieOptions, options.remember),
+              applySessionPersistence(cookieOptions, remember),
             );
           });
         } catch {

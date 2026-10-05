@@ -89,6 +89,7 @@ function compareSchedules(
   return (
     first.conflictCount - second.conflictCount ||
     first.totalConflictMinutes - second.totalConflictMinutes ||
+    (first.unknownRestrictionCount ?? 0) - (second.unknownRestrictionCount ?? 0) ||
     first.score - second.score ||
     first.metrics.campusDays - second.metrics.campusDays ||
     first.metrics.totalGapMinutes - second.metrics.totalGapMinutes ||

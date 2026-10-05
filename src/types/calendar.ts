@@ -1,3 +1,5 @@
+import type { ProgramRestriction } from "@/lib/program-restrictions/eligibility";
+
 export const days = [
   "Monday",
   "Tuesday",
@@ -11,6 +13,9 @@ export const days = [
 export type Day = (typeof days)[number];
 
 export type CourseBlock = {
+  majorRestriction?: string;
+  programRestriction?: ProgramRestriction;
+  semester?: string;
   id: string;
   selectionId?: string;
   code: string;
@@ -37,6 +42,9 @@ export type CourseMeetingOption = {
 };
 
 export type CourseSectionOption = {
+  majorRestriction?: string;
+  programRestriction?: ProgramRestriction;
+  semester?: string;
   id: string;
   crn: string;
   instructor?: string;
@@ -54,6 +62,8 @@ export type CourseOption = {
 };
 
 export type FacultyOption = {
+  semester?: string;
+  fetchedAt?: string;
   facultyCode: string;
   courses: CourseOption[];
 };

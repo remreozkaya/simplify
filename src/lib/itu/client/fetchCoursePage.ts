@@ -1,5 +1,4 @@
 import {
-  ITU_CACHE_REVALIDATE_SECONDS,
   ITU_OBS_ORIGIN,
   ITU_OBS_PATHS,
   ITU_PROGRAM_LEVELS,
@@ -39,10 +38,9 @@ export async function fetchCoursePage(
     response = await fetch(url, {
       method: "GET",
       headers: ITU_REQUEST_HEADERS,
-      next: {
-        revalidate:
-          ITU_CACHE_REVALIDATE_SECONDS,
-      },
+      // The service caches validated catalogs by semester; raw HTML must not
+      // revalidate in the background across a semester boundary.
+      cache: "no-store",
       signal: AbortSignal.timeout(
         ITU_REQUEST_TIMEOUT_MS,
       ),

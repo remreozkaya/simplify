@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
+
 import { responseJson } from "@/lib/http/responseJson";
 
 import { recordPlanningMilestone } from "@/lib/planning/checklist";
@@ -158,6 +160,7 @@ export default function SmartSemesterPlanner() {
       }),
     )
       .then((loaded) => {
+        if (controller.signal.aborted) return;
         setPrograms(loaded);
         setLoading(false);
         setError("");
@@ -188,8 +191,9 @@ export default function SmartSemesterPlanner() {
     [courseCatalog],
   );
 
+  const programsCurrent = JSON.stringify(enrollments) === JSON.stringify(programs.map((program) => program.enrollment));
   const plan = useMemo<SemesterPlan | null>(() => {
-    if (!request) return null;
+    if (!request || !programsCurrent || !enrollments.length) return null;
     return buildSemesterPlan(programs, {
       desiredCredits: request.desiredCredits,
       maxCourses: request.maxCourses,
@@ -202,8 +206,9 @@ export default function SmartSemesterPlanner() {
         ),
       ),
       courseOfferings,
+      programMemberships: resolveProgramMemberships(profile.programEnrollments),
     });
-  }, [request, programs, loadedBranchCodes, courseCatalog, courseOfferings]);
+  }, [request, programs, loadedBranchCodes, courseCatalog, courseOfferings, profile.programEnrollments, programsCurrent, enrollments.length]);
 
   useEffect(() => {
     if (plan?.recommendations.length) recordPlanningMilestone("semester");
@@ -310,7 +315,7 @@ export default function SmartSemesterPlanner() {
   const number = (value: number, digits = 1) =>
     formatNumber(language, value, { maximumFractionDigits: digits });
 
-  if (loading || isLoadingBranches)
+  if (enrollments.length > 0 && (loading || isLoadingBranches || (!programsCurrent && !error)))
     return (
       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
         {t("semesterPlanner.loading")}
@@ -325,10 +330,10 @@ export default function SmartSemesterPlanner() {
         {localizeRuntimeMessage(language, error)}
       </div>
     );
-  if (!programs.length)
+  if (!enrollments.length || !programs.length)
     return (
       <section className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-amber-950">
-        <h2 className="text-xl font-black">
+        <h2 className="text-xl font-semibold">
           {t("semesterPlanner.completeProfile")}
         </h2>
         <p className="mt-2 text-sm">
@@ -336,7 +341,7 @@ export default function SmartSemesterPlanner() {
         </p>
         <Link
           href="/profile"
-          className="mt-4 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-black text-white"
+          className="mt-4 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white"
         >
           {t("graduationCalculator.openProfile")}
         </Link>
@@ -431,7 +436,7 @@ export default function SmartSemesterPlanner() {
             type="button"
             onClick={() => void generateRecommendations()}
             disabled={checkingOfferings}
-            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-black text-white hover:bg-blue-800 disabled:opacity-50"
+            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
           >
             {t(
               checkingOfferings
@@ -491,7 +496,7 @@ export default function SmartSemesterPlanner() {
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-            <h2 className="text-xl font-black text-slate-950 dark:text-white">
+            <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
               {t("semesterPlanner.programContributions")}
             </h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -500,7 +505,7 @@ export default function SmartSemesterPlanner() {
                   key={summary.enrollmentId}
                   className="rounded-xl bg-slate-50 p-4 dark:bg-slate-950"
                 >
-                  <p className="text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                     {t(
                       summary.enrollmentType === "main"
                         ? "academicPrograms.main"
@@ -509,7 +514,7 @@ export default function SmartSemesterPlanner() {
                           : "academicPrograms.minor",
                     )}
                   </p>
-                  <p className="mt-1 font-black text-slate-950 dark:text-white">
+                  <p className="mt-1 font-semibold text-slate-950 dark:text-white">
                     {localizedAcademicName(
                       {
                         name: summary.programName,
@@ -545,7 +550,7 @@ export default function SmartSemesterPlanner() {
           <section>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-black text-slate-950 dark:text-white">
+                <h2 className="text-2xl font-semibold text-slate-950 dark:text-white">
                   {t("semesterPlanner.recommendations")}
                 </h2>
               </div>
@@ -553,7 +558,7 @@ export default function SmartSemesterPlanner() {
                 type="button"
                 onClick={sendToGenerator}
                 disabled={!plan.recommendations.length}
-                className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {t("semesterPlanner.sendToGenerator")}
               </button>
@@ -573,7 +578,7 @@ export default function SmartSemesterPlanner() {
 
           {plan.alternatives.length ? (
             <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <summary className="cursor-pointer font-black">
+              <summary className="cursor-pointer font-semibold">
                 {t("semesterPlanner.alternatives", {
                   count: plan.alternatives.length,
                 })}
@@ -584,7 +589,7 @@ export default function SmartSemesterPlanner() {
                     key={course.code}
                     className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950"
                   >
-                    <p className="font-black">
+                    <p className="font-semibold">
                       {course.code} ·{" "}
                       {localizedAcademicName(
                         {
@@ -636,10 +641,10 @@ function Summary({
 }) {
   return (
     <div>
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-3xl font-black text-slate-950 dark:text-white">
+      <p className="mt-1 text-3xl font-semibold text-slate-950 dark:text-white">
         {value}
       </p>
       {detail ? (
@@ -694,10 +699,10 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700 dark:text-blue-300">
+          <p className="text-xs font-semibold uppercase tracking-[.16em] text-blue-700 dark:text-blue-300">
             {course.code}
           </p>
-          <h3 className="mt-1 text-lg font-black text-slate-950 dark:text-white">
+          <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
             {localizedAcademicName(
               {
                 name: course.title,
@@ -709,7 +714,7 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
           </h3>
         </div>
         <div className="text-right">
-          <p className="text-lg font-black">
+          <p className="text-lg font-semibold">
             {formatNumber(language, course.credits)}
           </p>
           <p className="text-xs text-slate-500">
@@ -734,6 +739,11 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
           </span>
         ))}
       </div>
+      {course.programEligibility === "unknown" ? (
+        <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+          {t("semesterPlanner.notice_program_restriction_unknown")}
+        </p>
+      ) : null}
       {course.eligibility !== "confirmed" ? (
         <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
           {t(`semesterPlanner.eligibility_${course.eligibility}`)}

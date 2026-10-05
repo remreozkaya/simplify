@@ -66,3 +66,12 @@ describe("parseCoursePage", () => {
     );
   });
 });
+
+it("rejects a partially malformed schedule instead of silently dropping a CRN", () => {
+  const malformed = fixture.replace("23713", "invalid-crn");
+  expect(() => parseCoursePage(malformed)).toThrow(/invalid.*schedule row/i);
+});
+
+it("permits an explicit empty-table placeholder", () => {
+  expect(parseCoursePage(`<table><thead><tr><th>CRN</th><th>Ders Kodu</th><th>Ders Adı</th></tr></thead><tbody><tr><td colspan="3">Kayıt bulunamadı.</td></tr></tbody></table>`)).toEqual([]);
+});

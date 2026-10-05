@@ -17,7 +17,7 @@ export default function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-65 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-65 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
     >
       {pending ? (
         <span

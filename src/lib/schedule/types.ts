@@ -1,3 +1,4 @@
+import type { ProgramMembership, ProgramRestriction } from "@/lib/program-restrictions/eligibility";
 import type {
   CourseMeetingOption,
   CourseSectionOption,
@@ -34,6 +35,7 @@ export type GeneratorCourse = {
 };
 
 export type GeneratedCourseSelection = {
+  programEligibility?: "eligible" | "ineligible" | "unknown";
   branchCode: string;
   courseId: string;
   courseCode: string;
@@ -42,6 +44,9 @@ export type GeneratedCourseSelection = {
 };
 
 export type GeneratedMeeting = CourseMeetingOption & {
+  majorRestriction?: string;
+  programRestriction?: ProgramRestriction;
+  semester?: string;
   branchCode: string;
   courseId: string;
   courseCode: string;
@@ -55,6 +60,7 @@ export type GeneratedMeeting = CourseMeetingOption & {
 };
 
 export type GeneratedSchedule = {
+  unknownRestrictionCount?: number;
   id: string;
   selections: GeneratedCourseSelection[];
   meetings: GeneratedMeeting[];
@@ -65,6 +71,7 @@ export type GeneratedSchedule = {
 };
 
 export type GenerateScheduleOptions = {
+  programMemberships?: readonly ProgramMembership[];
   constraints?: ScheduleConstraints;
   maxResults?: number;
   maxVisitedNodes?: number;
@@ -73,6 +80,7 @@ export type GenerateScheduleOptions = {
 };
 
 export type GenerateScheduleResult = {
+  restrictionBlockedCourses?: string[];
   schedules: GeneratedSchedule[];
   truncated: boolean;
   visitedNodes: number;

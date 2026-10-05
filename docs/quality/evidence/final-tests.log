@@ -1,0 +1,332 @@
+
+> simplify@0.1.0 test:run
+> vitest run
+
+
+ RUN  v4.1.9 /Users/remreozkaya/Desktop/Portfolio/simplify
+
+(node:17364) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/quality/english-credit-audit.test.ts (1 test | 1 failed) 15ms
+   × counts source English language credits in the graduation audit 14ms
+ ❯ tests/quality/official-enrollment.test.ts (1 test | 1 failed) 54ms
+   × retains the published enrolled count under the official Yazılan header 54ms
+ ❯ tests/quality/incomplete-meetings.test.ts (2 tests | 2 failed) 13ms
+   × does not certify a schedule when 'separate laboratory row has a missing…' 11ms
+   × does not certify a schedule when 'one time in a multi-session row is un…' 2ms
+ ❯ tests/quality/minor-program-codes.test.ts (1 test | 1 failed) 11ms
+   × accepts the exact minor identities supplied by the official curriculum catalog 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/quality/english-credit-audit.test.ts > counts source English language credits in the graduation audit
+AssertionError: expected { requiredCourses: 3, …(5) } to match object { earnedEnglishCredit: 4, …(1) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "earnedEnglishCredit": 4,
+-   "requiredEnglishCredit": 8.5,
++   "earnedEnglishCredit": 0,
++   "requiredEnglishCredit": 0,
+  }
+
+ ❯ tests/quality/english-credit-audit.test.ts:14:49
+     12|   const progress = applyTranscriptImport(curriculum,emptyProgress(1562…
+     13|   // Source fixture marks Mathematics I (4) and Programming (4.5) Engl…
+     14|   expect(curriculumTotals(curriculum,progress)).toMatchObject({earnedE…
+       |                                                 ^
+     15| });
+     16|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/quality/incomplete-meetings.test.ts > does not certify a schedule when 'separate laboratory row has a missing…'
+AssertionError: expected [ { …(7) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "conflictCount": 0,
++     "id": "BLG:BLG:BLG 101E:90001",
++     "meetings": [
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Monday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:0",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++     ],
++     "metrics": {
++       "campusDays": 1,
++       "earliestStartMinutes": 540,
++       "latestEndMinutes": 600,
++       "totalGapMinutes": 0,
++     },
++     "score": 315,
++     "selections": [
++       {
++         "branchCode": "BLG",
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "crn": "90001",
++         "sectionId": "BLG:90001",
++       },
++     ],
++     "totalConflictMinutes": 0,
++   },
++ ]
+
+ ❯ tests/quality/incomplete-meetings.test.ts:20:62
+     18|   // Removing all incomplete sections, or rejecting the offering expli…
+     19|   // would satisfy this contract. Returning one verified schedule woul…
+     20|   expect(generateConflictFreeSchedules(offerings).schedules).toEqual([…
+       |                                                              ^
+     21| });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/quality/incomplete-meetings.test.ts > does not certify a schedule when 'one time in a multi-session row is un…'
+AssertionError: expected [ { …(7) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "conflictCount": 0,
++     "id": "BLG:BLG:BLG 101E:90001",
++     "meetings": [
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Monday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:0",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++       {
++         "branchCode": "BLG",
++         "building": undefined,
++         "capacity": undefined,
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "courseTitle": "QA lecture and laboratory",
++         "crn": "90001",
++         "day": "Wednesday",
++         "endTime": "10:00",
++         "enrolled": undefined,
++         "id": "BLG:90001:meeting:1",
++         "instructor": undefined,
++         "majorRestriction": "BLGE_LS",
++         "programRestriction": {
++           "codes": [
++             "BLGE_LS",
++           ],
++           "raw": "BLGE_LS",
++           "state": "allowlist",
++         },
++         "room": undefined,
++         "sectionId": "BLG:90001",
++         "semester": "QA semester",
++         "startTime": "09:00",
++         "teachingMethod": undefined,
++       },
++     ],
++     "metrics": {
++       "campusDays": 2,
++       "earliestStartMinutes": 540,
++       "latestEndMinutes": 600,
++       "totalGapMinutes": 0,
++     },
++     "score": 615,
++     "selections": [
++       {
++         "branchCode": "BLG",
++         "courseCode": "BLG 101E",
++         "courseId": "BLG:BLG 101E",
++         "crn": "90001",
++         "sectionId": "BLG:90001",
++       },
++     ],
++     "totalConflictMinutes": 0,
++   },
++ ]
+
+ ❯ tests/quality/incomplete-meetings.test.ts:20:62
+     18|   // Removing all incomplete sections, or rejecting the offering expli…
+     19|   // would satisfy this contract. Returning one verified schedule woul…
+     20|   expect(generateConflictFreeSchedules(offerings).schedules).toEqual([…
+       |                                                              ^
+     21| });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/quality/minor-program-codes.test.ts > accepts the exact minor identities supplied by the official curriculum catalog
+AssertionError: expected [ 'FIZ_YD', 'BTK_YD', 'KIM_YD', …(73) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "FIZ_YD",
++   "BTK_YD",
++   "KIM_YD",
++   "MAT_YD",
++   "MAT_YD_EC",
++   "MAT_YD_TE",
++   "MAT_YD_UY",
++   "BIO_YD",
++   "EUT_YD",
++   "ENT_YD",
++   "ICM_YD",
++   "PEM_YD",
++   "SBP_YD",
++   "MKN_YD_EL",
++   "IML_YD",
++   "MAK_YD",
++   "MKN_YD_MK",
++   "NUM_YD",
++   "CHZ_YD",
++   "JEF_YD",
++   "JEO_YD",
++   "MAD_YD",
++   "PET_YD",
++   "EGC_YD",
++   "ALG_YD",
++   "GID_YD",
++   "KMM_YD",
++   "YAN_YD",
++   "GEM_YD",
++   "OSN_YD",
++   "SOR_YD",
++   "BHB_YD",
++   "ECN_YD",
++   "SUS_YD",
++   "IBM_YD",
++   "MTO_YD",
++   "SAV_YD",
++   "UCK_YD",
++   "UZB_YD",
++   "CGM1_YD",
++   "CGM5_YD",
++   "CGM2_YD",
++   "CGM3_YD",
++   "CGM4_YD",
++   "CGM8_YD",
++   "CGM6_YD",
++   "CGM7_YD",
++   "MTMM_YD",
++   "MTMS_YD",
++   "MTMY_YD",
++   "MTR_YD",
++   "ETMM_YD",
++   "SEMH_YD",
++   "SEMS_YD",
++   "SMKM_YD",
++   "THMA_YD",
++   "THMB_YD",
++   "THMR_YD",
++   "THMH_YD",
++   "THMN_YD",
++   "THMK_YD",
++   "THMD_YD",
++   "THMZ_YD",
++   "THMT_YD",
++   "TMKM_YD",
++   "TEK_YD",
++   "KHE_YD",
++   "MTM_YD",
++   "CEN_YD",
++   "MMD_YD",
++   "EFN_YD",
++   "IND_YD",
++   "NAE_YD",
++   "MEN_YD",
++   "IAD_YD",
++   "ARC_YD",
++ ]
+
+ ❯ tests/quality/minor-program-codes.test.ts:10:20
+      8|   const rejected = minors.filter(program=>!curriculumProgramCodeSchema…
+      9|   // The selector and the plans/detail APIs must agree on program iden…
+     10|   expect(rejected).toEqual([]);
+       |                    ^
+     11| });
+     12|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/quality/official-enrollment.test.ts > retains the published enrolled count under the official Yazılan header
+AssertionError: expected undefined to be 90 // Object.is equality
+
+- Expected:
+90
+
++ Received:
+undefined
+
+ ❯ tests/quality/official-enrollment.test.ts:13:29
+     11|   const section = catalog.courses.find(x=>x.code==="BLG 231E")?.sectio…
+     12|   expect(section?.capacity).toBe(95);
+     13|   expect(section?.enrolled).toBe(90);
+       |                             ^
+     14| });
+     15|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  4 failed | 64 passed (68)
+      Tests  5 failed | 343 passed (348)
+   Start at  17:33:38
+   Duration  16.61s (transform 13.73s, setup 0ms, import 45.79s, tests 3.68s, environment 10ms)

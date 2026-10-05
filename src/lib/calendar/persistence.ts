@@ -1,3 +1,4 @@
+import { parseProgramRestriction } from "@/lib/program-restrictions/eligibility";
 import {
   days,
   type CourseBlock,
@@ -28,6 +29,22 @@ function optionalCount(value: unknown): number | undefined {
     : undefined;
 }
 
+function storedRestriction(value: Record<string, unknown>) {
+  const raw = typeof value.majorRestriction === "string" ? value.majorRestriction : undefined;
+  // Keep unknown/conflicting source states through a save/load round trip.
+  const stored = value.programRestriction;
+  if (isRecord(stored) && stored.state === "unrestricted" && Array.isArray(stored.codes) && stored.codes.length === 0) {
+    return { raw: typeof stored.raw === "string" ? stored.raw : raw,
+      state: "unrestricted" as const, codes: [], reason: optionalString(stored.reason) };
+  }
+  if (isRecord(stored) && stored.state === "unknown") {
+    return { raw: typeof stored.raw === "string" ? stored.raw : raw,
+      state: "unknown" as const, codes: Array.isArray(stored.codes) ? stored.codes.filter((code): code is string => typeof code === "string") : [],
+      reason: optionalString(stored.reason) };
+  }
+  return parseProgramRestriction(raw);
+}
+
 function parseCourseBlock(value: unknown): CourseBlock | null {
   if (
     !isRecord(value) ||
@@ -56,6 +73,9 @@ function parseCourseBlock(value: unknown): CourseBlock | null {
     teachingMethod: optionalString(value.teachingMethod),
     capacity: optionalCount(value.capacity),
     enrolled: optionalCount(value.enrolled),
+    majorRestriction: typeof value.majorRestriction === "string" ? value.majorRestriction : undefined,
+    programRestriction: storedRestriction(value),
+    semester: optionalString(value.semester),
   };
 }
 

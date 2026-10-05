@@ -6,7 +6,7 @@ describe("remember-me cookie policy", () => {
   it("keeps provider persistence when remember me is selected", () => {
     expect(
       applySessionPersistence({ maxAge: 3600, path: "/" }, true),
-    ).toEqual({ maxAge: 3600, path: "/" });
+    ).toEqual({ maxAge: 3600, path: "/", httpOnly: true, sameSite: "lax", secure: false });
   });
 
   it("uses browser-session cookies when remember me is not selected", () => {
@@ -15,6 +15,6 @@ describe("remember-me cookie policy", () => {
         { maxAge: 3600, expires: new Date("2030-01-01"), path: "/" },
         false,
       ),
-    ).toEqual({ path: "/" });
+    ).toEqual({ path: "/", httpOnly: true, sameSite: "lax", secure: false });
   });
 });

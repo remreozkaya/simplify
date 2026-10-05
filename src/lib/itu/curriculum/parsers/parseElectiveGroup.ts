@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 
 import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { normalizeCourseLanguage } from "@/lib/itu/curriculum/language";
 import { firstNumericValue, parseNumericOptions } from "@/lib/itu/curriculum/parsers/numbers";
 import type { ItuElectiveCourse } from "@/lib/itu/curriculum/types";
 
@@ -21,10 +22,11 @@ export function parseElectiveGroup(html: string): ParsedElectiveGroup {
     const whole = clean($(cells[0]).text());
     const title = clean(whole.slice(whole.indexOf(code) + code.length));
     if (!title) return;
+    const language = normalizeCourseLanguage($(cells[1]).text());
     courses.push({
       code,
       title,
-      ...(clean($(cells[1]).text()) ? { language: clean($(cells[1]).text()) } : {}),
+      ...(language ? { language } : {}),
       creditOptions: parseNumericOptions($(cells[2]).text()),
       ectsOptions: parseNumericOptions($(cells[3]).text()),
       ...(firstNumericValue($(cells[4]).text()) !== undefined

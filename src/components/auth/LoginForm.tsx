@@ -63,7 +63,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
         {t("authentication.noAccount")}{" "}
         <Link
           href="/signup"
-          className="font-black text-blue-700 hover:underline dark:text-blue-300"
+          className="font-semibold text-blue-700 hover:underline dark:text-blue-300"
         >
           {t("authentication.signup")}
         </Link>

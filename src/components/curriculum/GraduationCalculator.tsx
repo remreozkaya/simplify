@@ -79,7 +79,7 @@ function StatusIcon({ complete }: { complete: boolean }) {
   return (
     <span
       aria-label={t(complete ? "common.completed" : "common.incomplete")}
-      className={`inline-grid size-6 place-items-center rounded-full text-sm font-black ${complete ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
+      className={`inline-grid size-6 place-items-center rounded-full text-sm font-semibold ${complete ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
     >
       {complete ? "✓" : "×"}
     </span>
@@ -105,6 +105,7 @@ function ProgramAuditSection({
   const { curriculum, enrollment, program, progress } = audit;
   const totals = curriculumTotals(curriculum, progress);
   const programGpa = calculateProgramGpa(curriculum, progress);
+  const planLabel = localizedAcademicName({ name: curriculum.planTitle, nameTr: enrollment.curriculumPlanNameTr, nameEn: enrollment.curriculumPlanNameEn }, language);
   const completion = totals.requiredCourses
     ? Math.min(
         100,
@@ -116,7 +117,7 @@ function ProgramAuditSection({
     <article className="space-y-4" aria-labelledby={`audit-${enrollment.id}`}>
       <section className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm md:grid-cols-[1fr_auto]">
         <div>
-          <p className="text-xs font-black uppercase tracking-[.18em] text-cyan-300">
+          <p className="text-xs font-semibold uppercase tracking-[.18em] text-cyan-300">
             {t(
               enrollment.type === "main"
                 ? "academicPrograms.main"
@@ -127,15 +128,15 @@ function ProgramAuditSection({
           </p>
           <h2
             id={`audit-${enrollment.id}`}
-            className="mt-1 text-2xl font-black"
+            className="mt-1 text-2xl font-semibold"
           >
             {program
               ? localizedAcademicName(program, language)
               : enrollment.programName || curriculum.title}
           </h2>
           <p className="mt-1 text-sm text-slate-300">
-            {enrollment.facultyName} · {localizedAcademicName({ name: curriculum.planTitle, nameTr: enrollment.curriculumPlanNameTr, nameEn: enrollment.curriculumPlanNameEn }, language)}
-            {curriculum.validityPeriod ? ` · ${curriculum.validityPeriod}` : ""}
+            {enrollment.facultyName} · {planLabel}
+            {curriculum.validityPeriod && !planLabel.includes(curriculum.validityPeriod) ? ` · ${curriculum.validityPeriod}` : ""}
           </p>
         </div>
         <div className="min-w-40 self-center">
@@ -158,7 +159,7 @@ function ProgramAuditSection({
             <p className="text-xs font-bold uppercase text-slate-500">
               {t("graduationCalculator.requirements")}
             </p>
-            <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+            <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
               {totals.earnedCourses} / {totals.requiredCourses}
             </p>
           </div>
@@ -166,7 +167,7 @@ function ProgramAuditSection({
             <p className="text-xs font-bold uppercase text-slate-500">
               {t("graduationCalculator.countedCredits")}
             </p>
-            <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+            <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
               {value(totals.earnedCredit)} / {value(totals.requiredCredit)}
             </p>
           </div>
@@ -174,7 +175,7 @@ function ProgramAuditSection({
             <p className="text-xs font-bold uppercase text-slate-500">
               {t("graduationCalculator.englishCredits")}
             </p>
-            <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+            <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
               {value(totals.earnedEnglishCredit)} /{" "}
               {value(totals.requiredEnglishCredit)}
             </p>
@@ -183,7 +184,7 @@ function ProgramAuditSection({
             <p className="text-xs font-bold uppercase text-slate-500">
               {t("graduationCalculator.programGpa")}
             </p>
-            <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+            <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
               {programGpa === null
                 ? "—"
                 : formatNumber(language, programGpa, {
@@ -241,7 +242,7 @@ function ProgramAuditSection({
             className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-4 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-blue-600 sm:px-6">
-              <span className="text-lg font-black text-slate-950 dark:text-white">
+              <span className="text-lg font-semibold text-slate-950 dark:text-white">
                 {localizedCurriculumSection(
                   language,
                   curriculum.planType,
@@ -321,7 +322,7 @@ function ProgramAuditSection({
                             .join(" + ") ?? ""}
                         </td>
                         <td className="p-3">
-                          <span className="font-black">
+                          <span className="font-semibold">
                             {item.kind === "course"
                               ? item.code
                               : localizedAcademicName(item, language)}
@@ -335,7 +336,7 @@ function ProgramAuditSection({
                         <td className="p-3 font-bold">
                           {actualCodes}
                           {equivalent ? (
-                            <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black uppercase text-blue-800">
+                            <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase text-blue-800">
                               {t("graduationCalculator.equivalent")}
                             </span>
                           ) : null}
@@ -590,7 +591,7 @@ export default function GraduationCalculator() {
   if (!audits.length)
     return (
       <section className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-amber-950 shadow-sm">
-        <h2 className="text-xl font-black">
+        <h2 className="text-xl font-semibold">
           {t("graduationCalculator.completeProfile")}
         </h2>
         <p className="mt-2 text-sm">
@@ -598,7 +599,7 @@ export default function GraduationCalculator() {
         </p>
         <Link
           href="/profile"
-          className="mt-4 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-black text-white"
+          className="mt-4 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white"
         >
           {t("graduationCalculator.openProfile")}
         </Link>
@@ -610,7 +611,7 @@ export default function GraduationCalculator() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <label
           htmlFor="transcript-input"
-          className="text-lg font-black text-slate-950 dark:text-white"
+          className="text-lg font-semibold text-slate-950 dark:text-white"
         >
           {t("graduationCalculator.sharedTranscript")}
         </label>
@@ -638,14 +639,14 @@ export default function GraduationCalculator() {
             type="button"
             onClick={importCourses}
             disabled={!input.trim()}
-            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-black text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("graduationCalculator.importCourses")}
           </button>
           <button
             type="button"
             onClick={() => setInput("")}
-            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
           >
             {t("graduationCalculator.clearInput")}
           </button>
@@ -653,7 +654,7 @@ export default function GraduationCalculator() {
             type="button"
             onClick={resetImported}
             disabled={!sharedTranscript.length}
-            className="rounded-xl border border-red-300 bg-red-50 px-5 py-3 text-sm font-black text-red-800 disabled:opacity-50"
+            className="rounded-xl border border-red-300 bg-red-50 px-5 py-3 text-sm font-semibold text-red-800 disabled:opacity-50"
           >
             {t("graduationCalculator.resetImported")}
           </button>
@@ -665,7 +666,7 @@ export default function GraduationCalculator() {
                 <p className="text-xs font-bold uppercase text-slate-500">
                   {t("graduationCalculator.parsedCourses")}
                 </p>
-                <p className="text-2xl font-black">
+                <p className="text-2xl font-semibold">
                   {lastReport.parsed.calculatedCourses.length +
                     lastReport.parsed.nonCalculatedCourses.length}
                 </p>
@@ -674,13 +675,13 @@ export default function GraduationCalculator() {
                 <p className="text-xs font-bold uppercase text-slate-500">
                   {t("graduationCalculator.programsEvaluated")}
                 </p>
-                <p className="text-2xl font-black">{audits.length}</p>
+                <p className="text-2xl font-semibold">{audits.length}</p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
                 <p className="text-xs font-bold uppercase text-slate-500">
                   {t("graduationCalculator.rowsAttention")}
                 </p>
-                <p className="text-2xl font-black">
+                <p className="text-2xl font-semibold">
                   {lastReport.parsed.invalidRows.length +
                     lastReport.parsed.duplicateRows.length}
                 </p>
@@ -715,19 +716,19 @@ export default function GraduationCalculator() {
               <p className="text-xs font-bold uppercase text-slate-500">
                 {t("graduationCalculator.transcriptCourses")}
               </p>
-              <p className="text-2xl font-black">{sharedTranscript.length}</p>
+              <p className="text-2xl font-semibold">{sharedTranscript.length}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
               <p className="text-xs font-bold uppercase text-slate-500">
                 {t("graduationCalculator.transcriptCredits")}
               </p>
-              <p className="text-2xl font-black">{value(calculatedCredit)}</p>
+              <p className="text-2xl font-semibold">{value(calculatedCredit)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
               <p className="text-xs font-bold uppercase text-slate-500">
                 {t("graduationCalculator.gpaOnce")}
               </p>
-              <p className="text-2xl font-black">
+              <p className="text-2xl font-semibold">
                 {gpa === null
                   ? "—"
                   : formatNumber(language, gpa, {
@@ -743,7 +744,7 @@ export default function GraduationCalculator() {
       {audits.length > 1 ? (
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5">
           <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700 dark:text-blue-300">
+            <p className="text-xs font-semibold uppercase tracking-[.18em] text-blue-700 dark:text-blue-300">
               {t("curriculum.yourPrograms")}
             </p>
           </div>
@@ -779,7 +780,7 @@ export default function GraduationCalculator() {
 
       {nonCalculated.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-xl font-black">
+          <h2 className="text-xl font-semibold">
             {t("graduationCalculator.nonCalculated")}
           </h2>
           <p className="mt-1 text-sm text-slate-500">

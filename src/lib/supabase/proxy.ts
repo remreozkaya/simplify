@@ -9,6 +9,10 @@ import {
 import { getRouteDecision } from "@/lib/auth/redirects";
 
 export async function updateSession(request: NextRequest) {
+  // Legal information is public and requires no provider session refresh.
+  if (request.nextUrl.pathname === "/legal" || request.nextUrl.pathname.startsWith("/legal/")) {
+    return NextResponse.next({ request });
+  }
   const configured = isSupabaseConfigured();
   let response = NextResponse.next({ request });
   let isAuthenticated = false;

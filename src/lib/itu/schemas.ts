@@ -201,7 +201,7 @@ export const ituCourseTableRowSchema: z.ZodType<ItuCourseTableRow> =
     capacity: optionalTextSchema,
     enrolled: optionalTextSchema,
     reserved: optionalTextSchema,
-    majorRestriction: optionalTextSchema,
+    majorRestriction: z.string().max(10_000).optional(),
     classRestriction: optionalTextSchema,
     prerequisites: optionalTextSchema,
   });
@@ -241,6 +241,13 @@ const ituCourseSectionSchema: z.ZodType<ItuCourseSection> =
     courseTitle: nonEmptyTextSchema,
     teachingMethod: optionalTextSchema,
     instructor: optionalTextSchema,
+    semester: optionalTextSchema,
+    programRestriction: z.object({
+      raw: z.string().max(10_000).optional(),
+      state: z.enum(["unrestricted", "allowlist", "unknown"]),
+      codes: z.array(z.string()),
+      reason: optionalTextSchema,
+    }).optional(),
     meetings: z
       .array(ituCourseMeetingSchema)
       .min(
@@ -250,7 +257,7 @@ const ituCourseSectionSchema: z.ZodType<ItuCourseSection> =
     capacity: optionalNonNegativeIntegerSchema,
     enrolled: optionalNonNegativeIntegerSchema,
     reserved: optionalNonNegativeIntegerSchema,
-    majorRestriction: optionalTextSchema,
+    majorRestriction: z.string().max(10_000).optional(),
     classRestriction: optionalTextSchema,
     prerequisites: optionalTextSchema,
   });
@@ -304,6 +311,7 @@ export const ituCourseCatalogSchema: z.ZodType<ItuCourseCatalog> =
     branchCode: branchCodeSchema,
     courses: z.array(ituCourseSchema),
     fetchedAt: z.iso.datetime({ offset: true }),
+    semester: optionalTextSchema,
   });
 
 export const ituCoursesQuerySchema: z.ZodType<ItuCoursesQuery> =

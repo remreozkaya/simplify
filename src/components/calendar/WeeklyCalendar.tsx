@@ -19,6 +19,9 @@ import {
 } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
+import { useProfile } from "@/components/profile/ProfileProvider";
+import { resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
+
 import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
@@ -103,6 +106,11 @@ export default function WeeklyCalendar({
   view = "planner",
 }: WeeklyCalendarProps) {
   const { language, t } = useLanguage();
+  const { profile } = useProfile();
+  const programMemberships = useMemo(
+    () => resolveProgramMemberships(profile.programEnrollments),
+    [profile.programEnrollments],
+  );
   const {
     courseCatalog,
     isLoadingBranches,
@@ -585,6 +593,9 @@ export default function WeeklyCalendar({
           code: selectedCourse.code,
           title: selectedCourse.title,
           crn: selectedSection.crn,
+          majorRestriction: selectedSection.majorRestriction,
+          programRestriction: selectedSection.programRestriction,
+          semester: selectedSection.semester,
           day: meeting.day,
           startTime: meeting.startTime,
           endTime: meeting.endTime,
@@ -914,6 +925,7 @@ export default function WeeklyCalendar({
                         <SortableCourseRow
                           key={selection.id}
                           selection={selection}
+                          programMemberships={programMemberships}
                           courseCatalog={courseCatalog}
                           isLoadingBranches={isLoadingBranches}
                           isBranchLoading={isBranchLoading}
@@ -941,6 +953,7 @@ export default function WeeklyCalendar({
         </div>
       ) : (
         <ScheduleGeneratorPanel
+          programMemberships={programMemberships}
           courseCatalog={courseCatalog}
           isLoadingBranches={isLoadingBranches}
           isBranchLoading={isBranchLoading}

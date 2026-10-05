@@ -23,6 +23,9 @@ export async function saveProfileAction(input: unknown): Promise<ProfileActionSt
 
   const profile = makeProfile(parsed.data);
   try {
+    const supabase = await createClient();
+    const { data, error: userError } = await supabase.auth.getUser();
+    if (userError || !data.user?.email_confirmed_at) return { status: "error", message: "Your session has expired. Sign in again to save your profile." };
     const main = profile.programEnrollments.find((item) => item.type === "main")!;
     for (const enrollment of profile.programEnrollments) {
       const programs = await getFacultyPrograms(enrollment.facultyId, enrollment.planType);
@@ -53,9 +56,6 @@ export async function saveProfileAction(input: unknown): Promise<ProfileActionSt
       }
       enrollment.selectionRequiresReview = undefined;
     }
-    const supabase = await createClient();
-    const { data, error: userError } = await supabase.auth.getUser();
-    if (userError || !data.user) return { status: "error", message: "Your session has expired. Sign in again to save your profile." };
     const { error } = await supabase.auth.updateUser({ data: { profile } });
     if (error) return { status: "error", message: "Your profile could not be saved right now. Try again." };
     revalidatePath("/", "layout");

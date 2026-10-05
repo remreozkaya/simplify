@@ -7,6 +7,7 @@ export const ITU_OBS_ORIGIN =
   "https://obs.itu.edu.tr";
 
 export const ITU_OBS_PATHS = {
+  activeSemester: "/public/DersProgram/GetAktifDonemByProgramSeviye",
   courseSchedule: "/public/DersProgram",
   branchesSearch:
     "/public/DersProgram/SearchBransKoduByProgramSeviye",
@@ -165,6 +166,8 @@ export const ITU_COURSE_TABLE_HEADER_ALIASES = {
   ],
 
   enrolled: [
+    "yazılan",
+    "yazilan",
     "kayıtlı",
     "kayitli",
     "enrolled",
@@ -176,6 +179,8 @@ export const ITU_COURSE_TABLE_HEADER_ALIASES = {
   ],
 
   majorRestriction: [
+    "dersi alabilen programlar",
+    "eligible programs",
     "bölüm kısıtı",
     "bolum kisiti",
     "major restriction",

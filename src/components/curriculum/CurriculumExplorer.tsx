@@ -820,13 +820,13 @@ export default function CurriculumExplorer() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700 dark:text-blue-300">
+              <p className="text-xs font-semibold uppercase tracking-[.18em] text-blue-700 dark:text-blue-300">
                 {t("curriculum.yourPrograms")}
               </p>
             </div>
             <a
               href="/profile"
-              className="text-sm font-black text-blue-700 hover:underline dark:text-blue-300"
+              className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300"
             >
               {t("curriculum.manageProfile")}
             </a>
@@ -845,7 +845,7 @@ export default function CurriculumExplorer() {
       {!enrolledPrograms.length ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-[.18em] text-blue-700">
+            <p className="text-xs font-semibold uppercase tracking-[.18em] text-blue-700">
               {t("curriculum.chooseProgram")}
             </p>
           </div>
@@ -921,7 +921,7 @@ export default function CurriculumExplorer() {
                 type="button"
                 onClick={saveCurriculum}
                 disabled={!curriculum || !progress}
-                className="min-w-36 rounded-xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-w-36 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t(
                   saveConfirmed
@@ -968,7 +968,7 @@ export default function CurriculumExplorer() {
                     )
                   : curriculum.programCode}
               </p>
-              <h2 className="mt-2 text-2xl font-black">
+              <h2 className="mt-2 text-2xl font-semibold">
                 {localizedAcademicName({ name: curriculum.title, nameTr: currentEnrollment?.programNameTr, nameEn: currentEnrollment?.programNameEn }, language)}
               </h2>
               <p className="mt-1 max-w-3xl text-sm text-slate-600">
@@ -1017,7 +1017,7 @@ export default function CurriculumExplorer() {
             <div className="grid grid-cols-3 gap-2 self-center text-center">
               {(Object.keys(summary) as CourseDerivedStatus[]).map((status) => (
                 <div key={status} className="px-3 py-2">
-                  <div className="text-xl font-black">{summary[status]}</div>
+                  <div className="text-xl font-semibold">{summary[status]}</div>
                   <div className="text-xs font-medium text-slate-500">
                     {statusLabel(status)}
                   </div>
@@ -1029,7 +1029,7 @@ export default function CurriculumExplorer() {
           <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="mb-2 text-xs font-black uppercase tracking-[.16em] text-slate-500">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">
                   {t("curriculum.courseStatus")}
                 </p>
                 <div
@@ -1051,8 +1051,16 @@ export default function CurriculumExplorer() {
                               [filter]: event.target.checked,
                             }))
                           }
-                          className="size-4 accent-slate-900"
+                          className="peer sr-only"
                         />
+                        <span
+                          aria-hidden="true"
+                          className="flex size-5 shrink-0 items-center justify-center rounded border-2 border-slate-400 bg-white text-white transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2 dark:border-slate-400 dark:bg-slate-800 dark:peer-checked:border-blue-600 dark:peer-checked:bg-blue-600 dark:peer-focus-visible:ring-offset-slate-900"
+                        >
+                          <svg viewBox="0 0 16 16" className="size-4 opacity-0" fill="none">
+                            <path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
                         {statusLabel(filter)}
                       </label>
                     ),
@@ -1159,7 +1167,7 @@ export default function CurriculumExplorer() {
                     <>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-xl font-black text-slate-950">
+                          <p className="text-xl font-semibold text-slate-950">
                             {selectedCode}
                           </p>
                           <p className="mt-1 text-sm text-slate-600">
@@ -1210,7 +1218,7 @@ export default function CurriculumExplorer() {
                             "equivalence" ||
                             selectedCompletion.satisfaction.satisfactionType ===
                               "language-equivalence") && (
-                            <span className="mr-2 rounded-full bg-blue-100 px-2 py-1 font-black text-blue-800">
+                            <span className="mr-2 rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800">
                               {t(
                                 selectedCompletion.satisfaction
                                   .satisfactionType === "language-equivalence"
@@ -1261,7 +1269,7 @@ export default function CurriculumExplorer() {
                       )}
 
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">
+                        <h4 className="text-sm font-semibold text-slate-900">
                           {t("common.status")}
                         </h4>
                         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -1271,7 +1279,7 @@ export default function CurriculumExplorer() {
                               setCourseProgress(selectedCode, "none")
                             }
                             aria-pressed={!progress.courses[selectedCode]}
-                            className={`rounded-lg border-2 border-slate-500 bg-slate-200 px-2 py-2 text-xs font-black text-black hover:bg-slate-300 ${!progress.courses[selectedCode] ? "ring-2 ring-slate-700 ring-offset-2" : "opacity-65"}`}
+                            className={`rounded-lg border-2 border-slate-500 bg-slate-200 px-2 py-2 text-xs font-semibold text-black hover:bg-slate-300 ${!progress.courses[selectedCode] ? "ring-2 ring-slate-700 ring-offset-2" : "opacity-65"}`}
                           >
                             {t("curriculum.notTaken")}
                           </button>
@@ -1287,7 +1295,7 @@ export default function CurriculumExplorer() {
                             aria-pressed={
                               progress.courses[selectedCode]?.state === "passed"
                             }
-                            className={`rounded-lg border-2 border-emerald-600 bg-emerald-200 px-2 py-2 text-xs font-black text-emerald-950 hover:bg-emerald-300 ${progress.courses[selectedCode]?.state === "passed" ? "ring-2 ring-emerald-700 ring-offset-2" : "opacity-65"}`}
+                            className={`rounded-lg border-2 border-emerald-600 bg-emerald-200 px-2 py-2 text-xs font-semibold text-emerald-950 hover:bg-emerald-300 ${progress.courses[selectedCode]?.state === "passed" ? "ring-2 ring-emerald-700 ring-offset-2" : "opacity-65"}`}
                           >
                             {t("curriculum.passed")}
                           </button>
@@ -1299,7 +1307,7 @@ export default function CurriculumExplorer() {
                             aria-pressed={
                               progress.courses[selectedCode]?.state === "failed"
                             }
-                            className={`rounded-lg border-2 border-red-600 bg-red-200 px-2 py-2 text-xs font-black text-red-950 hover:bg-red-300 ${progress.courses[selectedCode]?.state === "failed" ? "ring-2 ring-red-700 ring-offset-2" : "opacity-65"}`}
+                            className={`rounded-lg border-2 border-red-600 bg-red-200 px-2 py-2 text-xs font-semibold text-red-950 hover:bg-red-300 ${progress.courses[selectedCode]?.state === "failed" ? "ring-2 ring-red-700 ring-offset-2" : "opacity-65"}`}
                           >
                             {t("curriculum.failed")}
                           </button>
@@ -1334,7 +1342,7 @@ export default function CurriculumExplorer() {
                       </div>
 
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">
+                        <h4 className="text-sm font-semibold text-slate-900">
                           {t("curriculum.prerequisites")}
                         </h4>
                         {selectedPrerequisite?.rawExpression ? (
@@ -1358,7 +1366,7 @@ export default function CurriculumExplorer() {
                         )}
                       </div>
                       <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-sm font-black text-slate-900">
+                        <h4 className="text-sm font-semibold text-slate-900">
                           {t("curriculum.unlocks")}
                         </h4>
                         {unlocks.length ? (
@@ -1386,7 +1394,7 @@ export default function CurriculumExplorer() {
                     </>
                   ) : selectedNode?.kind === "and" ? (
                     <div>
-                      <p className="text-xl font-black">
+                      <p className="text-xl font-semibold">
                         {t("curriculum.andRequirement")}
                       </p>
                       <p className="mt-2 text-sm text-slate-600">
@@ -1468,7 +1476,7 @@ function ElectiveDetails({
 
   return (
     <div>
-      <p className="text-xl font-black text-slate-950">
+      <p className="text-xl font-semibold text-slate-950">
         {localizedAcademicName(slot, language)}
       </p>
       <p className="mt-2 text-xs text-slate-500">
@@ -1481,7 +1489,7 @@ function ElectiveDetails({
         {optionsText(slot.creditOptions, t("common.credit"))} ·{" "}
         {optionsText(slot.ectsOptions, t("curriculum.ects"))}
       </p>
-      <h4 className="mt-5 border-t border-slate-100 pt-4 text-sm font-black">
+      <h4 className="mt-5 border-t border-slate-100 pt-4 text-sm font-semibold">
         {t(
           onlyTakeable
             ? "curriculum.availableThisSemester"
@@ -1535,7 +1543,7 @@ function ElectiveDetails({
                   {localizedAcademicName(course, language)}
                 </p>
                 {languageEquivalent && (
-                  <p className="mt-1 text-[10px] font-black text-blue-700">
+                  <p className="mt-1 text-[10px] font-semibold text-blue-700">
                     {t("curriculum.languageEquivalent", {
                       code: actualCode ?? "",
                     })}

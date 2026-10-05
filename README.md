@@ -221,3 +221,11 @@ The importer discovers faculties and undergraduate, ÇAP, and Yandal programs; f
 ```bash
 npm run curricula:prerequisites
 ```
+
+## Privacy and deployment readiness
+
+Public bilingual legal pages live at `/legal/privacy`, `/legal/storage`, `/legal/terms`, and `/legal/requests`. Collection-point notices explain server-saved profiles and browser-only academic data. Profile includes verified account export/deletion; the public storage policy also offers local download/clear. Local records remain shared by accounts in the same browser and survive logout; users are warned explicitly.
+
+Legal owner facts are centralized in `src/lib/legal/operator.json`. They are intentionally unresolved: notices remain pre-launch drafts. Account deletion additionally requires a **server-only** `SUPABASE_SECRET_KEY`; no admin credential is sent to clients. The request page opens a configured mail app and has no fake delivery form; contact/delivery must be confirmed before launch.
+
+Run `npm run legal:check` to see missing mandatory facts/reviews. Use **`npm run build:production` as the deployment build command**; ordinary `npm run build` only verifies compilation and does not authorize launch. Read [audit](docs/legal/AUDIT.md), [requirements and official sources](docs/legal/REQUIREMENTS.md), [operations and launch blockers](docs/legal/OPERATIONS.md), and [verification](docs/legal/VERIFICATION.md). No overseas-transfer arrangement, retention period, controller identity or university affiliation has been invented.

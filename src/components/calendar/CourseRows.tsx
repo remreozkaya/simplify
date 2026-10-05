@@ -1,5 +1,8 @@
 "use client";
 
+import ProgramRestrictionWarning from "./ProgramRestrictionWarning";
+import { evaluateProgramEligibility, type ProgramMembership } from "@/lib/program-restrictions/eligibility";
+
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -22,6 +25,7 @@ export const courseRowGridClassName =
 
 type SortableCourseRowProps = {
   selection: CourseSelection;
+  programMemberships: readonly ProgramMembership[];
   courseCatalog: FacultyOption[];
   isLoadingBranches: boolean;
   isBranchLoading: (branchCode: string) => boolean;
@@ -47,6 +51,7 @@ function DragHandleIcon() {
 
 export function SortableCourseRow({
   selection,
+  programMemberships,
   courseCatalog,
   isLoadingBranches,
   isBranchLoading,
@@ -77,6 +82,12 @@ export function SortableCourseRow({
     courseCatalog,
     selection.facultyCode,
     selection.courseId,
+  );
+
+  const selectedSection = getSectionById(selectedCourse, selection.sectionId);
+  const eligibility = evaluateProgramEligibility(
+    selectedSection?.programRestriction ?? selectedSection?.majorRestriction,
+    programMemberships,
   );
 
   const branchIsLoading = isBranchLoading(selection.facultyCode);
@@ -193,6 +204,9 @@ export function SortableCourseRow({
       >
         {t("weeklyPlanner.delete")}
       </button>
+      {selectedSection && !branchIsLoading ? (
+        <ProgramRestrictionWarning eligibility={eligibility} />
+      ) : null}
     </div>
   );
 }

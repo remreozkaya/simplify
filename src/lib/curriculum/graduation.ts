@@ -4,6 +4,7 @@ import type { CourseProgress, CurriculumProgress, RequirementSatisfaction, Trans
 import type { TranscriptParseResult } from "@/lib/curriculum/transcript";
 import type { ItuCurriculum, ItuCurriculumItem } from "@/lib/itu/curriculum/types";
 import { courseLanguageFromCode, courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
+import { normalizeCourseLanguage } from "@/lib/itu/curriculum/language";
 
 export type CourseMatchIssue = { record: TranscriptCourseRecord; reason: string; requirementId?: string };
 export type ImportResult = { progress: CurriculumProgress; matched: TranscriptCourseRecord[]; unmatched: CourseMatchIssue[]; ambiguous: CourseMatchIssue[] };
@@ -338,7 +339,7 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
   let earnedCourses = 0, earnedCredit = 0, earnedEnglishCredit = 0, requiredEnglishCredit = 0;
   items.forEach((item) => {
     const requiredCredit = item.creditOptions[0] ?? 0;
-    const requiredLanguage = item.kind === "course" ? item.language : item.courses.length && item.courses.every((course) => course.language === "EN") ? "EN" : undefined;
+    const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : item.courses.length && item.courses.every((course) => normalizeCourseLanguage(course.language) === "EN") ? "EN" : undefined;
     if (requiredLanguage === "EN") requiredEnglishCredit += requiredCredit;
     const completed = progressForRequirement(item, progress, curriculum);
     if (completed?.course.state !== "passed") return;
@@ -347,7 +348,7 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
     // retained separately for GPA and transcript reporting.
     const credit = requiredCredit;
     earnedCredit += credit;
-    if ((requiredLanguage ?? completed.course.courseLanguage ?? completed.language) === "EN") earnedEnglishCredit += credit;
+    if (normalizeCourseLanguage(requiredLanguage ?? completed.course.courseLanguage ?? completed.language) === "EN") earnedEnglishCredit += credit;
   });
   return {
     requiredCourses: items.length,

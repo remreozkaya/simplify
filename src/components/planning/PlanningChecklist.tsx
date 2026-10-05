@@ -10,11 +10,11 @@ import { getPlanningCompletion, type PlanningRecords } from '@/lib/planning/chec
 import { GENERATOR_SESSION_STORAGE_KEY, PLANNING_PROGRESS_EVENT } from '@/lib/schedule/session';
 
 const steps = [
-  { href: '/profile', label: 'home.setup', description: 'home.setupDescription' },
-  { href: '/graduation-calculator', label: 'home.import', description: 'home.importDescription' },
-  { href: '/semester-planner', label: 'navigation.semesterPlanner', description: 'home.semesterDescription' },
-  { href: '/generator', label: 'navigation.scheduleGenerator', description: 'home.generatorDescription' },
-  { href: '/weekly-planner', label: 'navigation.weeklyPlanner', description: 'home.plannerDescription' },
+  { href: '/profile', label: 'home.setup' },
+  { href: '/graduation-calculator', label: 'home.import' },
+  { href: '/semester-planner', label: 'navigation.semesterPlanner' },
+  { href: '/generator', label: 'navigation.scheduleGenerator' },
+  { href: '/weekly-planner', label: 'navigation.weeklyPlanner' },
 ];
 const events = ['storage', 'focus', SHARED_TRANSCRIPT_EVENT, PLANNING_PROGRESS_EVENT];
 function subscribe(callback: () => void) {
@@ -63,7 +63,6 @@ export function PlanningChecklistView({ completed, t }: { completed: boolean[]; 
                 {done || active ? <span className={`text-xs font-medium ${done ? 'text-emerald-700 dark:text-emerald-300' : 'text-blue-700 dark:text-blue-300'}`}>{t(done ? 'home.planningCompleted' : 'home.planningNext')}</span> : null}
               </div>
               <p className={`text-sm font-semibold ${done ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>{t(step.label)}</p>
-              <p className={`mt-1 text-xs leading-5 ${done ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>{t(step.description)}</p>
               {active ? <span className="mt-auto pt-4 text-xs font-semibold text-blue-700 dark:text-blue-300">{t('home.planningContinue')} <span aria-hidden="true">→</span></span> : null}
             </Link>
           </li>;

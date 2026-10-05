@@ -8,6 +8,9 @@ import {
   useState,
 } from "react";
 
+import { ITU_CACHE_REVALIDATE_SECONDS } from "@/lib/itu/constants";
+import { isCatalogFresh, markCatalogUnavailable, mergeSemesterCatalog, parseCalendarCatalog } from "@/lib/itu/services/semesterCache";
+
 import type { FacultyOption } from "@/types/calendar";
 
 type ItuBranch = {
@@ -43,23 +46,6 @@ function parseBranches(value: unknown): ItuBranch[] {
   );
 }
 
-function parseCatalog(value: unknown, branchCode: string): FacultyOption {
-  if (!isRecord(value) || !isRecord(value.catalog)) {
-    throw new Error(`The ${branchCode} catalog response is invalid.`);
-  }
-
-  const catalog = value.catalog;
-
-  if (
-    catalog.facultyCode !== branchCode ||
-    !Array.isArray(catalog.courses)
-  ) {
-    throw new Error(`The ${branchCode} catalog response is invalid.`);
-  }
-
-  return catalog as FacultyOption;
-}
-
 async function readErrorMessage(
   response: Response,
   fallback: string,
@@ -91,6 +77,7 @@ export function useItuCourseCatalog() {
     new Set(),
   );
   const [error, setError] = useState<string | null>(null);
+  const [unavailableBranchCodes, setUnavailableBranchCodes] = useState<Set<string>>(new Set());
   const [failedBranchCode, setFailedBranchCode] = useState<string | null>(null);
   const [branchRequestVersion, setBranchRequestVersion] = useState(0);
   const inFlightBranchCodes = useRef<Set<string>>(new Set());
@@ -155,7 +142,7 @@ export function useItuCourseCatalog() {
 
       if (
         !normalizedBranchCode ||
-        (!force && catalogRef.current[normalizedBranchCode]) ||
+        (!force && isCatalogFresh(catalogRef.current[normalizedBranchCode])) ||
         inFlightBranchCodes.current.has(normalizedBranchCode)
       ) {
         return;
@@ -185,7 +172,7 @@ export function useItuCourseCatalog() {
         });
         const response = await fetch(
           `/api/itu/courses?${parameters.toString()}`,
-          { method: "GET" },
+          { method: "GET", cache: "no-store" },
         );
 
         if (!response.ok) {
@@ -197,16 +184,21 @@ export function useItuCourseCatalog() {
           );
         }
 
-        const catalog = parseCatalog(
+        const catalog = parseCalendarCatalog(
           (await response.json()) as unknown,
           normalizedBranchCode,
         );
 
-        setCatalogByCode((current) => ({
-          ...current,
-          [normalizedBranchCode]: catalog,
-        }));
+        const next = mergeSemesterCatalog(catalogRef.current, catalog);
+        catalogRef.current = next;
+        setCatalogByCode(next);
+        setUnavailableBranchCodes((current) => {
+          const available = new Set(current);
+          available.delete(normalizedBranchCode);
+          return available;
+        });
       } catch (requestError: unknown) {
+        setUnavailableBranchCodes((current) => new Set(current).add(normalizedBranchCode));
         setFailedBranchCode(normalizedBranchCode);
         setError(
           requestError instanceof Error
@@ -225,6 +217,21 @@ export function useItuCourseCatalog() {
     [branches],
   );
 
+  useEffect(() => {
+    const refreshLoadedBranches = () => {
+      if (document.visibilityState === "hidden") return;
+      for (const code of Object.keys(catalogRef.current)) void loadBranch(code);
+    };
+    const interval = window.setInterval(refreshLoadedBranches, ITU_CACHE_REVALIDATE_SECONDS * 1000);
+    window.addEventListener("focus", refreshLoadedBranches);
+    document.addEventListener("visibilitychange", refreshLoadedBranches);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshLoadedBranches);
+      document.removeEventListener("visibilitychange", refreshLoadedBranches);
+    };
+  }, [loadBranch]);
+
   const retryBranches = useCallback(() => {
     setBranchRequestVersion((current) => current + 1);
   }, []);
@@ -239,12 +246,14 @@ export function useItuCourseCatalog() {
     () =>
       branches.map(
         (branch) =>
-          catalogByCode[branch.code] ?? {
+          (catalogByCode[branch.code] && unavailableBranchCodes.has(branch.code)
+            ? markCatalogUnavailable(catalogByCode[branch.code])
+            : catalogByCode[branch.code]) ?? {
             facultyCode: branch.code,
             courses: [],
           },
       ),
-    [branches, catalogByCode],
+    [branches, catalogByCode, unavailableBranchCodes],
   );
   const loadedBranchCodes = useMemo(
     () => new Set(Object.keys(catalogByCode)),

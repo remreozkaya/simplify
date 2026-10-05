@@ -1,3 +1,4 @@
+import { evaluateProgramEligibility, resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
 import {
   evaluatePrerequisiteExpression,
   getMissingPrerequisites,
@@ -38,7 +39,7 @@ export const MAX_PLANNER_CANDIDATE_VISITS = 2_000;
 export const MAX_PLANNER_SCHEDULE_NODES = 20_000;
 const MAX_PLANNER_SCHEDULE_CALL_NODES = 500;
 
-type MutableCandidate = Omit<SemesterCourseCandidate, "eligibility" | "availability" | "missingPrerequisites" | "immediateUnlocks" | "downstreamUnlocks" | "score"> & {
+type MutableCandidate = Omit<SemesterCourseCandidate, "programEligibility" | "eligibility" | "availability" | "missingPrerequisites" | "immediateUnlocks" | "downstreamUnlocks" | "score"> & {
   prerequisiteSources: Array<{ prerequisite?: ItuCoursePrerequisite; prerequisiteKnown: boolean }>;
 };
 
@@ -321,7 +322,8 @@ function baseScore(candidate: Omit<SemesterCourseCandidate, "score">) {
     candidate.immediateUnlocks.length * 28 +
     candidate.downstreamUnlocks.length * 9 +
     (candidate.availability === "available" ? 10 : candidate.availability === "unknown" ? -4 : -1000) +
-    (candidate.eligibility === "confirmed" ? 8 : candidate.eligibility === "conditional" ? -5 : -10);
+    (candidate.eligibility === "confirmed" ? 8 : candidate.eligibility === "conditional" ? -5 : -10) +
+    (candidate.programEligibility === "eligible" ? 20 : 0);
 }
 
 function candidateSelectionScore(
@@ -404,6 +406,7 @@ function scheduleForCourses(
     maxResults: 1,
     maxVisitedNodes,
     stopAfterFirst: true,
+    programMemberships: options.programMemberships,
   });
   const schedule = generated.schedules[0];
   const diagnostics = { visitedNodes: generated.visitedNodes, limited: Boolean(generated.searchLimitReached || generated.truncated) };
@@ -450,6 +453,16 @@ export function buildSemesterPlan(
   options: SemesterPlannerOptions,
 ): SemesterPlan {
   validateOptions(options);
+  options = { ...options, programMemberships: options.programMemberships ?? resolveProgramMemberships(programs.map((program) => program.enrollment)) };
+  const memberships = options.programMemberships ?? [];
+  const sectionStatus = (section: GeneratorCourse["sections"][number]) => evaluateProgramEligibility(section.programRestriction ?? section.majorRestriction, memberships).status;
+  // Section openness never creates a curriculum contribution: collectCandidates
+  // continues to draw solely from each selected program's own requirements.
+  const sourceOfferings = options.courseOfferings ?? [];
+  options = { ...options, courseOfferings: sourceOfferings.map((offering) => ({ ...offering,
+    sections: offering.sections.filter((section) => !memberships.length || sectionStatus(section) !== "ineligible"),
+  })) };
+  let restrictedCourseCount = 0;
   const confirmedProgress = combinedProgress(programs);
   const notices: PlannerNotice[] = [];
   const candidateMap = collectCandidates(programs);
@@ -465,6 +478,10 @@ export function buildSemesterPlan(
     const availability = evaluateAvailability(code, options);
     if (availability === "unknown") hasUnknownAvailability = true;
     const offerings = offeringsForCode(code, options.courseOfferings);
+    const beforeRestrictions = offeringsForCode(code, sourceOfferings).flatMap((offering) => offering.sections.filter((section) => (!offering.pinnedSectionId || section.id === offering.pinnedSectionId) && section.meetings.length > 0));
+    if (memberships.length && beforeRestrictions.length && beforeRestrictions.every((section) => sectionStatus(section) === "ineligible")) restrictedCourseCount += 1;
+    const permittedSections = offerings.flatMap((offering) => offering.sections.filter((section) => (!offering.pinnedSectionId || section.id === offering.pinnedSectionId) && section.meetings.length > 0));
+    const programEligibility = memberships.length ? (permittedSections.some((section) => sectionStatus(section) === "eligible") ? "eligible" as const : "unknown" as const) : undefined;
     if (availability !== "available" || !offerings.some((offering) => offering.sections.some((section) => section.meetings.length > 0))) return;
     const unlocks = unlocksForCandidate(code, programs, confirmedProgress);
     const value = {
@@ -477,6 +494,7 @@ export function buildSemesterPlan(
       contributions: candidate.contributions,
       eligibility,
       availability,
+      programEligibility,
       missingPrerequisites: missing,
       immediateUnlocks: unlocks.immediate,
       downstreamUnlocks: unlocks.downstream,
@@ -562,6 +580,11 @@ export function buildSemesterPlan(
 
   explore(0, [], new Set());
 
+  // Reflect actual section status; preserve candidate identity for alternative exclusion.
+  selected.forEach((candidate) => {
+    const chosen = (compatibleSchedule as GeneratedSchedule | null)?.selections.find((selection) => selection.courseCode === candidate.code);
+    if (chosen?.programEligibility) candidate.programEligibility = chosen.programEligibility === "eligible" ? "eligible" : "unknown";
+  });
   const selectedCredits = selected.reduce((sum, course) => sum + course.credits, 0);
   const selectedEcts = selected.reduce((sum, course) => sum + course.ects, 0);
   programSummaries.forEach((summary) => {
@@ -587,6 +610,8 @@ export function buildSemesterPlan(
   if (searchLimited) notices.push({ kind: "search-limited" });
   if (hasUnknownAvailability) notices.push({ kind: "availability-unknown" });
   if (hasUnknownEligibility) notices.push({ kind: "eligibility-unknown" });
+  if (restrictedCourseCount) notices.push({ kind: "program-restriction-blocked", count: restrictedCourseCount });
+  if (selected.some((course) => course.programEligibility === "unknown")) notices.push({ kind: "program-restriction-unknown" });
   notices.push({ kind: "registration-limit-unknown" }, { kind: "corequisites-unknown" });
 
   const selectedSchedule = compatibleSchedule as GeneratedSchedule | null;

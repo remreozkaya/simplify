@@ -231,7 +231,7 @@ export default function CurriculumGraph({
           >
             <h3
               id={`semester-heading-${semester}`}
-              className="absolute left-4 top-3 z-20 text-[10px] font-black uppercase tracking-[.16em] text-slate-600 sm:left-5 sm:text-xs"
+              className="absolute left-4 top-3 z-20 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600 sm:left-5 sm:text-xs"
             >
               {localizedCurriculumSection(language, planType, semester)}
             </h3>
@@ -283,7 +283,7 @@ export default function CurriculumGraph({
                               : ""
                       }`}
                     >
-                      <span className="max-w-full break-words text-[11px] font-black leading-tight sm:text-xs lg:text-sm">
+                      <span className="max-w-full break-words text-[11px] font-semibold leading-tight sm:text-xs lg:text-sm">
                         {elective ? title : code}
                       </span>
                       {!elective && (

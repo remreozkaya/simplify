@@ -55,6 +55,9 @@ export function generatedScheduleToWeeklyProgram(
         teachingMethod: meeting.teachingMethod,
         capacity: meeting.capacity,
         enrolled: meeting.enrolled,
+        majorRestriction: meeting.majorRestriction,
+        programRestriction: meeting.programRestriction,
+        semester: meeting.semester,
       });
     });
   });

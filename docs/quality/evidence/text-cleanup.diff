@@ -1,0 +1,102 @@
+--- baseline/src/components/AppNavigation.tsx
++++ src/components/AppNavigation.tsx
+@@ -136,3 +135,0 @@
+-              </p>
+-              <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+-                {t("navigation.profileIncompleteDescription")}
+--- baseline/src/lib/navigation.ts
++++ src/lib/navigation.ts
+@@ -5 +4,0 @@
+-    description: "home.semesterDescription",
+@@ -10 +8,0 @@
+-    description: "home.plannerDescription",
+@@ -15 +12,0 @@
+-    description: "home.generatorDescription",
+@@ -20 +16,0 @@
+-    description: "home.curriculumDescription",
+@@ -25 +20,0 @@
+-    description: "home.graduationDescription",
+--- baseline/src/lib/i18n/tr.ts
++++ src/lib/i18n/tr.ts
+@@ -170 +169,0 @@
+-    description: "Derslerini, dönemlerini ve mezuniyet yolunu planla.",
+@@ -177 +175,0 @@
+-    heroEyebrow: "İTÜ için akademik planlama",
+@@ -183 +180,0 @@
+-    toolsDescription: "İlk dersinden mezuniyetine, planlamanın her adımı için bir araç.",
+@@ -187 +184 @@
+-    programsDescription: "Her programın müfredatı ve mezuniyet gereklilikleri ayrı değerlendirilir.",
++    programsDescription: "İlerleme her program için ayrı hesaplanır.",
+@@ -195 +191,0 @@
+-    setupDescription: "Ana programınızı, ÇAP veya Yandal müfredatınızı seçin.",
+@@ -197 +192,0 @@
+-    importDescription: "Geçmiş dönemleri birleştirin ve program ilerlemenizi inceleyin.",
+@@ -201,7 +195,0 @@
+-    plannerDescription: "Derslerinizi haftalık takvime yerleştirin.",
+-    generatorDescription:
+-      "Derslerinize ve saat tercihlerinize uygun programları karşılaştırın.",
+-    curriculumDescription: "Derslerinizi ve önkoşullarını inceleyin.",
+-    graduationDescription: "Tamamlanan ve mezuniyet için kalan dersleri görün.",
+-    semesterDescription:
+-      "Akademik ilerlemenize göre dönemlik ders önerileri alın.",
+--- baseline/src/lib/i18n/en.ts
++++ src/lib/i18n/en.ts
+@@ -173 +172,0 @@
+-    description: "Plan your courses, semesters and path to graduation.",
+@@ -180 +178,0 @@
+-    heroEyebrow: "Academic planning for İTÜ",
+@@ -186 +183,0 @@
+-    toolsDescription: "From your first course to graduation, a tool for every step.",
+@@ -190 +187 @@
+-    programsDescription: "Each program is evaluated against its own curriculum and graduation requirements.",
++    programsDescription: "Progress is calculated separately for each program.",
+@@ -198 +194,0 @@
+-    setupDescription: "Choose your main, double major or minor curriculum.",
+@@ -200 +195,0 @@
+-    importDescription: "Combine previous terms and review your program progress.",
+@@ -204,8 +198,0 @@
+-    plannerDescription: "Arrange your classes on a weekly calendar.",
+-    generatorDescription:
+-      "Compare schedules that fit your courses and time preferences.",
+-    curriculumDescription: "Explore your courses and prerequisites.",
+-    graduationDescription:
+-      "See completed courses and remaining degree requirements.",
+-    semesterDescription:
+-      "Find semester courses based on your academic progress.",
+--- baseline/src/components/curriculum/GraduationCalculator.tsx
++++ src/components/curriculum/GraduationCalculator.tsx
+@@ -107,0 +108 @@
++  const planLabel = localizedAcademicName({ name: curriculum.planTitle, nameTr: enrollment.curriculumPlanNameTr, nameEn: enrollment.curriculumPlanNameEn }, language);
+@@ -137,2 +138,2 @@
+-            {enrollment.facultyName} · {localizedAcademicName({ name: curriculum.planTitle, nameTr: enrollment.curriculumPlanNameTr, nameEn: enrollment.curriculumPlanNameEn }, language)}
+-            {curriculum.validityPeriod ? ` · ${curriculum.validityPeriod}` : ""}
++            {enrollment.facultyName} · {planLabel}
++            {curriculum.validityPeriod && !planLabel.includes(curriculum.validityPeriod) ? ` · ${curriculum.validityPeriod}` : ""}
+--- baseline/src/components/planning/PlanningChecklist.tsx
++++ src/components/planning/PlanningChecklist.tsx
+@@ -13,5 +13,5 @@
+-  { href: '/profile', label: 'home.setup', description: 'home.setupDescription' },
+-  { href: '/graduation-calculator', label: 'home.import', description: 'home.importDescription' },
+-  { href: '/semester-planner', label: 'navigation.semesterPlanner', description: 'home.semesterDescription' },
+-  { href: '/generator', label: 'navigation.scheduleGenerator', description: 'home.generatorDescription' },
+-  { href: '/weekly-planner', label: 'navigation.weeklyPlanner', description: 'home.plannerDescription' },
++  { href: '/profile', label: 'home.setup' },
++  { href: '/graduation-calculator', label: 'home.import' },
++  { href: '/semester-planner', label: 'navigation.semesterPlanner' },
++  { href: '/generator', label: 'navigation.scheduleGenerator' },
++  { href: '/weekly-planner', label: 'navigation.weeklyPlanner' },
+@@ -66 +65,0 @@
+-              <p className={`mt-1 text-xs leading-5 ${done ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>{t(step.description)}</p>
+--- baseline/src/components/legal/LegalFooter.tsx
++++ src/components/legal/LegalFooter.tsx
+@@ -18 +17,0 @@
+-        <p className="mt-5 max-w-xs text-sm leading-6 text-slate-600 dark:text-slate-400">{t('footer.description')}</p>
+--- baseline/src/app/(app)/page.tsx
++++ src/app/(app)/page.tsx
+@@ -32 +31,0 @@
+-        <p className="mb-5 text-sm font-medium text-slate-600 dark:text-slate-300">{t("home.heroEyebrow")}</p>
+@@ -65 +63,0 @@
+-        <p className="mb-6 max-w-xl text-base leading-7 text-slate-600 dark:text-slate-300">{t("home.toolsDescription")}</p>
+@@ -69 +67 @@
+-            <div className="min-w-0 flex-1"><h3 className="text-lg font-semibold text-slate-950 dark:text-white">{t(tool.label)}</h3><p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{t(tool.description)}</p></div>
++            <div className="min-w-0 flex-1"><h3 className="text-lg font-semibold text-slate-950 dark:text-white">{t(tool.label)}</h3></div>

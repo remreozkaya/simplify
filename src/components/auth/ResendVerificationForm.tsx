@@ -36,7 +36,7 @@ function ResendButton({
     <button
       type="submit"
       disabled={pending || remaining > 0 || disabled}
-      className="h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200 dark:hover:bg-blue-950"
+      className="h-11 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200 dark:hover:bg-blue-950"
     >
       {pending
         ? t("authentication.sending")

@@ -1,3 +1,4 @@
+import type { ProgramMembership } from "@/lib/program-restrictions/eligibility";
 import type { CourseProgress, CurriculumProgress, MissingRequirement } from "@/lib/curriculum/types";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 import type { EnrollmentType, ProgramEnrollment } from "@/lib/profile/types";
@@ -29,6 +30,7 @@ export type PlannerContribution = {
 };
 
 export type SemesterCourseCandidate = {
+  programEligibility?: "eligible" | "unknown";
   code: string;
   title: string;
   titleTr?: string;
@@ -45,6 +47,7 @@ export type SemesterCourseCandidate = {
 };
 
 export type SemesterPlannerOptions = {
+  programMemberships?: readonly ProgramMembership[];
   desiredCredits: number;
   maxCourses?: number;
   priority: ProgramPriority;
@@ -82,7 +85,9 @@ export type PlannerNotice =
   | { kind: "availability-unknown" }
   | { kind: "eligibility-unknown" }
   | { kind: "registration-limit-unknown" }
-  | { kind: "corequisites-unknown" };
+  | { kind: "corequisites-unknown" }
+  | { kind: "program-restriction-blocked"; count: number }
+  | { kind: "program-restriction-unknown" };
 
 export type SemesterPlan = {
   searchLimited: boolean;

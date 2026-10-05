@@ -58,7 +58,7 @@ export default function CourseDetails({
             autoFocus
             onClick={onClose}
             aria-label={t("weeklyPlanner.closeDetails")}
-            className="rounded-lg px-3 py-1 text-xl focus-visible:outline-2 focus-visible:outline-blue-500"
+            className="rounded-lg px-3 py-1 text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-gray-700 dark:focus-visible:bg-gray-700"
           >
             ×
           </button>

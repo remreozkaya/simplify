@@ -30,7 +30,7 @@ export default function ForgotPasswordForm() {
       <p className="text-center text-sm">
         <Link
           href="/login"
-          className="font-black text-blue-700 hover:underline dark:text-blue-300"
+          className="font-semibold text-blue-700 hover:underline dark:text-blue-300"
         >
           {t("authentication.backLogin")}
         </Link>

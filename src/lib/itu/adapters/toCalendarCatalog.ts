@@ -6,6 +6,8 @@ export function toCalendarCatalog(
 ): FacultyOption {
   return {
     facultyCode: catalog.branchCode,
+    semester: catalog.semester,
+    fetchedAt: catalog.fetchedAt,
     courses: catalog.courses.map((course) => ({
       id: course.id,
       code: course.code,
@@ -13,6 +15,9 @@ export function toCalendarCatalog(
       sections: course.sections.map((section) => ({
         id: section.id,
         crn: section.crn,
+        majorRestriction: section.majorRestriction,
+        programRestriction: section.programRestriction,
+        semester: section.semester ?? catalog.semester,
         instructor: section.instructor,
         teachingMethod: section.teachingMethod,
         capacity: section.capacity,

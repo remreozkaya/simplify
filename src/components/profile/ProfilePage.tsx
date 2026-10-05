@@ -1,5 +1,6 @@
 "use client";
 
+import PrivacyControls from "@/components/legal/PrivacyControls";
 import PageShell from "@/components/PageShell";
 import { responseJson } from "@/lib/http/responseJson";
 
@@ -348,9 +349,11 @@ function PasswordSection({
 export default function ProfilePage({
   email,
   canChangePassword,
+  deletionAvailable,
 }: {
   email: string;
   canChangePassword: boolean;
+  deletionAvailable: boolean;
 }) {
   const { language, t } = useLanguage();
   const enrollmentLabel = (type: EnrollmentType) =>
@@ -601,7 +604,7 @@ export default function ProfilePage({
         ) : null}
         <form onSubmit={submitProfile} className="space-y-5" noValidate>
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-            <h2 className="text-xl font-black text-slate-950 dark:text-white">
+            <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
               {t("profile.personalInformation")}
             </h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -674,7 +677,7 @@ export default function ProfilePage({
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-black text-slate-950 dark:text-white">
+                <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
                   {t("profile.academicPrograms")}
                 </h2>
               </div>
@@ -701,7 +704,7 @@ export default function ProfilePage({
                     ],
                   }))
                 }
-                className="rounded-xl border border-blue-300 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300"
+                className="rounded-xl border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300"
               >
                 {t("profile.addSecondary")}
               </button>
@@ -772,7 +775,7 @@ export default function ProfilePage({
             <button
               type="submit"
               disabled={isPending || !dirty}
-              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
             >
               {isPending ? t("common.saving") : t("common.saveChanges")}
             </button>
@@ -788,7 +791,7 @@ export default function ProfilePage({
         </form>
 
         <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-          <h2 className="text-xl font-black text-slate-950 dark:text-white">
+          <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
             {t("profile.accountSecurity")}
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -799,6 +802,7 @@ export default function ProfilePage({
           </div>
         </section>
       </div>
+      <PrivacyControls account deletionAvailable={deletionAvailable} />
     </PageShell>
   );
 }
