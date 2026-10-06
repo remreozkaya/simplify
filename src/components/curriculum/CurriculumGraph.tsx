@@ -1,8 +1,18 @@
 "use client";
 
-import { useMemo, type CSSProperties } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
-import type { CurriculumGraph as CurriculumGraphData } from "@/lib/curriculum/graph";
+import {
+  getVisibleCourseConnections,
+  type CurriculumCourseConnection,
+  type CurriculumGraph as CurriculumGraphData,
+} from "@/lib/curriculum/graph";
 import type { CourseDerivedStatus } from "@/lib/curriculum/types";
 import type { RequirementProgress } from "@/lib/curriculum/graduation";
 import type { ItuPlanType } from "@/lib/itu/curriculum/types";
@@ -31,6 +41,11 @@ type Props = {
   planType?: ItuPlanType;
 };
 
+type Curve = CurriculumCourseConnection & {
+  path: string;
+  highlighted: boolean;
+};
+
 export default function CurriculumGraph({
   graph,
   statuses,
@@ -46,6 +61,11 @@ export default function CurriculumGraph({
 }: Props) {
   const { language, t } = useLanguage();
   const showSectionHeadings = !planType || planType === "undergraduate";
+  const boardRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [curves, setCurves] = useState<Curve[]>([]);
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 });
+
   const semesters = useMemo(() => {
     const semesterNumbers = [
       ...new Set(
@@ -70,12 +90,121 @@ export default function CurriculumGraph({
     });
   }, [graph.nodes, visibleNodeIds]);
 
+  const connections = useMemo(
+    () => getVisibleCourseConnections(graph, visibleNodeIds),
+    [graph, visibleNodeIds],
+  );
+
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+
+    function measure() {
+      const currentBoard = boardRef.current;
+      if (!currentBoard) return;
+      const boardRect = currentBoard.getBoundingClientRect();
+      const nextCurves = connections.flatMap((connection): Curve[] => {
+        const source = cardRefs.current.get(connection.source);
+        const target = cardRefs.current.get(connection.target);
+        if (!source || !target) return [];
+
+        const sourceRect = source.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const sameRow = Math.abs(sourceRect.top - targetRect.top) < 8;
+        const sourceBeforeTarget = sourceRect.left < targetRect.left;
+        const sourceX = sameRow
+          ? (sourceBeforeTarget ? sourceRect.right : sourceRect.left) -
+            boardRect.left
+          : sourceRect.left - boardRect.left + sourceRect.width / 2;
+        const sourceY = sameRow
+          ? sourceRect.top - boardRect.top + sourceRect.height / 2
+          : sourceRect.bottom - boardRect.top - 2;
+        const targetX = sameRow
+          ? (sourceBeforeTarget ? targetRect.left : targetRect.right) -
+            boardRect.left
+          : targetRect.left - boardRect.left + targetRect.width / 2;
+        const targetY = sameRow
+          ? targetRect.top - boardRect.top + targetRect.height / 2
+          : targetRect.top - boardRect.top + 2;
+        const distance = Math.max(64, Math.abs(targetY - sourceY) * 0.48);
+        const midpointX = (sourceX + targetX) / 2;
+
+        return [
+          {
+            ...connection,
+            path: sameRow
+              ? `M ${sourceX} ${sourceY} C ${midpointX} ${sourceY - 76}, ${midpointX} ${targetY - 76}, ${targetX} ${targetY}`
+              : `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + distance}, ${targetX} ${targetY - distance}, ${targetX} ${targetY}`,
+            highlighted:
+              Boolean(selectedNodeId) &&
+              (connection.source === selectedNodeId ||
+                connection.target === selectedNodeId ||
+                (Boolean(prerequisiteNodeIds?.has(connection.source)) &&
+                  Boolean(prerequisiteNodeIds?.has(connection.target))) ||
+                (Boolean(dependentNodeIds?.has(connection.source)) &&
+                  Boolean(dependentNodeIds?.has(connection.target)))),
+          },
+        ];
+      });
+
+      setBoardSize({
+        width: currentBoard.scrollWidth,
+        height: currentBoard.scrollHeight,
+      });
+      setCurves(nextCurves);
+    }
+
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [
+    connections,
+    dependentNodeIds,
+    language,
+    prerequisiteNodeIds,
+    selectedNodeId,
+  selectedDetailsId,
+  ]);
+
   return (
     <div
       className="w-full overflow-hidden pb-2"
       aria-label={t("curriculum.graphLabel")}
     >
-      <div className="relative space-y-8 py-1">
+      <div ref={boardRef} className="relative space-y-8 py-1">
+        <svg
+          className="pointer-events-none absolute left-0 top-0 z-10 overflow-visible"
+          width={boardSize.width}
+          height={boardSize.height}
+          viewBox={`0 0 ${boardSize.width} ${boardSize.height}`}
+          fill="none"
+          aria-hidden="true"
+        >
+          {curves.map((curve) => (
+            <g key={curve.id}>
+              <path
+                d={curve.path}
+                stroke="rgba(255,255,255,.92)"
+                strokeWidth={curve.highlighted ? 7 : 5}
+                strokeLinecap="round"
+              />
+              <path
+                d={curve.path}
+                stroke={curve.highlighted ? "#1d4ed8" : "#64748b"}
+                strokeWidth={curve.highlighted ? 3.5 : 2.25}
+                strokeLinecap="round"
+                opacity={curve.highlighted ? 1 : 0.78}
+              />
+            </g>
+          ))}
+        </svg>
+
         {semesters.map(({ semester, columnCount, nodes }) => (
           <section
             key={semester}
@@ -112,6 +241,10 @@ export default function CurriculumGraph({
                   return (
                     <button
                       key={node.id}
+                      ref={(element) => {
+                        if (element) cardRefs.current.set(node.id, element);
+                        else cardRefs.current.delete(node.id);
+                      }}
                       type="button"
                       onClick={() => onSelectNode(node.id)}
                       aria-pressed={selectedNodeId === node.id}
