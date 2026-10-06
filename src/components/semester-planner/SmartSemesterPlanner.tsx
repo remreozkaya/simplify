@@ -290,7 +290,7 @@ export default function SmartSemesterPlanner() {
         branchCode,
         courseId: constraint?.courseId ?? course?.id ?? "",
         courseCode: recommendation.code,
-        pinnedSectionId: constraint?.sectionId ?? "",
+        pinnedSectionId: "",
       };
     });
     const saved = persistGeneratorSession({

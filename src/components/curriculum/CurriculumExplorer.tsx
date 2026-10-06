@@ -562,6 +562,14 @@ export default function CurriculumExplorer() {
     return statuses;
   }, [curriculum, graph, itemById, progress, resolvedProgress]);
 
+  const nodeCompletions = useMemo(
+    () => Object.fromEntries(items.map((item) => [
+      item.id,
+      curriculum && progress ? progressForRequirement(item, progress, curriculum) : null,
+    ])),
+    [curriculum, items, progress],
+  );
+
   const availableCourseCodes = useMemo(
     () =>
       new Set(
@@ -1130,6 +1138,7 @@ export default function CurriculumExplorer() {
                   graph={graph}
                   planType={curriculum.planType}
                   statuses={nodeStatuses}
+                  completions={nodeCompletions}
                   visibleNodeIds={visibleNodeIds}
                   selectedNodeId={selectedNodeId ?? undefined}
                   prerequisiteNodeIds={prerequisiteNodeIds}

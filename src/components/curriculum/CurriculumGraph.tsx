@@ -14,6 +14,7 @@ import {
   type CurriculumGraph as CurriculumGraphData,
 } from "@/lib/curriculum/graph";
 import type { CourseDerivedStatus } from "@/lib/curriculum/types";
+import type { RequirementProgress } from "@/lib/curriculum/graduation";
 import type { ItuPlanType } from "@/lib/itu/curriculum/types";
 import { useLanguage } from "@/lib/i18n/client";
 import { localizedAcademicName, localizedCurriculumSection } from "@/lib/i18n";
@@ -29,6 +30,7 @@ const STATUS_STYLE: Record<CourseDerivedStatus, string> = {
 type Props = {
   graph: CurriculumGraphData;
   statuses: Record<string, CourseDerivedStatus>;
+  completions: Record<string, RequirementProgress | null>;
   visibleNodeIds: Set<string>;
   selectedNodeId?: string;
   selectedDetailsId?: string;
@@ -47,6 +49,7 @@ type Curve = CurriculumCourseConnection & {
 export default function CurriculumGraph({
   graph,
   statuses,
+  completions,
   visibleNodeIds,
   selectedNodeId,
   selectedDetailsId,
@@ -57,14 +60,7 @@ export default function CurriculumGraph({
   planType,
 }: Props) {
   const { language, t } = useLanguage();
-  const statusLabel = (status: CourseDerivedStatus) =>
-    t(
-      status === "not-taken"
-        ? "curriculum.notTaken"
-        : status === "passed"
-          ? "curriculum.passed"
-          : "curriculum.failed",
-    );
+  const showSectionHeadings = !planType || planType === "undergraduate";
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   const [curves, setCurves] = useState<Curve[]>([]);
@@ -226,12 +222,12 @@ export default function CurriculumGraph({
         {semesters.map(({ semester, columnCount, nodes }) => (
           <section
             key={semester}
-            className="relative min-h-[184px] rounded-xl bg-slate-50 px-3 pb-4 pt-10 sm:px-4"
+            className={`relative min-h-[184px] rounded-xl bg-slate-50 px-3 pb-4 sm:px-4 ${showSectionHeadings ? "pt-10" : "pt-4"}`}
             aria-labelledby={`semester-heading-${semester}`}
           >
             <h3
               id={`semester-heading-${semester}`}
-              className="absolute left-4 top-3 z-20 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600 sm:left-5 sm:text-xs"
+              className={showSectionHeadings ? "absolute left-4 top-3 z-20 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600 sm:left-5 sm:text-xs" : "sr-only"}
             >
               {localizedCurriculumSection(language, planType, semester)}
             </h3>
@@ -240,6 +236,9 @@ export default function CurriculumGraph({
                 {nodes.map((node) => {
                   const status = statuses[node.id] ?? "not-taken";
                   const elective = node.kind === "elective-slot";
+                  const completion = completions[node.id];
+                  const completedElective = elective && status === "passed" && completion;
+                  const grade = status !== "not-taken" ? completion?.course.grade : undefined;
                   const prerequisiteRelated = prerequisiteNodeIds?.has(node.id);
                   const dependentRelated = dependentNodeIds?.has(node.id);
                   const [code, ...titleParts] = node.label.split("\n");
@@ -284,33 +283,23 @@ export default function CurriculumGraph({
                       }`}
                     >
                       <span className="max-w-full break-words text-[11px] font-semibold leading-tight sm:text-xs lg:text-sm">
-                        {elective ? title : code}
+                        {completedElective ? completion.code : elective ? title : code}
                       </span>
-                      {!elective && (
+                      {(!elective || completedElective) && (
                         <p className="mt-2 max-w-full break-words text-xs font-medium leading-snug">
-                          {title}
+                          {completedElective ? completion.name : title}
                         </p>
                       )}
-                      <span className="mt-2 max-w-full text-xs font-medium">
-                        {elective && status === "not-taken"
-                          ? t("curriculum.electiveRequirement")
-                          : statusLabel(status)}
-                      </span>
+                      {grade && (
+                        <span className="mt-2 max-w-full text-xs font-medium">
+                          {grade}
+                        </span>
+                      )}
                       {takeableNodeIds?.has(node.id) && (
                         <span className="absolute -right-1 -top-2 rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white shadow-sm">
                           {t("curriculum.available")}
                         </span>
                       )}
-                      {node.externalPrerequisiteCodes?.length ? (
-                        <span
-                          className="mt-2 rounded-full bg-amber-950 px-2 py-1 text-xs font-semibold text-amber-100"
-                          title={t("curriculum.externalCodes", {
-                            codes: node.externalPrerequisiteCodes.join(", "),
-                          })}
-                        >
-                          {t("curriculum.externalPrerequisite")}
-                        </span>
-                      ) : null}
                     </button>
                   );
                 })}
