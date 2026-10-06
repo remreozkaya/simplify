@@ -35,6 +35,17 @@ describe("manual program restriction warning", () => {
       locale.language = "tr";
     }
   });
+  it("provides a labeled close button for short and expandable warnings", () => {
+    locale.language = "en";
+    try {
+      for (const codes of [["BLG_LS"], ["A", "B", "C", "D", "E"]]) {
+        expect(render("ineligible", codes)).toContain('aria-label="Dismiss program restriction warning"');
+        expect(render("ineligible", codes)).toContain('type="button"');
+      }
+    } finally {
+      locale.language = "tr";
+    }
+  });
   it("keeps long allowed-program lists expandable and accessible", () => {
     const markup = render("ineligible", ["A", "B", "C", "D", "E"]);
     expect(markup).toContain("<details");

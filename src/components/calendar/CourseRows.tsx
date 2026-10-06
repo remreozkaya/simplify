@@ -205,7 +205,10 @@ export function SortableCourseRow({
         {t("weeklyPlanner.delete")}
       </button>
       {selectedSection && !branchIsLoading ? (
-        <ProgramRestrictionWarning eligibility={eligibility} />
+        <ProgramRestrictionWarning
+          key={`${selection.courseId}:${selection.sectionId}:${eligibility.status}:${eligibility.allowedCodes.join(",")}`}
+          eligibility={eligibility}
+        />
       ) : null}
     </div>
   );

@@ -136,6 +136,8 @@ export default function WeeklyCalendar({
 
   const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
 
+  const [dismissedConflictKey, setDismissedConflictKey] = useState<string | null>(null);
+
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedSchedule | null>(null);
 
@@ -231,6 +233,16 @@ export default function WeeklyCalendar({
   const hasScheduleConflicts = useMemo(
     () => hasMeetingConflicts(courseBlocks),
     [courseBlocks],
+  );
+
+  const scheduleConflictKey = useMemo(
+    () => JSON.stringify([
+      selectedProgramId,
+      courseBlocks.map(({ id, day, startTime, endTime }) =>
+        JSON.stringify([id, day, startTime, endTime]),
+      ).sort(),
+    ]),
+    [selectedProgramId, courseBlocks],
   );
 
   const orderedSelectionIds = useMemo(
@@ -869,12 +881,22 @@ export default function WeeklyCalendar({
             </div>
           )}
 
-          {hasScheduleConflicts && (
+          {hasScheduleConflicts && dismissedConflictKey !== scheduleConflictKey && (
             <div
-              className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
               role="status"
             >
-              {t("weeklyPlanner.conflict")}
+              <span>{t("weeklyPlanner.conflict")}</span>
+              <button
+                type="button"
+                aria-label={t("weeklyPlanner.dismissConflict")}
+                onClick={() => setDismissedConflictKey(scheduleConflictKey)}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-amber-700 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true" className="h-3.5 w-3.5">
+                  <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
           )}
 

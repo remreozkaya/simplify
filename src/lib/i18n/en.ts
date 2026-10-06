@@ -453,6 +453,7 @@ const en = {
     selectComplete: "Select at least one complete course before generating.",
     invalidTime: "Earliest class time must be before latest class time.",
     programRestrictionWarning: "This section is not open to your selected programs. Open to:",
+    dismissProgramRestrictionWarning: "Dismiss program restriction warning",
     allowedProgramCount: "{count} programs",
     restrictionNoSchedule: "No section is open to your selected programs for: {courses}.",
     unknownProgramRestrictions: "Program eligibility could not be verified for {count} sections in this result.",
@@ -496,6 +497,7 @@ const en = {
     unsavedName: "Program name has unsaved changes.",
     loadingPrefixes: "Loading İTÜ course prefixes…",
     conflict: "Schedule conflict: at least two selected meetings overlap.",
+    dismissConflict: "Dismiss schedule conflict warning",
     dragHelp:
       "Drag a handle, or focus it and press Space, move with arrow keys, then press Space to drop. Escape cancels.",
     dragCourse: "Drag to reorder course",

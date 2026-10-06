@@ -447,6 +447,7 @@ const tr = {
     selectComplete: "Oluşturmadan önce en az bir eksiksiz ders seçin.",
     invalidTime: "En erken ders saati en geç ders saatinden önce olmalıdır.",
     programRestrictionWarning: "Bu şube seçtiğiniz programlara açık değil. Açık olduğu programlar:",
+    dismissProgramRestrictionWarning: "Program kısıtlaması uyarısını kapat",
     allowedProgramCount: "{count} program",
     restrictionNoSchedule: "Seçtiğiniz programlara açık şube bulunamadı: {courses}.",
     unknownProgramRestrictions: "Bu öneride {count} şubenin program uygunluğu doğrulanamadı.",
@@ -490,6 +491,7 @@ const tr = {
     unsavedName: "Program adı kaydedilmedi.",
     loadingPrefixes: "İTÜ ders önekleri yükleniyor…",
     conflict: "Program çakışması: seçilen en az iki ders saati çakışıyor.",
+    dismissConflict: "Program çakışması uyarısını kapat",
     dragHelp:
       "Tutamacı sürükleyin veya odaktayken Boşluk tuşuna basın, oklarla taşıyın ve Boşluk ile bırakın. Escape iptal eder.",
     dragCourse: "Dersi yeniden sıralamak için sürükle",
