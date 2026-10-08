@@ -45,3 +45,6 @@ branches-live.html
 course-*-live.html
 
 temp/
+
+# generated audit artifacts
+/docs/quality/evidence/

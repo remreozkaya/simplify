@@ -6,6 +6,42 @@ vi.mock("@/lib/itu/services/getUndergraduateBranches", () => ({ getUndergraduate
 afterEach(() => {vi.unstubAllGlobals(); vi.useRealTimers(); vi.resetModules();});
 
 describe("semester scoped validated catalog cache", () => {
+  it("retains stale same-semester data after HTTP failure and retries on the next request", async () => {
+    vi.useFakeTimers();
+    let fail = false;
+    let html = fixture;
+    let courseRequests = 0;
+    vi.stubGlobal("fetch", async (url: URL) => {
+      if (url.pathname.includes("GetAktifDonem")) return new Response(JSON.stringify({aktifDonem: "2026-2027 Güz Dönemi"}));
+      courseRequests += 1;
+      return fail ? new Response("unavailable", {status: 503}) : new Response(html);
+    });
+    const {getCoursesByBranch} = await import("@/lib/itu/services/getCoursesByBranch");
+    const first = await getCoursesByBranch({branchId:310, branchCode:"BLG"});
+    vi.advanceTimersByTime(301_000);
+    fail = true;
+    expect(await getCoursesByBranch({branchId:310, branchCode:"BLG"})).toEqual(markCatalogUnavailable(first));
+    fail = false;
+    html = fixture.replaceAll("23713", "99999");
+    const recovered = await getCoursesByBranch({branchId:310, branchCode:"BLG"});
+    expect(courseRequests).toBe(3);
+    expect(recovered.fetchedAt).not.toBe(first.fetchedAt);
+    expect(recovered.courses.flatMap(course => course.sections.map(section => section.crn))).toContain("99999");
+  });
+
+  it("does not relabel old cached CRNs when the next semester request fails", async () => {
+    let semester = "2026-2027 Güz Dönemi";
+    let fail = false;
+    vi.stubGlobal("fetch", async (url: URL) => url.pathname.includes("GetAktifDonem")
+      ? new Response(JSON.stringify({aktifDonem: semester}))
+      : fail ? new Response("unavailable", {status: 503}) : new Response(fixture));
+    const {getCoursesByBranch} = await import("@/lib/itu/services/getCoursesByBranch");
+    await getCoursesByBranch({branchId:310, branchCode:"BLG"});
+    semester = "2026-2027 Bahar Dönemi";
+    fail = true;
+    await expect(getCoursesByBranch({branchId:310, branchCode:"BLG"})).rejects.toThrow("invalid BLG schedule");
+  });
+
   it("refetches CRNs on a semester transition even within the normal cache lifetime", async () => {
     let semester = "2026-2027 Güz Dönemi";
     let html = fixture;

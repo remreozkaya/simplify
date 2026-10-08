@@ -16,26 +16,34 @@ export const END_TIME = "20:00";
 
 const PIXELS_PER_MINUTE = SLOT_HEIGHT / GRID_INTERVAL_MINUTES;
 
-export function generateTimeLabels(): string[] {
-  const labels: string[] = [];
-
-  const calendarStartMinutes = timeToMinutes(START_TIME);
-
-  const calendarEndMinutes = timeToMinutes(END_TIME);
-
-  for (
-    let currentMinutes = calendarStartMinutes;
-    currentMinutes <= calendarEndMinutes;
-    currentMinutes += GRID_INTERVAL_MINUTES
-  ) {
-    labels.push(minutesToTime(currentMinutes));
+export function calculateCalendarRange(courseBlocks: readonly CourseBlock[]) {
+  let startMinutes = timeToMinutes(START_TIME);
+  let endMinutes = timeToMinutes(END_TIME);
+  for (const block of courseBlocks) {
+    const start = timeToMinutes(block.startTime);
+    const end = timeToMinutes(block.endTime);
+    if (end <= start) continue;
+    startMinutes = Math.min(startMinutes, Math.floor(start / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES);
+    endMinutes = Math.max(endMinutes, Math.ceil(end / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES);
   }
+  return { startMinutes, endMinutes };
+}
 
+export function generateTimeLabels(
+  calendarStartMinutes = timeToMinutes(START_TIME),
+  calendarEndMinutes = timeToMinutes(END_TIME),
+): string[] {
+  const labels: string[] = [];
+  for (let minutes = calendarStartMinutes; minutes <= calendarEndMinutes; minutes += GRID_INTERVAL_MINUTES) {
+    labels.push(minutesToTime(minutes));
+  }
   return labels;
 }
 
-export function getTimeTop(time: string): number {
-  return (timeToMinutes(time) - timeToMinutes(START_TIME)) * PIXELS_PER_MINUTE;
+export function getTimeTop(time: string, startMinutes = timeToMinutes(START_TIME)): number {
+  // 24:00 is only the rounded grid boundary, never a recurring meeting time.
+  const minutes = time === "24:00" ? 24 * 60 : timeToMinutes(time);
+  return (minutes - startMinutes) * PIXELS_PER_MINUTE;
 }
 
 export function getCourseHeight(startTime: string, endTime: string): number {

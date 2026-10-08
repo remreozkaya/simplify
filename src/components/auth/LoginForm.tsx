@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { useAuthForm } from "@/hooks/useAuthForm";
 
 import { loginAction } from "@/app/auth/actions";
 import AuthMessage from "@/components/auth/AuthMessage";
@@ -15,10 +16,16 @@ import { useLanguage } from "@/lib/i18n/client";
 export default function LoginForm({ nextPath }: { nextPath: string }) {
   const { t } = useLanguage();
   const [state, action] = useActionState(loginAction, INITIAL_AUTH_STATE);
+  const formRef = useAuthForm();
 
   return (
     <div className="space-y-5">
-      <form action={action} className="space-y-5" noValidate>
+      <form
+        action={action}
+        ref={formRef}
+        className="space-y-5"
+        noValidate
+      >
         <input type="hidden" name="next" value={nextPath} />
         <AuthMessage message={state.message} />
         <EmailInput error={state.fieldErrors?.email} />

@@ -747,7 +747,7 @@ export default function ProfilePage({
                 role="alert"
                 className="mt-3 text-sm text-red-700 dark:text-red-300"
               >
-                {localizeRuntimeMessage(language, programError)}
+                {localizeRuntimeMessage(language, programError, { fallback: true })}
               </p>
             ) : null}
             {feedback.fieldErrors?.programEnrollments ? (

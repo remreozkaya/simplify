@@ -15,6 +15,7 @@ const catalogSchema = z.object({
   fetchedAt: z.iso.datetime({ offset: true }),
   courses: z.array(z.object({
     id: text, code: text, title: text,
+    localCredits: z.number().nonnegative().nullable().optional(),
     sections: z.array(z.object({
       id: text, crn: text,
       instructor: z.string().optional(), teachingMethod: z.string().optional(),
@@ -26,6 +27,8 @@ const catalogSchema = z.object({
         startTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
         endTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
         building: z.string().optional(), room: z.string().optional(),
+      }).refine((meeting) => meeting.endTime > meeting.startTime, {
+        path: ["endTime"], message: "Meeting end time must be later than its start time.",
       })).min(1),
     })).min(1),
   })),

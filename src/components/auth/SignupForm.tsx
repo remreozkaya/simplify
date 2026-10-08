@@ -3,6 +3,7 @@
 import Link from "next/link";
 import CollectionNotice from "@/components/legal/CollectionNotice";
 import { useActionState } from "react";
+import { useAuthForm } from "@/hooks/useAuthForm";
 
 import { signupAction } from "@/app/auth/actions";
 import AuthMessage from "@/components/auth/AuthMessage";
@@ -17,11 +18,12 @@ function TermsLabel() { const { language } = useLanguage(); return <>{language =
 export default function SignupForm() {
   const { t } = useLanguage();
   const [state, action] = useActionState(signupAction, INITIAL_AUTH_STATE);
+  const formRef = useAuthForm();
 
   return (
     <div className="space-y-6">
       <Link href="/legal/terms" className="text-sm font-semibold text-blue-700 underline dark:text-blue-300"><TermsLabel /></Link>
-      <form action={action} className="space-y-5" noValidate>
+      <form ref={formRef} action={action} className="space-y-5" noValidate>
         <AuthMessage message={state.message} />
         <CollectionNotice kind="account" />
         <EmailInput error={state.fieldErrors?.email} />

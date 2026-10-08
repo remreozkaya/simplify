@@ -7,6 +7,8 @@ import {
 } from "@/lib/itu/errors";
 import { ituCoursesQuerySchema } from "@/lib/itu/schemas";
 import { getCoursesByBranch } from "@/lib/itu/services/getCoursesByBranch";
+import { readStoredCurriculumCatalog } from "@/lib/itu/curriculum/catalogStore";
+import { buildLocalCreditIndex } from "@/lib/itu/curriculum/localCredits";
 
 export async function GET(request: NextRequest) {
   const result = ituCoursesQuerySchema.safeParse({
@@ -28,9 +30,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const catalog = await getCoursesByBranch(result.data);
+    const curriculum = await readStoredCurriculumCatalog();
+    const localCredits = curriculum ? buildLocalCreditIndex(curriculum) : new Map<string, number | null>();
 
     return NextResponse.json({
-      catalog: toCalendarCatalog(catalog),
+      catalog: toCalendarCatalog(catalog, localCredits),
     });
   } catch (error: unknown) {
     if (error instanceof ItuBranchMismatchError) {

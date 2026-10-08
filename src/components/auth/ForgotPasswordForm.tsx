@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { useAuthForm } from "@/hooks/useAuthForm";
 
 import { forgotPasswordAction } from "@/app/auth/actions";
 import AuthMessage from "@/components/auth/AuthMessage";
@@ -12,6 +13,7 @@ import { useLanguage } from "@/lib/i18n/client";
 
 export default function ForgotPasswordForm() {
   const { t } = useLanguage();
+  const formRef = useAuthForm();
   const [state, action] = useActionState(
     forgotPasswordAction,
     INITIAL_AUTH_STATE,
@@ -19,7 +21,7 @@ export default function ForgotPasswordForm() {
 
   return (
     <div className="space-y-6">
-      <form action={action} className="space-y-5" noValidate>
+      <form ref={formRef} action={action} className="space-y-5" noValidate>
         <AuthMessage
           message={state.message}
           tone={state.status === "success" ? "success" : "error"}

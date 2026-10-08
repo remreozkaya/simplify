@@ -1,8 +1,10 @@
 import type { ItuCourseCatalog } from "@/lib/itu/types";
 import type { FacultyOption } from "@/types/calendar";
+import { normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
 export function toCalendarCatalog(
   catalog: ItuCourseCatalog,
+  localCredits?: ReadonlyMap<string, number | null>,
 ): FacultyOption {
   return {
     facultyCode: catalog.branchCode,
@@ -12,6 +14,7 @@ export function toCalendarCatalog(
       id: course.id,
       code: course.code,
       title: course.title,
+      ...(localCredits ? { localCredits: localCredits.get(normalizeCourseCode(course.code)) ?? null } : {}),
       sections: course.sections.map((section) => ({
         id: section.id,
         crn: section.crn,

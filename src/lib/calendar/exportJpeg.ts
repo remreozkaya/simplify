@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, formatDate, localizedWeekday, translate, type Language } from "@/lib/i18n";
 import { meetingsOverlap } from "@/lib/schedule/conflicts";
 import { minutesToTime, timeToMinutes } from "@/lib/schedule/time";
 import { days, type CourseBlock, type Day, type WeeklyProgram } from "@/types/calendar";
@@ -193,7 +194,10 @@ function getSelectionOrder(program: WeeklyProgram): string[] {
   return ordered;
 }
 
-export function exportWeeklyProgramAsJpeg(program: WeeklyProgram): string {
+export function exportWeeklyProgramAsJpeg(
+  program: WeeklyProgram,
+  language: Language = DEFAULT_LANGUAGE,
+): string {
   const range = calculateJpegExportRange(program.courseBlocks);
   const halfHourRows = (range.endMinutes - range.startMinutes) / 30;
   const calendarHeight = halfHourRows * HALF_HOUR_HEIGHT;
@@ -215,19 +219,19 @@ export function exportWeeklyProgramAsJpeg(program: WeeklyProgram): string {
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("JPEG export is not supported by this browser.");
+    throw new Error(translate(language, "weeklyPlanner.exportError"));
   }
 
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#111827";
   context.font = "700 46px system-ui, sans-serif";
-  context.fillText(program.name, LEFT_GUTTER, 72);
+  context.fillText(truncateText(context, program.name, EXPORT_WIDTH - LEFT_GUTTER - RIGHT_GUTTER), LEFT_GUTTER, 72);
   context.fillStyle = "#6b7280";
   context.font = "24px system-ui, sans-serif";
-  context.fillText("Weekly Program · Simplify", LEFT_GUTTER, 112);
+  context.fillText(`${translate(language, "weeklyPlanner.weeklyProgram")} · Simplify`, LEFT_GUTTER, 112);
   context.fillText(
-    `Exported ${new Date().toLocaleDateString("en-GB")}`,
+    translate(language, "weeklyPlanner.exportedOn", { date: formatDate(language, new Date()) }),
     LEFT_GUTTER,
     145,
   );
@@ -256,7 +260,7 @@ export function exportWeeklyProgramAsJpeg(program: WeeklyProgram): string {
   context.textAlign = "center";
   days.forEach((day, index) => {
     const x = LEFT_GUTTER + index * dayWidth;
-    context.fillText(day, x + dayWidth / 2, TOP_HEADER + 39);
+    context.fillText(localizedWeekday(language, day), x + dayWidth / 2, TOP_HEADER + 39);
     context.beginPath();
     context.moveTo(x, TOP_HEADER);
     context.lineTo(x, gridTop + calendarHeight);
@@ -353,7 +357,7 @@ export function exportWeeklyProgramAsJpeg(program: WeeklyProgram): string {
   context.textAlign = "left";
   context.fillStyle = "#111827";
   context.font = "700 26px system-ui, sans-serif";
-  context.fillText("Course details", LEFT_GUTTER, legendTop);
+  context.fillText(translate(language, "weeklyPlanner.courseDetails"), LEFT_GUTTER, legendTop);
 
   legendBlocks.forEach((block, index) => {
     const y = legendTop + 34 + index * LEGEND_ITEM_HEIGHT;
@@ -378,7 +382,7 @@ export function exportWeeklyProgramAsJpeg(program: WeeklyProgram): string {
     context.fillText(
       truncateText(
         context,
-        [block.title, block.instructor ?? "Instructor TBA"]
+        [block.title, block.instructor ?? `${translate(language, "weeklyPlanner.instructor")}: ${translate(language, "weeklyPlanner.tba")}`]
           .filter(Boolean)
           .join(" · "),
         EXPORT_WIDTH - LEFT_GUTTER * 2 - 280,

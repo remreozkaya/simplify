@@ -153,3 +153,44 @@ export function parseStoredWeeklyPrograms(value: unknown): WeeklyProgram[] {
     ];
   });
 }
+
+
+export const WEEKLY_PROGRAMS_STORAGE_KEY = "simplify-weekly-programs";
+
+/** Keep the original stored value intact if sanitizing it would discard data. */
+export function loadWeeklyPrograms(storage: Pick<Storage, "getItem">): {
+  programs: WeeklyProgram[];
+  recoveryRequired: boolean;
+} {
+  try {
+    const raw = storage.getItem(WEEKLY_PROGRAMS_STORAGE_KEY);
+    if (raw === null) return { programs: [], recoveryRequired: false };
+    const value: unknown = JSON.parse(raw);
+    const programs = parseStoredWeeklyPrograms(value);
+    const recoveryRequired = !Array.isArray(value) || value.length !== programs.length || value.some((candidate, index) => {
+      if (!isRecord(candidate)) return true;
+      const program = programs[index];
+      return (candidate.courseBlocks !== undefined && !Array.isArray(candidate.courseBlocks)) ||
+        (candidate.courseSelections !== undefined && !Array.isArray(candidate.courseSelections)) ||
+        (Array.isArray(candidate.courseBlocks) && candidate.courseBlocks.length !== program.courseBlocks.length) ||
+        (Array.isArray(candidate.courseSelections) && candidate.courseSelections.length !== program.courseSelections.length);
+    });
+    return { programs, recoveryRequired };
+  } catch {
+    return { programs: [], recoveryRequired: true };
+  }
+}
+
+export function saveWeeklyPrograms(
+  storage: Pick<Storage, "setItem">,
+  programs: readonly WeeklyProgram[],
+  recoveryRequired: boolean,
+): "saved" | "error" | "recovery" {
+  if (recoveryRequired) return "recovery";
+  try {
+    storage.setItem(WEEKLY_PROGRAMS_STORAGE_KEY, JSON.stringify(programs));
+    return "saved";
+  } catch {
+    return "error";
+  }
+}

@@ -5,6 +5,8 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   applyLanguagePreference,
   DEFAULT_LANGUAGE,
+  LANGUAGE_STORAGE_KEY,
+  resolveLanguage,
   translate,
   validLanguage,
   type Language,
@@ -18,11 +20,23 @@ function currentLanguage(): Language {
 }
 
 function subscribe(callback: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== LANGUAGE_STORAGE_KEY && event.key !== null) return;
+    try {
+      if (event.storageArea !== window.localStorage) return;
+    } catch {
+      return;
+    }
+    // Storage events do not run the other tab's applyLanguage call. Update
+    // the snapshot source before notifying React, without writing it back.
+    applyLanguagePreference(resolveLanguage(event.newValue), document.documentElement);
+    callback();
+  };
   window.addEventListener(LANGUAGE_CHANGE_EVENT, callback);
-  window.addEventListener("storage", callback);
+  window.addEventListener("storage", onStorage);
   return () => {
     window.removeEventListener(LANGUAGE_CHANGE_EVENT, callback);
-    window.removeEventListener("storage", callback);
+    window.removeEventListener("storage", onStorage);
   };
 }
 

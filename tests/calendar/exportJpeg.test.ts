@@ -173,5 +173,47 @@ describe("weekly program JPEG export", () => {
     expect(appendChild).toHaveBeenCalledWith(link);
     expect(click).toHaveBeenCalledOnce();
     expect(link.remove).toHaveBeenCalledOnce();
+    const renderedText = () => context.fillText.mock.calls.map(([text]) => text);
+    expect(renderedText()).toContain("Haftalık Program · Simplify");
+    expect(renderedText()).toContain("Pazartesi");
+    expect(renderedText()).toContain("Ders bilgileri");
+    expect(renderedText().some((text) => String(text).startsWith("Dışa aktarılma tarihi:"))).toBe(true);
+
+    context.fillText.mockClear();
+    exportWeeklyProgramAsJpeg({
+      id: "empty", name: "X".repeat(500), updatedAt: "", courseSelections: [], courseBlocks: [],
+    }, "en");
+    expect(renderedText()).toContain("Weekly Program · Simplify");
+    expect(renderedText()).toContain("Monday");
+    expect(renderedText()).toContain("Course details");
+    const heading = context.fillText.mock.calls[0];
+    expect(context.measureText(String(heading[0])).width + Number(heading[1])).toBeLessThanOrEqual(canvas.width - 48);
+    context.fillText.mockClear();
+    exportWeeklyProgramAsJpeg({
+      id: "multi", name: "Çalışma planı", updatedAt: "", courseSelections: [], courseBlocks: [
+        { id: "lecture", selectionId: "shared", code: "MAT 101", title: "Çok uzun ders adı ".repeat(30), day: "Monday", startTime: "07:30", endTime: "08:30" },
+        { id: "lab", selectionId: "shared", code: "MAT 101", title: "Çok uzun ders adı ".repeat(30), day: "Tuesday", startTime: "21:30", endTime: "22:30" },
+      ],
+    }, "tr");
+    expect(renderedText()).toContain("07:30–08:30");
+    expect(renderedText()).toContain("21:30–22:30");
+    // One legend entry represents both recurring meetings of the same course.
+    expect(renderedText().filter(text => text === "MAT 101")).toHaveLength(3);
+    expect(context.fillText.mock.calls.every(([text, x]) => Number(x) + context.measureText(String(text)).width <= canvas.width)).toBe(true);
+    const missingInstructor = {
+      id: "tba", name: "Program", updatedAt: "", courseSelections: [], courseBlocks: [
+        { id: "single", code: "MAT 101", title: "Math", day: "Monday" as const, startTime: "09:00", endTime: "10:00" },
+      ],
+    };
+    context.fillText.mockClear();
+    exportWeeklyProgramAsJpeg(missingInstructor, "tr");
+    expect(renderedText()).toContain("Math · Öğretim elemanı: Belirtilmedi");
+    context.fillText.mockClear();
+    exportWeeklyProgramAsJpeg(missingInstructor, "en");
+    expect(renderedText()).toContain("Math · Instructor: TBA");
+
+
+
+
   });
 });

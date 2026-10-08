@@ -58,6 +58,7 @@ export type CourseOption = {
   id: string;
   code: string;
   title: string;
+  localCredits?: number | null;
   sections: CourseSectionOption[];
 };
 

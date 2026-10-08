@@ -18,6 +18,17 @@ it("keeps unknown minor identities and URL-like inputs invalid", () => {
   }
 });
 
+it.each([
+  { code: "MAT_YD_TE", ids: [1699, 1828, 1829] },
+  { code: "MAT_YD_UY", ids: [1700, 1831, 1832, 1922] },
+])("loads exact official plan versions for suffix variant $code", async ({ code, ids }) => {
+  const response = await GET(new NextRequest(`http://localhost/api/itu/curriculum/plans?programCode=${code}&planType=yandal`));
+  expect(response.status).toBe(200);
+  const { plans } = await response.json();
+  expect(plans.map((plan: { id: number }) => plan.id)).toEqual(ids);
+  expect(plans.every((plan: { programCode: string; planType: string }) => plan.programCode === code && plan.planType === "yandal")).toBe(true);
+});
+
 it("returns the catalogued Physics minor plans associated with the chosen primary program", async () => {
   const response = await GET(new NextRequest("http://localhost/api/itu/curriculum/plans?programCode=FIZ_YD&planType=yandal&primaryProgramCode=BLGE_LS"));
   expect(response.status).toBe(200);

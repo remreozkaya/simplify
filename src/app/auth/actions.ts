@@ -342,6 +342,9 @@ export async function logoutAction() {
   try {
     const supabase = await createClient();
     await supabase.auth.signOut();
+  } catch {
+    // Provider availability must not prevent local logout and its redirect.
+    // Auth cookies are removed below even when remote session revocation fails.
   } finally {
     const cookieStore = await cookies();
     cookieStore.delete(REMEMBER_COOKIE);

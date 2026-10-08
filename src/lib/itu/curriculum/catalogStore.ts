@@ -23,6 +23,7 @@ type StoredCatalog = {
   faculties: ItuFaculty[];
   programs: { code: string; name: string; facultyId: string; facultyName: string; planType: ItuPlanType }[];
   plans: StoredPlan[];
+  electiveGroups?: Record<string, { courses?: unknown[] }>;
 };
 
 export const readStoredCurriculumCatalog = cache(async (): Promise<StoredCatalog | null> => {

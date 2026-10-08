@@ -5,6 +5,23 @@ import { curriculumTotals, applyTranscriptImport } from "@/lib/curriculum/gradua
 import { emptyProgress } from "@/lib/curriculum/progress";
 import { parseTranscriptMarkdown } from "@/lib/curriculum/transcript";
 import { parseElectiveGroup } from "@/lib/itu/curriculum/parsers/parseElectiveGroup";
+import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
+
+it.each([
+  { requiredCode: "MAT 103E", requiredLanguage: "EN", completedCode: "MAT 103", completedLanguage: "TR", earnedEnglishCredit: 0, requiredEnglishCredit: 4 },
+  { requiredCode: "MAT 103", requiredLanguage: "TR", completedCode: "MAT 103E", completedLanguage: "EN", earnedEnglishCredit: 4, requiredEnglishCredit: 0 },
+])("uses the completed teaching language for $completedCode against $requiredCode", ({ requiredCode, requiredLanguage, completedCode, completedLanguage, earnedEnglishCredit, requiredEnglishCredit }) => {
+  const curriculum: ItuCurriculum = {
+    planId: 1, programCode: "QA_LS", title: "QA", planTitle: "QA",
+    semesters: [{ semester: 1, items: [{ kind: "course", id: "math", semester: 1, code: requiredCode, title: "Math", language: requiredLanguage, requirementType: "compulsory", creditOptions: [4], ectsOptions: [6] }] }],
+    prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: [], prerequisiteDataAvailable: true, warnings: [], fetchedAt: "2026-10-08T00:00:00Z",
+  };
+  const parsed = parseTranscriptMarkdown(`| Completed English Courses |\n| 202610 | 1 | ${completedCode} | Math | 2 / 3 | AA |`);
+  parsed.calculatedCourses[0].courseLanguage = completedLanguage;
+  const progress = applyTranscriptImport(curriculum, emptyProgress(1), parsed).progress;
+  expect(curriculumTotals(curriculum, progress)).toMatchObject({ earnedCredit: 4, earnedEnglishCredit, requiredEnglishCredit });
+  expect(progress.courses[completedCode]).toMatchObject({ countedCredit: 2, transcriptCredit: 3, courseLanguage: completedLanguage });
+});
 
 it("counts source English language credits in the graduation audit", () => {
   const html = readFileSync(new URL("../fixtures/itu/curriculum/detail.html", import.meta.url),"utf8");

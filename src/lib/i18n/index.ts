@@ -116,15 +116,14 @@ export function localizedAcademicName(
   value: LocalizedName,
   language: Language,
 ) {
-  return (
-    (language === "tr" ? value.nameTr : value.nameEn) ??
-    (language === "tr" ? value.nameEn : value.nameTr) ??
-    value.name ??
-    value.title ??
-    value.officialProgramCode ??
-    value.code ??
-    ""
-  );
+  return [
+    language === "tr" ? value.nameTr : value.nameEn,
+    language === "tr" ? value.nameEn : value.nameTr,
+    value.name,
+    value.title,
+    value.officialProgramCode,
+    value.code,
+  ].find((name) => name?.trim()) ?? "";
 }
 
 export function offeringDisplayName(

@@ -38,7 +38,7 @@ The semester planner accepts a local-credit target, maximum course count (0 mean
 
 Transcript imports accumulate across semesters. Reimporting a course retains the most recent attempt; older input cannot overwrite a newer result. Each main-major, double-major, and minor enrollment is audited independently against its exact curriculum. Program GPA uses transcript credit weights for matched, numerically graded courses, counting each course once. Courses without numeric grades do not contribute to GPA. A course is allocated once per program audit; manual completions follow direct-course priority before elective slots. Shared transcript grades and credits remain authoritative for prerequisite eligibility, including courses outside the active degree requirements. Resetting the shared transcript clears transcript-derived progress in all saved plans, including inactive enrollments, while preserving manual completions. An intentionally empty transcript does not reimport legacy plan records.
 
-Profile details and enrollments are stored in Supabase user metadata. Weekly schedules, generator preferences, transcripts, curriculum progress, language, and theme are stored in this browser’s `localStorage`. They are not synchronized across devices and remain after logout. Cleanup must preserve existing storage keys and migrations. Official academic names use the requested language when supplied by OBS, with the source name as fallback.
+Profile details and enrollments are stored in Supabase user metadata. Weekly schedules, generator preferences, transcripts, curriculum progress, language, and theme are stored in this browser’s `localStorage`. They are shared by accounts using the same browser, are not synchronized across devices, and remain after logout. Cleanup must preserve existing storage keys and migrations. Official academic names use the requested language when supplied by OBS, with the source name as fallback.
 
 Public İTÜ data is advisory. Unknown availability, registration limits, and unstructured corequisite rules must stay visible; students should verify registration decisions in OBS.
 
@@ -104,7 +104,7 @@ simplify/
 │   ├── curriculum/, itu/
 │   └── fixtures/              # OBS HTML and sample transcript records
 ├── .codex/agents/             # architecture, academic, design, reviewer TOML
-├── docs/superpowers/plans/    # implementation scope and verification evidence
+├── docs/quality/             # functional and translation audit
 ├── AGENTS.md                  # Next.js-generated agent guidance
 ├── CLAUDE.md                  # reference to AGENTS.md
 ├── .env.example               # public Supabase/site configuration placeholders
@@ -229,3 +229,5 @@ Public bilingual legal pages live at `/legal/privacy`, `/legal/storage`, `/legal
 Legal owner facts are centralized in `src/lib/legal/operator.json`. They are intentionally unresolved: notices remain pre-launch drafts. Account deletion additionally requires a **server-only** `SUPABASE_SECRET_KEY`; no admin credential is sent to clients. The request page opens a configured mail app and has no fake delivery form; contact/delivery must be confirmed before launch.
 
 Run `npm run legal:check` to see missing mandatory facts/reviews. Use **`npm run build:production` as the deployment build command**; ordinary `npm run build` only verifies compilation and does not authorize launch. Read [audit](docs/legal/AUDIT.md), [requirements and official sources](docs/legal/REQUIREMENTS.md), [operations and launch blockers](docs/legal/OPERATIONS.md), and [verification](docs/legal/VERIFICATION.md). No overseas-transfer arrangement, retention period, controller identity or university affiliation has been invented.
+
+The production compiler is explicitly webpack (`npm run build`). Geist fonts are bundled locally with their OFL license to avoid network-dependent font builds. Metadata is Turkish on the server and follows the browser language preference after hydration; search crawlers without JavaScript receive Turkish metadata. Generated audit screenshots/logs are kept outside the repository; browser regression runners write their evidence to temporary directories.

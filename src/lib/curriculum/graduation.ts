@@ -348,7 +348,9 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
     // retained separately for GPA and transcript reporting.
     const credit = requiredCredit;
     earnedCredit += credit;
-    if (normalizeCourseLanguage(requiredLanguage ?? completed.course.courseLanguage ?? completed.language) === "EN") earnedEnglishCredit += credit;
+    // A language counterpart can complete the requirement without changing
+    // the actual teaching language of the completed course.
+    if (normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit += credit;
   });
   return {
     requiredCourses: items.length,

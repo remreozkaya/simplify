@@ -55,6 +55,7 @@ type ScheduleGeneratorPanelProps = {
   isBranchLoading: (branchCode: string) => boolean;
   loadBranch: (branchCode: string) => Promise<void>;
   catalogError: string | null;
+  onRetryCatalog: () => void;
   onPreviewChange: (schedule: GeneratedSchedule | null) => void;
   onSave: (schedule: GeneratedSchedule) => string;
 };
@@ -146,6 +147,7 @@ export default function ScheduleGeneratorPanel({
   isBranchLoading,
   loadBranch,
   catalogError,
+  onRetryCatalog,
   onPreviewChange,
   onSave,
 }: ScheduleGeneratorPanelProps) {
@@ -743,25 +745,37 @@ export default function ScheduleGeneratorPanel({
 
         <div
           className={`text-sm ${
-            status === "error" || status === "no-results"
+            catalogError || status === "error" || status === "no-results"
               ? "text-red-700"
               : status === "success"
                 ? "font-medium text-green-700"
                 : "text-gray-500"
           }`}
           aria-live="polite"
-          role={status === "error" ? "alert" : "status"}
+          role={catalogError || status === "error" ? "alert" : "status"}
         >
           {isLoadingBranches
             ? t("courses.loadingCourses")
             : isLoadingSelectedCourses
               ? t("courses.loadingSelected")
               : catalogError
-                ? localizeRuntimeMessage(language, catalogError)
+                ? localizeRuntimeMessage(language, catalogError, { fallback: true })
                 : contextChanged
                   ? ""
                   : localizeRuntimeMessage(language, message)}
         </div>
+        {catalogError && (
+          <button
+            type="button"
+            onClick={onRetryCatalog}
+            disabled={isLoadingBranches || isLoadingSelectedCourses}
+            title={t("weeklyPlanner.retry")}
+            aria-label={t("weeklyPlanner.retry")}
+            className="rounded-md border border-red-700 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("weeklyPlanner.retry")}
+          </button>
+        )}
       </div>
 
       {visibleStatus === "no-results" && plannerAlternatives.length > 0 ? (

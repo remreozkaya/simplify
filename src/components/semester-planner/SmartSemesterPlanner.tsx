@@ -327,7 +327,7 @@ export default function SmartSemesterPlanner() {
         role="alert"
         className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
       >
-        {localizeRuntimeMessage(language, error)}
+        {localizeRuntimeMessage(language, error, { fallback: true })}
       </div>
     );
   if (!enrollments.length || !programs.length)
@@ -456,7 +456,7 @@ export default function SmartSemesterPlanner() {
         {offeringsError ? (
           <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
             {t("semesterPlanner.offeringsWarning", {
-              error: localizeRuntimeMessage(language, offeringsError) ?? "",
+              error: localizeRuntimeMessage(language, offeringsError, { fallback: true }) ?? "",
             })}
           </p>
         ) : null}

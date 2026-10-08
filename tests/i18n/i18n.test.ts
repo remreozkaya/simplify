@@ -15,6 +15,7 @@ import {
   translate,
 } from "@/lib/i18n";
 import { translations } from "@/lib/i18n/translations";
+import { legalCopy, legalSections } from "@/lib/legal/copy";
 
 function keys(value: unknown, prefix = ""): string[] {
   if (!value || typeof value !== "object") return [prefix];
@@ -48,6 +49,47 @@ describe("Turkish and English localization", () => {
     expect(translate("en", "academicPrograms.doubleMajor")).toBe(
       "Double Major",
     );
+  });
+
+  it("has nonempty text and matching interpolation placeholders at every leaf", () => {
+    for (const key of keys(translations.tr)) {
+      const tr = translate("tr", key);
+      const en = translate("en", key);
+      expect(tr.trim(), `tr.${key}`).not.toBe("");
+      expect(en.trim(), `en.${key}`).not.toBe("");
+      const placeholders = (value: string) =>
+        [...value.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+      expect(placeholders(tr), key).toEqual(placeholders(en));
+    }
+  });
+
+  it("resolves every runtime-constructed planner status key", () => {
+    for (const language of ["tr", "en"] as const) {
+      for (const status of ["confirmed", "conditional", "unknown"] as const) {
+        const key = `semesterPlanner.eligibility_${status}`;
+        expect(translate(language, key)).not.toBe(key);
+      }
+      for (const status of ["available", "unavailable", "unknown"] as const) {
+        const key = `semesterPlanner.availability_${status}`;
+        expect(translate(language, key)).not.toBe(key);
+      }
+    }
+  });
+
+  it("keeps bilingual legal copy and document sections populated", () => {
+    expect(keys(legalCopy.tr).sort()).toEqual(keys(legalCopy.en).sort());
+    for (const language of ["tr", "en"] as const) {
+      for (const document of ["privacy", "storage", "terms", "requests"] as const) {
+        const sections = legalSections(document, language);
+        expect(sections.length).toBeGreaterThan(0);
+        for (const section of sections) {
+          expect(section.title.trim()).not.toBe("");
+          expect(section.paragraphs.length).toBeGreaterThan(0);
+          for (const paragraph of section.paragraphs) expect(paragraph.trim()).not.toBe("");
+        }
+        expect(sections.length).toBe(legalSections(document, language === "tr" ? "en" : "tr").length);
+      }
+    }
   });
 
   it("resolves translation keys referenced by the interface", () => {
@@ -121,5 +163,11 @@ describe("Turkish and English localization", () => {
         "tr",
       ),
     ).toBe("Ekonomi – Yandal");
+  });
+
+  it("falls back to available official source names when a localized name is empty", () => {
+    expect(localizedAcademicName({ nameEn: "", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Ekonomi");
+    expect(localizedAcademicName({ nameEn: "  ", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Ekonomi");
+    expect(localizedAcademicName({ nameEn: "", nameTr: "", name: "Ekonomi", code: "ECN" }, "tr")).toBe("Ekonomi");
   });
 });

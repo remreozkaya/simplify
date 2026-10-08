@@ -5,8 +5,8 @@ const runtimeMessages: Record<string, string> = {
   "Enter a valid email address.": "Geçerli bir e-posta adresi girin.",
   "Password is required.": "Parola gereklidir.",
   "Passwords do not match.": "Parolalar eşleşmiyor.",
-  "Current password is required.": "Geçerli parola gereklidir.",
-  "Current password is incorrect.": "Geçerli parola yanlış.",
+  "Current password is required.": "Mevcut parola gereklidir.",
+  "Current password is incorrect.": "Mevcut parola yanlış.",
   "Use at least 8 characters.": "En az 8 karakter kullanın.",
   "Check the highlighted fields and try again.":
     "Vurgulanan alanları kontrol edip yeniden deneyin.",
@@ -53,7 +53,7 @@ const runtimeMessages: Record<string, string> = {
   "Password must contain no more than 128 characters.":
     "Parola en fazla 128 karakter olabilir.",
   "New password must be different from your current password.":
-    "Yeni parola geçerli parolanızdan farklı olmalıdır.",
+    "Yeni parola mevcut parolanızdan farklı olmalıdır.",
   "Too many attempts. Please wait a moment and try again.":
     "Çok fazla deneme yapıldı. Biraz bekleyip yeniden deneyin.",
   "Too many requests. Please wait before trying again.":
@@ -82,7 +82,7 @@ const runtimeMessages: Record<string, string> = {
     "Oturumunuz sona erdi. Parolanızı değiştirmek için yeniden giriş yapın.",
   "Your password is managed by your sign-in provider.":
     "Parolanız giriş sağlayıcınız tarafından yönetiliyor.",
-  "Your current password is incorrect.": "Geçerli parolanız yanlış.",
+  "Your current password is incorrect.": "Mevcut parolanız yanlış.",
   "Your password could not be changed right now. Try again.":
     "Parolanız değiştirilemedi. Yeniden deneyin.",
   "Check the highlighted profile fields and try again.":
@@ -211,6 +211,10 @@ const exact = {
   tr: new Map(pairs.map(([en, tr]) => [en, tr])),
   en: new Map(pairs.map(([en, tr]) => [tr, en])),
 };
+const knownTargets = {
+  tr: new Set(pairs.map(([, tr]) => tr)),
+  en: new Set(pairs.map(([en]) => en)),
+};
 const templates = pairs
   .filter(([en]) => en.includes("{"))
   .map(([en, tr]) => ({ en, tr }));
@@ -238,7 +242,11 @@ function translateTemplate(source: string, target: string, message: string) {
   );
 }
 
-export function localizeRuntimeMessage(language: Language, message?: string) {
+export function localizeRuntimeMessage(
+  language: Language,
+  message?: string,
+  options: { fallback?: boolean } = {},
+) {
   if (!message) return message;
   const translated = exact[language].get(message);
   if (translated) return translated;
@@ -250,6 +258,13 @@ export function localizeRuntimeMessage(language: Language, message?: string) {
       message,
     );
     if (result) return result;
+  }
+  if (options.fallback && !knownTargets[language].has(message)) {
+    const alreadyLocalized = templates.some((template) =>
+      translateTemplate(template[language], template[language], message),
+    );
+    if (!alreadyLocalized)
+      return translations[language].errors.upstreamDetails.replace("{message}", () => message);
   }
   return message;
 }

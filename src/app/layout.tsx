@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import LocalizedMetadata from "@/components/LocalizedMetadata";
+import { localizedMetadata } from "@/lib/i18n/metadata";
 import "./globals.css";
 import LegalFooter from "@/components/legal/LegalFooter";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "./fonts/Geist-Variable.woff2",
+  weight: "100 900",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/GeistMono-Variable.woff2",
+  weight: "100 900",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Simplify · ITU Student Planner",
-  description: "Plan schedules and explore undergraduate curricula with public ITU OBS data.",
-};
+export const metadata: Metadata = localizedMetadata.tr;
 
 export default function RootLayout({
   children,
@@ -36,7 +37,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}<LegalFooter /></body>
+      <body className="min-h-full flex flex-col"><LocalizedMetadata />{children}<LegalFooter /></body>
     </html>
   );
 }

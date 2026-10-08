@@ -26,7 +26,7 @@ import ScheduleGeneratorPanel from "@/components/calendar/ScheduleGeneratorPanel
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import { getCourseColorStyle } from "@/lib/calendar/courseColors";
 import { exportWeeklyProgramAsJpeg } from "@/lib/calendar/exportJpeg";
-import { parseStoredWeeklyPrograms } from "@/lib/calendar/persistence";
+import { loadWeeklyPrograms, saveWeeklyPrograms } from "@/lib/calendar/persistence";
 import { getCourseById, getSectionById } from "@/lib/calendar/catalog";
 import {
   SortableCourseRow,
@@ -34,13 +34,14 @@ import {
   courseRowGridClassName,
 } from "@/components/calendar/CourseRows";
 import CourseDetails from "@/components/calendar/CourseDetails";
+import CrnBookmarkletLink from "@/components/calendar/CrnBookmarkletLink";
+import { createCrnBookmarklet, getLocalCreditTotal } from "@/lib/calendar/planActions";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
-import { localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
+import { formatNumber, localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
 import { hasMeetingConflicts } from "@/lib/schedule/conflicts";
 import {
-  START_TIME,
-  END_TIME,
+  calculateCalendarRange,
   generateTimeLabels,
   getTimeTop,
   getCourseHeight,
@@ -55,7 +56,6 @@ import {
   type WeeklyProgram,
 } from "@/types/calendar";
 
-const WEEKLY_PROGRAMS_STORAGE_KEY = "simplify-weekly-programs";
 const NEW_PROGRAM_VALUE = "__new_program__";
 
 const selectClassName =
@@ -64,7 +64,6 @@ const selectClassName =
 const inputClassName =
   "min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-[border-color,box-shadow] duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
-const timeLabels = generateTimeLabels();
 
 const dropAnimation = {
   duration: 220,
@@ -129,6 +128,8 @@ export default function WeeklyCalendar({
   const [programName, setProgramName] = useState("");
 
   const [hasLoadedPrograms, setHasLoadedPrograms] = useState(false);
+  const [storageRecoveryRequired, setStorageRecoveryRequired] = useState(false);
+  const [storageWriteFailed, setStorageWriteFailed] = useState(false);
 
   const [activeSelectionId, setActiveSelectionId] = useState<string | null>(
     null,
@@ -177,10 +178,17 @@ export default function WeeklyCalendar({
   );
 
   const savedProgramName = selectedProgram?.name ?? "";
+  const localCreditTotal = useMemo(
+    () => getLocalCreditTotal(courseSelections, courseCatalog),
+    [courseSelections, courseCatalog],
+  );
+  const bookmarklet = useMemo(
+    () => createCrnBookmarklet(courseSelections, courseCatalog),
+    [courseSelections, courseCatalog],
+  );
 
   const hasUnsavedNameChanges = programName !== savedProgramName;
 
-  const calendarHeight = getCourseHeight(START_TIME, END_TIME);
 
   const activeSelection =
     courseSelections.find((selection) => selection.id === activeSelectionId) ??
@@ -199,6 +207,17 @@ export default function WeeklyCalendar({
         : courseBlocks,
     [courseBlocks, generatedPreview, view],
   );
+
+  const calendarRange = useMemo(
+    () => calculateCalendarRange(displayedCourseBlocks),
+    [displayedCourseBlocks],
+  );
+  const timeLabels = useMemo(
+    () => generateTimeLabels(calendarRange.startMinutes, calendarRange.endMinutes),
+    [calendarRange],
+  );
+  const calendarEndTime = timeLabels.at(-1)!;
+  const calendarHeight = getTimeTop(calendarEndTime, calendarRange.startMinutes);
 
   const detailsCourse = displayedCourseBlocks.find(
     (course) => course.id === detailsCourseId,
@@ -263,21 +282,15 @@ export default function WeeklyCalendar({
    * hydration intentionally synchronizes React state with localStorage after
    * SSR, preventing stored user schedules from causing a hydration mismatch. */
   useEffect(() => {
-    let savedPrograms: WeeklyProgram[] = [];
-
+    // Access to the localStorage object itself can also throw (blocked storage).
+    let loaded: ReturnType<typeof loadWeeklyPrograms>;
     try {
-      const storedPrograms = localStorage.getItem(WEEKLY_PROGRAMS_STORAGE_KEY);
-
-      if (storedPrograms) {
-        const parsedPrograms: unknown = JSON.parse(storedPrograms);
-
-        if (Array.isArray(parsedPrograms)) {
-          savedPrograms = parseStoredWeeklyPrograms(parsedPrograms);
-        }
-      }
+      loaded = loadWeeklyPrograms(localStorage);
     } catch {
-      savedPrograms = [];
+      loaded = { programs: [], recoveryRequired: true };
     }
+    const savedPrograms = loaded.programs;
+    setStorageRecoveryRequired(loaded.recoveryRequired);
 
     const initialPrograms =
       savedPrograms.length > 0
@@ -319,11 +332,16 @@ export default function WeeklyCalendar({
       return;
     }
 
-    localStorage.setItem(
-      WEEKLY_PROGRAMS_STORAGE_KEY,
-      JSON.stringify(weeklyPrograms),
-    );
-  }, [weeklyPrograms, hasLoadedPrograms]);
+    let result: ReturnType<typeof saveWeeklyPrograms>;
+    try {
+      result = saveWeeklyPrograms(localStorage, weeklyPrograms, storageRecoveryRequired);
+    } catch {
+      result = "error";
+    }
+    // The warning reflects an external write result, while edits remain in memory.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStorageWriteFailed(result === "error");
+  }, [weeklyPrograms, hasLoadedPrograms, storageRecoveryRequired]);
 
   function updateSelectedProgram(
     updater: (program: WeeklyProgram) => WeeklyProgram,
@@ -717,7 +735,7 @@ export default function WeeklyCalendar({
       const filename = exportWeeklyProgramAsJpeg({
         ...selectedProgram,
         name: programName.trim() || selectedProgram.name,
-      });
+      }, language);
       setJpegExportStatus({
         message: t("weeklyPlanner.downloaded", { filename }),
         isError: false,
@@ -735,6 +753,11 @@ export default function WeeklyCalendar({
 
   return (
     <div className="w-full space-y-4">
+      {(storageRecoveryRequired || storageWriteFailed) && (
+        <p role="alert" className="text-sm text-red-700">
+          {t(storageRecoveryRequired ? "weeklyPlanner.storageRecovery" : "weeklyPlanner.storageError")}
+        </p>
+      )}
       {detailsCourse && (
         <CourseDetails
           key={detailsCourse.id}
@@ -746,7 +769,7 @@ export default function WeeklyCalendar({
       )}
       {view === "planner" ? (
         <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] md:items-end">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.8fr)_auto_auto_auto] lg:items-end">
             <div className="min-w-0">
               <label
                 htmlFor="weekly-program"
@@ -793,14 +816,11 @@ export default function WeeklyCalendar({
               />
             </div>
 
-            <button
-              type="button"
-              onClick={handleExportJpeg}
-              disabled={!selectedProgram}
-              className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t("weeklyPlanner.exportJpeg")}
-            </button>
+            <CrnBookmarkletLink
+              url={bookmarklet.url}
+              label={t("weeklyPlanner.fillCrns")}
+              tooltip={t("weeklyPlanner.bookmarkletTooltip")}
+            />
 
             <button
               type="button"
@@ -821,17 +841,13 @@ export default function WeeklyCalendar({
             </button>
           </div>
 
-          {jpegExportStatus && (
+          {bookmarklet.error && (
             <div
-              className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
-                jpegExportStatus.isError
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-green-200 bg-green-50 text-green-700"
-              }`}
-              role={jpegExportStatus.isError ? "alert" : "status"}
+              className="mb-3 text-sm text-red-700"
+              role="alert"
               aria-live="polite"
             >
-              {localizeRuntimeMessage(language, jpegExportStatus.message)}
+              {t("weeklyPlanner.invalidCrn")}
             </div>
           )}
 
@@ -844,14 +860,23 @@ export default function WeeklyCalendar({
             </p>
           ) : null}
 
-          <button
-            type="button"
-            onClick={handleAddSelectionRow}
-            disabled={!selectedProgram}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-          >
-            {t("weeklyPlanner.addCourse")}
-          </button>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <button
+              type="button"
+              onClick={handleAddSelectionRow}
+              disabled={!selectedProgram}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              {t("weeklyPlanner.addCourse")}
+            </button>
+            <span className="text-sm text-gray-600" role="status" aria-live="polite">
+              {localCreditTotal === null
+                ? t("weeklyPlanner.localCreditsUnavailable")
+                : t("weeklyPlanner.localCredits", {
+                    credits: formatNumber(language, localCreditTotal, { maximumFractionDigits: 10 }),
+                  })}
+            </span>
+          </div>
 
           {(isLoadingBranches || courseCatalogError) && (
             <div
@@ -866,6 +891,7 @@ export default function WeeklyCalendar({
                 {localizeRuntimeMessage(
                   language,
                   courseCatalogError ?? undefined,
+                  { fallback: true },
                 ) ?? t("weeklyPlanner.loadingPrefixes")}
               </span>
 
@@ -901,7 +927,7 @@ export default function WeeklyCalendar({
           )}
 
           {courseSelections.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
+            <div className="relative mt-4 overflow-x-auto">
               <div className="min-w-[640px] space-y-2">
                 <div className={`${courseRowGridClassName} border border-transparent text-sm font-medium text-slate-700`}>
                   <span aria-hidden="true" />
@@ -981,6 +1007,7 @@ export default function WeeklyCalendar({
           isBranchLoading={isBranchLoading}
           loadBranch={loadBranch}
           catalogError={courseCatalogError}
+          onRetryCatalog={failedBranchCode ? retryFailedBranch : retryBranches}
           onPreviewChange={setGeneratedPreview}
           onSave={handleSaveGeneratedSchedule}
         />
@@ -1015,10 +1042,10 @@ export default function WeeklyCalendar({
                 key={time}
                 className="absolute left-0 w-full border-t border-gray-200"
                 style={{
-                  top: getTimeTop(time),
+                  top: getTimeTop(time, calendarRange.startMinutes),
                 }}
               >
-                {time !== END_TIME && (
+                {time !== calendarEndTime && (
                   <span
                     className={
                       time.endsWith(":00")
@@ -1042,7 +1069,7 @@ export default function WeeklyCalendar({
             </div>
 
             {displayedCourseBlocks.map((course) => {
-              const top = getTimeTop(course.startTime);
+              const top = getTimeTop(course.startTime, calendarRange.startMinutes);
 
               const height = getCourseHeight(course.startTime, course.endTime);
 
@@ -1106,6 +1133,27 @@ export default function WeeklyCalendar({
           </div>
         </div>
       </div>
+      {view === "planner" && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {jpegExportStatus && (
+            <span
+              className={`min-w-0 break-words text-sm ${jpegExportStatus.isError ? "text-red-700" : "text-green-700"}`}
+              role={jpegExportStatus.isError ? "alert" : "status"}
+              aria-live="polite"
+            >
+              {localizeRuntimeMessage(language, jpegExportStatus.message)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleExportJpeg}
+            disabled={!selectedProgram}
+            className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("weeklyPlanner.exportJpeg")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

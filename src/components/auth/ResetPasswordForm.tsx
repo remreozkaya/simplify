@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { useAuthForm } from "@/hooks/useAuthForm";
 
 import { resetPasswordAction } from "@/app/auth/actions";
 import AuthMessage from "@/components/auth/AuthMessage";
@@ -12,6 +13,7 @@ import { useLanguage } from "@/lib/i18n/client";
 
 export default function ResetPasswordForm() {
   const { t } = useLanguage();
+  const formRef = useAuthForm();
   const [state, action] = useActionState(
     resetPasswordAction,
     INITIAL_AUTH_STATE,
@@ -19,7 +21,7 @@ export default function ResetPasswordForm() {
 
   return (
     <div className="space-y-5">
-      <form action={action} className="space-y-5" noValidate>
+      <form ref={formRef} action={action} className="space-y-5" noValidate>
         <AuthMessage message={state.message} />
         <PasswordInput
           id="new-password"
