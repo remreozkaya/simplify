@@ -27,7 +27,7 @@ import {
 } from "@/lib/curriculum/transcriptStore";
 import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import {
-  formatNumber,
+  formatCredits,
   localizedAcademicName,
   localizedCourseTitle,
   localizedElectiveTitle,
@@ -80,7 +80,7 @@ function missingCourseCodes(
     if (value.kind === "all" || value.kind === "one-of")
       value.requirements.forEach(visit);
     if (value.kind === "credits")
-      codes.push(`${value.minimumCredits} ${creditLabel}`);
+      codes.push(`${formatCredits(value.minimumCredits)} ${creditLabel}`);
     if (value.kind === "unknown") codes.push(value.raw);
   };
   candidate.missingPrerequisites.forEach(visit);
@@ -99,7 +99,7 @@ export default function SmartSemesterPlanner() {
   const [loading, setLoading] = useState(enrollments.length > 0);
   const [error, setError] = useState("");
   const [targetSemester, setTargetSemester] = useState("published");
-  const [desiredCreditsInput, setDesiredCreditsInput] = useState("18");
+  const [desiredCreditsInput, setDesiredCreditsInput] = useState("18.00");
   const [maxCoursesInput, setMaxCoursesInput] = useState("6");
   const [priority, setPriority] = useState<ProgramPriority>("balanced");
   const [request, setRequest] = useState<{
@@ -228,7 +228,7 @@ export default function SmartSemesterPlanner() {
       desiredCredits > MAX_PLANNER_CREDITS
     ) {
       setValidationError(
-        t("semesterPlanner.invalidCredits", { max: MAX_PLANNER_CREDITS }),
+        t("semesterPlanner.invalidCredits", { max: formatCredits(MAX_PLANNER_CREDITS) }),
       );
       return;
     }
@@ -314,8 +314,7 @@ export default function SmartSemesterPlanner() {
     router.push("/generator#schedule-generator");
   }
 
-  const number = (value: number, digits = 1) =>
-    formatNumber(language, value, { maximumFractionDigits: digits });
+  const number = formatCredits;
 
   if (enrollments.length > 0 && (loading || isLoadingBranches || (!programsCurrent && !error)))
     return (
@@ -374,11 +373,18 @@ export default function SmartSemesterPlanner() {
             <input
               aria-describedby="planner-credit-hint"
               type="number"
+              lang="en"
               min={0}
               max={MAX_PLANNER_CREDITS}
               step={0.5}
               value={desiredCreditsInput}
               onChange={(event) => setDesiredCreditsInput(event.target.value)}
+              onBlur={() => {
+                const credits = Number(desiredCreditsInput);
+                if (desiredCreditsInput.trim() && Number.isFinite(credits)) {
+                  setDesiredCreditsInput(formatCredits(credits));
+                }
+              }}
               className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal dark:border-slate-700 dark:bg-slate-950"
             />
             <span
@@ -603,7 +609,7 @@ export default function SmartSemesterPlanner() {
                       )}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {course.credits} {t("common.credit")} ·{" "}
+                      {formatCredits(course.credits)} {t("common.credit")} ·{" "}
                       {course.contributions
                         .map((value) =>
                           localizedAcademicName(
@@ -661,7 +667,7 @@ function Summary({
 function Notice({ notice }: { notice: PlannerNotice }) {
   const { t } = useLanguage();
   let parameters: Record<string, string | number> | undefined;
-  if ("credits" in notice) parameters = { credits: notice.credits };
+  if ("credits" in notice) parameters = { credits: formatCredits(notice.credits) };
   else if ("count" in notice) parameters = { count: notice.count };
   return (
     <div className="text-sm text-amber-900 dark:text-amber-200">
@@ -717,10 +723,10 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold">
-            {formatNumber(language, course.credits)}
+            {formatCredits(course.credits)}
           </p>
           <p className="text-xs text-slate-500">
-            {t("common.credit")} · {formatNumber(language, course.ects)}{" "}
+            {t("common.credit")} · {formatCredits(course.ects)}{" "}
             {t("curriculum.ects")}
           </p>
         </div>

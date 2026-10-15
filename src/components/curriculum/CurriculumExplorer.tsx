@@ -75,6 +75,7 @@ import { groupCurriculum } from "@/lib/curriculum/grouping";
 import { useLanguage } from "@/lib/i18n/client";
 import {
   formatDate,
+  formatCredits,
   formatNumber,
   localizedAcademicName,
   localizedCourseTitle,
@@ -90,7 +91,7 @@ const STATUS_CLASS: Record<CourseDerivedStatus, string> = {
   failed: "border-red-600 bg-red-200 text-red-950",
 };
 function optionsText(values: number[], suffix: string) {
-  return values.length ? `${values.join(" / ")} ${suffix}` : "—";
+  return values.length ? `${values.map(formatCredits).join(" / ")} ${suffix}` : "—";
 }
 
 function MissingList({ requirements }: { requirements: MissingRequirement[] }) {
@@ -120,7 +121,7 @@ function MissingList({ requirements }: { requirements: MissingRequirement[] }) {
           {requirement.kind === "credits" && (
             <span>
               {t("curriculum.minimumCredits", {
-                credits: requirement.minimumCredits,
+                credits: formatCredits(requirement.minimumCredits),
               })}
             </span>
           )}
@@ -1004,19 +1005,19 @@ export default function CurriculumExplorer() {
                 ·{" "}
                 {curriculum.totalCredit === undefined
                   ? "—"
-                  : formatNumber(language, curriculum.totalCredit)}{" "}
+                  : formatCredits(curriculum.totalCredit)}{" "}
                 {t("common.credit")} ·{" "}
                 {curriculum.totalEcts === undefined
                   ? "—"
-                  : formatNumber(language, curriculum.totalEcts)}{" "}
+                  : formatCredits(curriculum.totalEcts)}{" "}
                 {t("curriculum.ects")}
               </p>
               {auditTotals ? (
                 <p className="mt-2 text-sm font-semibold text-slate-900">
                   {auditTotals.earnedCourses} / {auditTotals.requiredCourses}{" "}
                   {t("graduationCalculator.requirements")} ·{" "}
-                  {formatNumber(language, auditTotals.earnedCredit)} /{" "}
-                  {formatNumber(language, auditTotals.requiredCredit)}{" "}
+                  {formatCredits(auditTotals.earnedCredit)} /{" "}
+                  {formatCredits(auditTotals.requiredCredit)}{" "}
                   {t("common.credit")} ·{" "}
                   {t("curriculum.completeSummary", {
                     percent: formatNumber(language, completionPercentage),

@@ -7,6 +7,7 @@ import {
   applyLanguagePreference,
   DEFAULT_LANGUAGE,
   formatDate,
+  formatCredits,
   formatNumber,
   LANGUAGE_STORAGE_KEY,
   localizedAcademicName,
@@ -134,6 +135,19 @@ describe("Turkish and English localization", () => {
     expect(formatDate("tr", "2026-09-03T00:00:00Z", { timeZone: "UTC" })).toBe(
       "03.09.2026",
     );
+  });
+
+  it.each([
+    [0, "0.00"],
+    [3, "3.00"],
+    [3.5, "3.50"],
+    [3.125, "3.13"],
+    [1234.5, "1234.50"],
+  ])("formats %s credits with a decimal point and exactly two digits", (value, expected) => {
+    expect(formatCredits(value)).toBe(expected);
+    for (const language of ["tr", "en"] as const) {
+      expect(translate(language, "weeklyPlanner.localCredits", { credits: formatCredits(value) })).toContain(expected);
+    }
   });
 
   it("uses the official academic-name fallback chain and typed suffixes", () => {

@@ -54,6 +54,7 @@ import type {
 import { groupCurriculum } from "@/lib/curriculum/grouping";
 import { useLanguage } from "@/lib/i18n/client";
 import {
+  formatCredits,
   formatNumber,
   localizedAcademicName,
   localizedCourseTitle,
@@ -102,8 +103,7 @@ function ProgramAuditSection({
   report?: ImportReport;
 }) {
   const { language, t } = useLanguage();
-  const value = (number: number) =>
-    formatNumber(language, number, { maximumFractionDigits: 2 });
+  const value = formatCredits;
   const { curriculum, enrollment, program, progress } = audit;
   const totals = curriculumTotals(curriculum, progress);
   const programGpa = calculateProgramGpa(curriculum, progress);
@@ -383,8 +383,7 @@ function ProgramAuditSection({
 export default function GraduationCalculator() {
   const { profile } = useProfile();
   const { language, t } = useLanguage();
-  const value = (number: number) =>
-    formatNumber(language, number, { maximumFractionDigits: 2 });
+  const value = formatCredits;
   const configuredEnrollments = useMemo(
     () => orderedEnrollments(profile.programEnrollments),
     [profile.programEnrollments],

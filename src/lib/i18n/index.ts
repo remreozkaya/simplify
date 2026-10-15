@@ -61,6 +61,17 @@ export function formatNumber(
   return new Intl.NumberFormat(localeFor(language), options).format(value);
 }
 
+const creditFormatter = new Intl.NumberFormat("en", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  useGrouping: false,
+});
+
+/** Credit displays use a decimal point and two digits in every UI language. */
+export function formatCredits(value: number) {
+  return creditFormatter.format(value);
+}
+
 export function formatDate(
   language: Language,
   value: string | number | Date,

@@ -37,7 +37,7 @@ import CourseDetails from "@/components/calendar/CourseDetails";
 import CrnBookmarkletLink from "@/components/calendar/CrnBookmarkletLink";
 import { createCrnBookmarklet, getLocalCreditTotal } from "@/lib/calendar/planActions";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
-import { formatNumber, localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
+import { formatCredits, localizedWeekday, localizeRuntimeMessage } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
 import { hasMeetingConflicts } from "@/lib/schedule/conflicts";
 import {
@@ -873,7 +873,7 @@ export default function WeeklyCalendar({
               {localCreditTotal === null
                 ? t("weeklyPlanner.localCreditsUnavailable")
                 : t("weeklyPlanner.localCredits", {
-                    credits: formatNumber(language, localCreditTotal, { maximumFractionDigits: 10 }),
+                    credits: formatCredits(localCreditTotal),
                   })}
             </span>
           </div>

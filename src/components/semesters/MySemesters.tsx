@@ -15,7 +15,7 @@ import {
 import { loadSharedTranscript, parseTranscriptHistory, SHARED_TRANSCRIPT_EVENT, SHARED_TRANSCRIPT_STORAGE_KEY } from "@/lib/curriculum/transcriptStore";
 import { calculateGpa } from "@/lib/curriculum/transcript";
 import { responseJson } from "@/lib/http/responseJson";
-import { formatNumber, localizedCourseTitle } from "@/lib/i18n";
+import { formatCredits, formatNumber, localizedCourseTitle } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
 import type { ItuCurriculum, ItuElectiveCourse } from "@/lib/itu/curriculum/types";
 import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
@@ -160,7 +160,7 @@ export default function MySemesters() {
     save(resolveSemesterCourseCredits(importWeeklySemesterCourses(current, weeklyProgram, curriculumCourses), curriculumCourses, creditLookup.key === creditKey ? creditLookup.credits : {}));
   }
 
-  const number = (value: number) => formatNumber(language, value);
+  const number = formatCredits;
   const gpa = (value: number | null) => value === null ? "—" : formatNumber(language, value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const available = [...candidates.values()].filter(course => !current.some(selected => selected.courseCode === course.code));
   const matches = available.filter(course => `${course.code} ${localizedCourseTitle(course, language)}`.toLocaleLowerCase(language).includes(search.toLocaleLowerCase(language).trim()));
