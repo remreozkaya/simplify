@@ -112,6 +112,10 @@ function ProgramFields({
   onRemove?: () => void;
 }) {
   const { language, t } = useLanguage();
+  const [enrollmentTypeSelected, setEnrollmentTypeSelected] = useState(
+    enrollment.type === "main" ||
+      Boolean(enrollment.facultyId || enrollment.programCode),
+  );
   const enrollmentLabel = t(
     enrollment.type === "main"
       ? "academicPrograms.main"
@@ -121,11 +125,175 @@ function ProgramFields({
   );
   return (
     <div className="border-t border-slate-200 pt-5 dark:border-slate-700">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-          {enrollmentLabel}
-        </span>
-        {onRemove ? (
+      {enrollment.type === "main" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            {enrollmentLabel}
+          </span>
+        </div>
+      ) : null}
+      {enrollment.selectionRequiresReview ? (
+        <p className="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          {t("academicPrograms.selectionReview")}
+        </p>
+      ) : null}
+      {enrollmentTypeSelected &&
+        (disabled && enrollment.type !== "main" ? (
+          <p className="mt-3 text-xs font-semibold text-amber-700">
+            {t("academicPrograms.completeMainFirst")}
+          </p>
+        ) : enrollment.facultyId && !programsLoaded ? (
+          <p className="mt-3 text-xs text-slate-500">
+            {t("academicPrograms.loadingPrograms", { type: enrollmentLabel })}
+          </p>
+        ) : enrollment.facultyId && !programs.length ? (
+          <p className="mt-3 text-xs font-semibold text-amber-700">
+            {t(
+              enrollment.type === "double-major"
+                ? "academicPrograms.noDoubleMajor"
+                : enrollment.type === "minor"
+                  ? "academicPrograms.noMinor"
+                  : "academicPrograms.noUndergraduate",
+            )}
+          </p>
+        ) : enrollment.programCode && !plansLoaded ? (
+          <p className="mt-3 text-xs text-slate-500">
+            {t("academicPrograms.loadingPlans")}
+          </p>
+        ) : enrollment.programCode && plansLoaded && !plans.length ? (
+          <p className="mt-3 text-xs font-semibold text-amber-700">
+            {t("academicPrograms.noEligiblePlan")}
+          </p>
+        ) : null)}
+      {enrollment.type !== "main" ? (
+        <div className="mt-3">
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            {t("academicPrograms.enrollmentType")}
+            <select
+              value={enrollmentTypeSelected ? enrollment.type : ""}
+              onChange={(event) => {
+                const type = event.target.value as Exclude<
+                  EnrollmentType,
+                  "main"
+                >;
+                setEnrollmentTypeSelected(true);
+                onChange(
+                  changeSecondaryEnrollmentType(
+                    enrollment,
+                    type,
+                  ),
+                );
+              }}
+              className={inputClass}
+              required
+            >
+              <option value="" disabled>
+                {t("academicPrograms.selectEnrollmentType")}
+              </option>
+              <option value="double-major">
+                {t("academicPrograms.doubleMajor")}
+              </option>
+              <option value="minor">{t("academicPrograms.minor")}</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+      {enrollmentTypeSelected ? (
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            {t("common.faculty")}
+            <select
+              value={enrollment.facultyId}
+              onChange={(event) => {
+                const faculty = faculties.find(
+                  (item) => item.id === event.target.value,
+                );
+                onChange(changeEnrollmentFaculty(enrollment, faculty));
+              }}
+              className={inputClass}
+              required
+            >
+              <option value="">{t("academicPrograms.selectFaculty")}</option>
+              {faculties.map((faculty) => (
+                <option key={faculty.id} value={faculty.id}>
+                  {localizedAcademicName(faculty, language)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            {t("common.program")}
+            <select
+              value={enrollment.programCode}
+              onChange={(event) => {
+                const program = programs.find(
+                  (item) => item.code === event.target.value,
+                );
+                onChange({
+                  ...enrollment,
+                  programCode: program?.code ?? "",
+                  programName: program?.name ?? "",
+                  programNameTr: program?.nameTr,
+                  programNameEn: program?.nameEn,
+                  targetProgramCode:
+                    enrollment.type === "main" ? undefined : program?.code,
+                  curriculumPlanId: 0,
+                  curriculumPlanName: "",
+                  curriculumPlanNameTr: undefined,
+                  curriculumPlanNameEn: undefined,
+                  selectionRequiresReview: undefined,
+                });
+              }}
+              disabled={disabled || !enrollment.facultyId}
+              className={inputClass}
+            >
+              <option value="">{t("academicPrograms.selectProgram")}</option>
+              {programs.map((program) => (
+                <option key={program.id} value={program.code}>
+                  {offeringDisplayName(program, language)} · {program.code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            {t("common.curriculumPlan")}
+            <select
+              value={enrollment.curriculumPlanId || ""}
+              onChange={(event) => {
+                const plan = plans.find(
+                  (item) => item.id === Number(event.target.value),
+                );
+                onChange({
+                  ...enrollment,
+                  curriculumPlanId: plan?.id ?? 0,
+                  curriculumPlanName: plan?.title ?? "",
+                  curriculumPlanNameTr: plan?.nameTr,
+                  curriculumPlanNameEn: plan?.nameEn,
+                  associatedPrimaryProgramCodes:
+                    plan?.associatedPrimaryProgramCodes,
+                  selectionRequiresReview: undefined,
+                });
+              }}
+              disabled={!enrollment.programCode || !plans.length}
+              className={inputClass}
+            >
+              <option value="">{t("academicPrograms.selectPlan")}</option>
+              {plans.map((plan) => (
+                <option
+                  key={`${plan.planType}:${plan.programCode}:${plan.id}`}
+                  value={plan.id}
+                >
+                  {localizedAcademicName(plan, language)}
+                  {plan.isCurrent ? ` · ${t("common.current")}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
+      {onRemove ? (
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={onRemove}
@@ -133,154 +301,8 @@ function ProgramFields({
           >
             {t("common.remove")}
           </button>
-        ) : null}
-      </div>
-      {enrollment.selectionRequiresReview ? (
-        <p className="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
-          {t("academicPrograms.selectionReview")}
-        </p>
+        </div>
       ) : null}
-      {disabled && enrollment.type !== "main" ? (
-        <p className="mt-3 text-xs font-semibold text-amber-700">
-          {t("academicPrograms.completeMainFirst")}
-        </p>
-      ) : enrollment.facultyId && !programsLoaded ? (
-        <p className="mt-3 text-xs text-slate-500">
-          {t("academicPrograms.loadingPrograms", { type: enrollmentLabel })}
-        </p>
-      ) : enrollment.facultyId && !programs.length ? (
-        <p className="mt-3 text-xs font-semibold text-amber-700">
-          {t(
-            enrollment.type === "double-major"
-              ? "academicPrograms.noDoubleMajor"
-              : enrollment.type === "minor"
-                ? "academicPrograms.noMinor"
-                : "academicPrograms.noUndergraduate",
-          )}
-        </p>
-      ) : enrollment.programCode && !plansLoaded ? (
-        <p className="mt-3 text-xs text-slate-500">
-          {t("academicPrograms.loadingPlans")}
-        </p>
-      ) : enrollment.programCode && plansLoaded && !plans.length ? (
-        <p className="mt-3 text-xs font-semibold text-amber-700">
-          {t("academicPrograms.noEligiblePlan")}
-        </p>
-      ) : null}
-      <div className="mt-3 grid gap-4 md:grid-cols-2">
-        <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
-          {t("common.faculty")}
-          <select
-            value={enrollment.facultyId}
-            onChange={(event) => {
-              const faculty = faculties.find(
-                (item) => item.id === event.target.value,
-              );
-              onChange(changeEnrollmentFaculty(enrollment, faculty));
-            }}
-            className={inputClass}
-            required
-          >
-            <option value="">{t("academicPrograms.selectFaculty")}</option>
-            {faculties.map((faculty) => (
-              <option key={faculty.id} value={faculty.id}>
-                {localizedAcademicName(faculty, language)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {enrollment.type !== "main" ? (
-          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
-            {t("academicPrograms.enrollmentType")}
-            <select
-              value={enrollment.type}
-              onChange={(event) => {
-                const type = event.target.value as EnrollmentType;
-                onChange(
-                  changeSecondaryEnrollmentType(
-                    enrollment,
-                    type as Exclude<EnrollmentType, "main">,
-                  ),
-                );
-              }}
-              className={inputClass}
-            >
-              <option value="double-major">
-                {t("academicPrograms.doubleMajor")}
-              </option>
-              <option value="minor">{t("academicPrograms.minor")}</option>
-            </select>
-          </label>
-        ) : null}
-        <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
-          {t("common.program")}
-          <select
-            value={enrollment.programCode}
-            onChange={(event) => {
-              const program = programs.find(
-                (item) => item.code === event.target.value,
-              );
-              onChange({
-                ...enrollment,
-                programCode: program?.code ?? "",
-                programName: program?.name ?? "",
-                programNameTr: program?.nameTr,
-                programNameEn: program?.nameEn,
-                targetProgramCode:
-                  enrollment.type === "main" ? undefined : program?.code,
-                curriculumPlanId: 0,
-                curriculumPlanName: "",
-                curriculumPlanNameTr: undefined,
-                curriculumPlanNameEn: undefined,
-                selectionRequiresReview: undefined,
-              });
-            }}
-            disabled={disabled || !enrollment.facultyId}
-            className={inputClass}
-          >
-            <option value="">{t("academicPrograms.selectProgram")}</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.code}>
-                {offeringDisplayName(program, language)} · {program.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
-          {t("common.curriculumPlan")}
-          <select
-            value={enrollment.curriculumPlanId || ""}
-            onChange={(event) => {
-              const plan = plans.find(
-                (item) => item.id === Number(event.target.value),
-              );
-              onChange({
-                ...enrollment,
-                curriculumPlanId: plan?.id ?? 0,
-                curriculumPlanName: plan?.title ?? "",
-                curriculumPlanNameTr: plan?.nameTr,
-                curriculumPlanNameEn: plan?.nameEn,
-                associatedPrimaryProgramCodes:
-                  plan?.associatedPrimaryProgramCodes,
-                selectionRequiresReview: undefined,
-              });
-            }}
-            disabled={!enrollment.programCode || !plans.length}
-            className={inputClass}
-          >
-            <option value="">{t("academicPrograms.selectPlan")}</option>
-            {plans.map((plan) => (
-              <option
-                key={`${plan.planType}:${plan.programCode}:${plan.id}`}
-                value={plan.id}
-              >
-                {localizedAcademicName(plan, language)}
-                {plan.isCurrent ? ` · ${t("common.current")}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
     </div>
   );
 }
@@ -777,7 +799,7 @@ export default function ProfilePage({
               disabled={isPending || !dirty}
               className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
             >
-              {isPending ? t("common.saving") : t("common.saveChanges")}
+              {isPending ? t("common.saving") : t("common.save")}
             </button>
             {feedback.message ? (
               <p
