@@ -257,7 +257,11 @@ export default function MySemesters() {
               <span className="ml-2 font-semibold">{semesterTermLabel(semester.term, language)}</span>
               <span className="mt-2 flex flex-wrap justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
                 <span>{summary(semester.courses.length, semester.courses.reduce((total, course) => total + course.transcriptCredit, 0))}</span>
-                <span>{t("semesters.gpa")}: <strong className="tabular-nums text-slate-950 dark:text-white">{gpa(semester.gpa)}</strong></span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span>{t("semesters.gpa")}: <strong className="tabular-nums text-slate-950 dark:text-white">{gpa(semester.gpa)}</strong></span>
+                  <span aria-hidden="true" className="text-slate-400 dark:text-slate-500">|</span>
+                  <span>{t("semesters.overallGpa")}: <strong className="tabular-nums text-slate-950 dark:text-white">{gpa(semester.overallGpa)}</strong></span>
+                </span>
               </span>
             </summary>
             <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-800">

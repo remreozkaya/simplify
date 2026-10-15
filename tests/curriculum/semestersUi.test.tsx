@@ -35,6 +35,10 @@ it.each(["en", "tr"] as const)("renders saved projections before collapsible his
   expect(html).toContain('<option value="AA" selected="">AA</option>');
   expect(html).toContain(">3.29</span>");
   expect(html).toContain(">3.50</strong>");
+  const previousSemesterSummaries = [...html.matchAll(/<details class="[^"]*"><summary[^>]*>(.*?)<\/summary>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
+  expect(previousSemesterSummaries).toHaveLength(2);
+  expect(previousSemesterSummaries[0]).toContain(`${translate(language, "semesters.overallGpa")}: 3.29`);
+  expect(previousSemesterSummaries[1]).toContain(`${translate(language, "semesters.overallGpa")}: 3.50`);
   expect(html).not.toMatch(/>\d+,\d{2}</);
   expect(html).toContain(translate(language, "semesters.coursesCredits", { courses: 1, credits: "4.00" }));
   expect(html).toMatch(/>3\.00<\/td>/);

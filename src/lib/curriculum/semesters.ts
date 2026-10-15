@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { GRADES, gradePoint, isPassingGrade } from "@/lib/curriculum/grades";
 import { calculateGpa } from "@/lib/curriculum/transcript";
+import { mergeTranscriptCourses } from "@/lib/curriculum/transcriptStore";
 import type { TranscriptCourseRecord } from "@/lib/curriculum/types";
 import type { Language } from "@/lib/i18n/translations";
 import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
@@ -115,10 +116,16 @@ export function currentSemesterGpa(courses: readonly CurrentSemesterCourse[]) {
 export function groupTranscriptSemesters(courses: readonly TranscriptCourseRecord[]) {
   const groups = new Map<string, TranscriptCourseRecord[]>();
   for (const course of courses) groups.set(course.term, [...(groups.get(course.term) ?? []), course]);
-  return [...groups].sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true })).map(([term, records]) => ({
-    term,
-    courses: [...records].sort((a, b) => a.courseCode.localeCompare(b.courseCode)),
-    // Graduation exclusions (e.g. an old repeat) still belong to that term's GPA.
-    gpa: calculateGpa(records.map(record => ({ ...record, calculated: true }))),
-  }));
+  let cumulative: TranscriptCourseRecord[] = [];
+  return [...groups].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([term, records]) => {
+    // An old attempt can be excluded today but still count before its retake.
+    const historicalRecords = records.map(record => ({ ...record, calculated: true }));
+    cumulative = mergeTranscriptCourses(cumulative, historicalRecords);
+    return {
+      term,
+      courses: [...records].sort((a, b) => a.courseCode.localeCompare(b.courseCode)),
+      gpa: calculateGpa(historicalRecords),
+      overallGpa: calculateGpa(cumulative),
+    };
+  }).reverse();
 }

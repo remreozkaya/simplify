@@ -78,6 +78,40 @@ it("does not show an incomplete projection when a graded course has unknown cred
 });
 
 describe("semester history", () => {
+  it("calculates credit-weighted overall GPA through each term without later grades", () => {
+    const semesters = groupTranscriptSemesters([
+      record({ term: "202610", courseCode: "FIZ 101", grade: "AA", transcriptCredit: 3 }),
+      record({ term: "202510", grade: "BA", transcriptCredit: 4 }),
+      record({ term: "202520", courseCode: "KIM 101", grade: "FF", transcriptCredit: 2 }),
+    ]);
+    expect(semesters.map(semester => semester.term)).toEqual(["202610", "202520", "202510"]);
+    expect(semesters[2].overallGpa).toBe(3.5);
+    expect(semesters[1].overallGpa).toBeCloseTo(14 / 6);
+    expect(semesters[0].overallGpa).toBeCloseTo(26 / 9);
+  });
+
+  it("replaces a repeated course only from its retake term onward", () => {
+    const semesters = groupTranscriptSemesters([
+      record({ term: "202510", courseCode: "MAT103E", grade: "FF", calculated: false, transcriptCredit: 4 }),
+      record({ term: "202510", courseCode: "FIZ 101", grade: "BB", transcriptCredit: 3 }),
+      record({ term: "202520", courseCode: "MAT 103E", grade: "AA", transcriptCredit: 4 }),
+    ]);
+    expect(semesters[1].overallGpa).toBeCloseTo(9 / 7);
+    expect(semesters[0].overallGpa).toBeCloseTo(25 / 7);
+    expect(semesters[1].gpa).toBeCloseTo(9 / 7);
+    expect(semesters[0].gpa).toBe(4);
+  });
+
+  it("excludes pass/fail grades and carries the prior overall GPA through ungraded terms", () => {
+    const semesters = groupTranscriptSemesters([
+      record({ term: "202510", grade: "BL" }),
+      record({ term: "202520", courseCode: "FIZ 101", grade: "BB", transcriptCredit: 3 }),
+      record({ term: "202610", courseCode: "BED 101", grade: "BL", transcriptCredit: 10 }),
+    ]);
+    expect(semesters.map(semester => semester.overallGpa)).toEqual([3, 3, null]);
+    expect(groupTranscriptSemesters([])).toEqual([]);
+  });
+
   it("groups actual terms newest first and uses transcript credits for GPA", () => {
     const semesters = groupTranscriptSemesters([record(), record({ term: "202610", courseCode: "FIZ 101", grade: "AA", transcriptCredit: 3 }), record({ courseCode: "KIM 101", grade: "FF", transcriptCredit: 2 })]);
     expect(semesters.map(item => item.term)).toEqual(["202610", "202510"]);
