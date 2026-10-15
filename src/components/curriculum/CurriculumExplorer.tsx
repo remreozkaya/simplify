@@ -77,6 +77,8 @@ import {
   formatDate,
   formatNumber,
   localizedAcademicName,
+  localizedCourseTitle,
+  localizedElectiveTitle,
   localizedCurriculumSection,
   localizeRuntimeMessage,
   offeringDisplayName,
@@ -868,7 +870,7 @@ export default function CurriculumExplorer() {
               >
                 {faculties.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {option === "Other Faculty" ? t("common.otherFaculty") : localizedAcademicName({ name: option }, language)}
                   </option>
                 ))}
               </select>
@@ -883,7 +885,7 @@ export default function CurriculumExplorer() {
               >
                 {majors.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {option === "Other Faculty" ? t("common.otherFaculty") : localizedAcademicName({ name: option }, language)}
                   </option>
                 ))}
               </select>
@@ -991,7 +993,7 @@ export default function CurriculumExplorer() {
               </p>
               <p className="mt-3 text-sm text-slate-600">
                 {currentEnrollment?.facultyName
-                  ? `${currentEnrollment.facultyName} · `
+                  ? `${localizedAcademicName({ name: currentEnrollment.facultyName }, language)} · `
                   : ""}
                 {t(
                   curriculum.planType === "undergraduate"
@@ -1181,7 +1183,7 @@ export default function CurriculumExplorer() {
                           </p>
                           <p className="mt-1 text-sm text-slate-600">
                             {selectedItem?.kind === "course"
-                              ? localizedAcademicName(selectedItem, language)
+                              ? localizedCourseTitle(selectedItem, language)
                               : t("curriculum.externalPrerequisite")}
                           </p>
                         </div>
@@ -1383,7 +1385,7 @@ export default function CurriculumExplorer() {
                             {unlocks.map((node) => (
                               <li key={node.id}>
                                 → {node.courseCode} ·{" "}
-                                {localizedAcademicName(
+                                {localizedCourseTitle(
                                   {
                                     name: node.label.split("\n")[1],
                                     nameTr: node.nameTr,
@@ -1486,7 +1488,7 @@ function ElectiveDetails({
   return (
     <div>
       <p className="text-xl font-semibold text-slate-950">
-        {localizedAcademicName(slot, language)}
+        {localizedElectiveTitle(slot, language)}
       </p>
       <p className="mt-2 text-xs text-slate-500">
         {localizedCurriculumSection(
@@ -1549,7 +1551,7 @@ function ElectiveDetails({
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-600">
-                  {localizedAcademicName(course, language)}
+                  {localizedCourseTitle(course, language)}
                 </p>
                 {languageEquivalent && (
                   <p className="mt-1 text-[10px] font-semibold text-blue-700">

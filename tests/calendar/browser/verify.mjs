@@ -61,7 +61,7 @@ try {
   assert.equal(drag.uri, snapshot);
   assert.equal(drag.text, snapshot);
   assert.ok(drag.html.includes("javascript:"));
-  assert.equal(await link.textContent(), "CRN Doldur");
+  assert.equal(await link.textContent(), await link.getAttribute("data-label"));
   assert.equal(await link.getAttribute("data-label"), "Fill CRNs");
   const signedOut = await page.evaluate(async (bookmarklet) => {
     const logoutForm = document.createElement("form");

@@ -145,7 +145,7 @@ describe("Turkish and English localization", () => {
     ).toBe("Economics");
     expect(
       localizedAcademicName({ nameTr: "Ekonomi", code: "ECN" }, "en"),
-    ).toBe("Ekonomi");
+    ).toBe("Economics");
     expect(localizedAcademicName({ code: "ECN" }, "tr")).toBe("ECN");
     expect(
       offeringDisplayName(
@@ -166,8 +166,8 @@ describe("Turkish and English localization", () => {
   });
 
   it("falls back to available official source names when a localized name is empty", () => {
-    expect(localizedAcademicName({ nameEn: "", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Ekonomi");
-    expect(localizedAcademicName({ nameEn: "  ", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Ekonomi");
+    expect(localizedAcademicName({ nameEn: "", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Economics");
+    expect(localizedAcademicName({ nameEn: "  ", nameTr: "Ekonomi", code: "ECN" }, "en")).toBe("Economics");
     expect(localizedAcademicName({ nameEn: "", nameTr: "", name: "Ekonomi", code: "ECN" }, "tr")).toBe("Ekonomi");
   });
 });

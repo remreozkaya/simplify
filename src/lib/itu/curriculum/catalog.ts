@@ -1,3 +1,4 @@
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import * as cheerio from "cheerio";
 
 import type {
@@ -22,6 +23,7 @@ export function parseFaculties(html: string): ItuFaculty[] {
         id: String($(option).attr("value") ?? "").trim(),
         name,
         nameTr: name,
+        nameEn: officialAcademicLabel(name, "en"),
       };
     })
     .get()
@@ -64,7 +66,7 @@ export function parseFacultyPrograms(
   });
 }
 
-/** Explicit names supplied by the official product requirements; all other names use source-language fallback. */
+/** Official English labels imported from the public İTÜ catalogue. */
 export function officialProgramNames(
   programCode: string,
   sourceName: string,
@@ -73,7 +75,8 @@ export function officialProgramNames(
     return { nameTr: sourceName, nameEn: "Economics (English)" };
   if (programCode === "ECN_YD")
     return { nameTr: sourceName, nameEn: "Economics" };
-  return { nameTr: sourceName };
+  const nameEn = officialAcademicLabel(sourceName, "en");
+  return { nameTr: sourceName, ...(nameEn !== sourceName ? { nameEn } : {}) };
 }
 
 export function baseProgramIdFromCode(programCode: string) {

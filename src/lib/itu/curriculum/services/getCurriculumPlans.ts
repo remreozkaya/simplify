@@ -1,3 +1,4 @@
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import { fetchCurriculumPlansPage } from "@/lib/itu/curriculum/client/fetchCurriculumPlans";
 import { parseCurriculumPlans } from "@/lib/itu/curriculum/parsers/parseCurriculumPlans";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
@@ -13,7 +14,7 @@ export async function getCurriculumPlans(programCode: string, planType: ItuPlanT
     const storedPlans = stored?.plans.filter((plan) => plan.programCode === programCode && plan.planType === planType && plan.courses?.length).map((plan) => {
       const associatedPrimaryProgramCodes = plan.associatedPrimaryPrograms?.map((item) => item.code) ?? [];
       const associatedPrimaryProgramIds = associatedPrimaryProgramCodes.map(baseProgramIdFromCode);
-      return { id: plan.id, programCode, title: plan.title, nameTr: plan.title, nameEn: undefined, isCurrent: /(?:sonrası|after|ve sonrası|and after)/i.test(plan.title), planType, validityPeriod: plan.validityPeriod ?? undefined, sourceUrl: plan.sourceUrl, retrievedAt: plan.retrievedAt, associatedPrimaryProgramCodes, associatedPrimaryProgramIds, ...(associatedPrimaryProgramIds.length === 1 ? { primaryProgramId: associatedPrimaryProgramIds[0] } : {}), targetProgramId: baseProgramIdFromCode(programCode), ...(planType === "cap" ? { capPlanId: plan.id } : {}) };
+      return { id: plan.id, programCode, title: plan.title, nameTr: plan.title, nameEn: officialAcademicLabel(plan.title, "en"), isCurrent: /(?:sonrası|after|ve sonrası|and after)/i.test(plan.title), planType, validityPeriod: plan.validityPeriod ?? undefined, sourceUrl: plan.sourceUrl, retrievedAt: plan.retrievedAt, associatedPrimaryProgramCodes, associatedPrimaryProgramIds, ...(associatedPrimaryProgramIds.length === 1 ? { primaryProgramId: associatedPrimaryProgramIds[0] } : {}), targetProgramId: baseProgramIdFromCode(programCode), ...(planType === "cap" ? { capPlanId: plan.id } : {}) };
     });
     const plans = storedPlans?.length ? storedPlans : parseCurriculumPlans(await fetchCurriculumPlansPage(programCode, OBS_PLAN_TYPE[planType]), programCode, planType);
     if (planType === "undergraduate" || !primaryProgramCode) return plans;

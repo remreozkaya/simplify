@@ -29,6 +29,8 @@ import { useItuCourseCatalog } from "@/hooks/useItuCourseCatalog";
 import {
   formatNumber,
   localizedAcademicName,
+  localizedCourseTitle,
+  localizedElectiveTitle,
   localizeRuntimeMessage,
 } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
@@ -591,7 +593,7 @@ export default function SmartSemesterPlanner() {
                   >
                     <p className="font-semibold">
                       {course.code} ·{" "}
-                      {localizedAcademicName(
+                      {localizedCourseTitle(
                         {
                           name: course.title,
                           nameTr: course.titleTr,
@@ -677,7 +679,7 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
   const { language, t } = useLanguage();
   const contributions = course.contributions.map(
     (value) =>
-      `${localizedAcademicName({ name: value.programName, nameTr: value.programNameTr, nameEn: value.programNameEn }, language)}: ${localizedAcademicName({ name: value.requirementName, nameTr: value.requirementNameTr, nameEn: value.requirementNameEn }, language)}`,
+      `${localizedAcademicName({ name: value.programName, nameTr: value.programNameTr, nameEn: value.programNameEn }, language)}: ${value.requirementKind === "compulsory" ? value.requirementName : localizedElectiveTitle({ name: value.requirementName, nameTr: value.requirementNameTr, nameEn: value.requirementNameEn }, language)}`,
   );
   const missing = missingCourseCodes(course, t("common.credit"));
   const explanation =
@@ -703,7 +705,7 @@ function CourseCard({ course }: { course: SemesterCourseCandidate }) {
             {course.code}
           </p>
           <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
-            {localizedAcademicName(
+            {localizedCourseTitle(
               {
                 name: course.title,
                 nameTr: course.titleTr,

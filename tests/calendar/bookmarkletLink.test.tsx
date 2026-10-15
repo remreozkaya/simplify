@@ -32,12 +32,12 @@ describe("bookmarklet link", () => {
     expect(setData).toHaveBeenCalledWith("text/html", "anchor markup");
     expect(dataTransfer.effectAllowed).toBe("copyLink");
   });
-  it("keeps a fixed bookmark title in both languages without replacing native URL metadata", () => {
+  it("uses the current language for the saved bookmark title without replacing native URL metadata", () => {
     for (const label of ["Fill CRNs", "CRN Doldur"]) {
       const element = CrnBookmarkletLink({ ...props, label });
       const html = renderToStaticMarkup(createElement(CrnBookmarkletLink, { ...props, label }));
       expect(html).toContain(`data-label="${label}"`);
-      expect(html).toContain('aria-hidden="true">CRN Doldur</span>');
+      expect(html).toContain(`aria-hidden="true">${label}</span>`);
       const setData = vi.fn();
       element.props.onDragStart({ dataTransfer: { setData, getData: () => url }, currentTarget: { outerHTML: html } });
       expect(setData).not.toHaveBeenCalledWith("text/uri-list", expect.anything());

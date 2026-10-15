@@ -1,3 +1,4 @@
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import { readFile } from "node:fs/promises";
 import { cache } from "react";
 import { join } from "node:path";
@@ -32,7 +33,7 @@ export const readStoredCurriculumCatalog = cache(async (): Promise<StoredCatalog
     if (parsed.version !== 1 || !parsed.faculties.length || !parsed.programs.length || !parsed.plans.length) return null;
     return {
       ...parsed,
-      faculties: parsed.faculties.map((faculty) => ({ ...faculty, nameTr: faculty.nameTr ?? faculty.name })),
+      faculties: parsed.faculties.map((faculty) => ({ ...faculty, nameTr: faculty.nameTr ?? faculty.name, nameEn: faculty.nameEn ?? officialAcademicLabel(faculty.name, "en") })),
     };
   } catch {
     return null;

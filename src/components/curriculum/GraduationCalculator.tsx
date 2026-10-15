@@ -56,6 +56,8 @@ import { useLanguage } from "@/lib/i18n/client";
 import {
   formatNumber,
   localizedAcademicName,
+  localizedCourseTitle,
+  localizedElectiveTitle,
   localizedCurriculumSection,
   localizeRuntimeMessage,
 } from "@/lib/i18n";
@@ -106,6 +108,9 @@ function ProgramAuditSection({
   const totals = curriculumTotals(curriculum, progress);
   const programGpa = calculateProgramGpa(curriculum, progress);
   const planLabel = localizedAcademicName({ name: curriculum.planTitle, nameTr: enrollment.curriculumPlanNameTr, nameEn: enrollment.curriculumPlanNameEn }, language);
+  const periodLabel = curriculum.validityPeriod
+    ? localizedAcademicName({ name: curriculum.validityPeriod }, language)
+    : "";
   const completion = totals.requiredCourses
     ? Math.min(
         100,
@@ -132,11 +137,11 @@ function ProgramAuditSection({
           >
             {program
               ? localizedAcademicName(program, language)
-              : enrollment.programName || curriculum.title}
+              : localizedAcademicName({ name: enrollment.programName || curriculum.title }, language)}
           </h2>
           <p className="mt-1 text-sm text-slate-300">
-            {enrollment.facultyName} · {planLabel}
-            {curriculum.validityPeriod && !planLabel.includes(curriculum.validityPeriod) ? ` · ${curriculum.validityPeriod}` : ""}
+            {localizedAcademicName({ name: enrollment.facultyName }, language)} · {planLabel}
+            {periodLabel && !planLabel.includes(periodLabel) ? ` · ${periodLabel}` : ""}
           </p>
         </div>
         <div className="min-w-40 self-center">
@@ -325,11 +330,11 @@ function ProgramAuditSection({
                           <span className="font-semibold">
                             {item.kind === "course"
                               ? item.code
-                              : localizedAcademicName(item, language)}
+                              : localizedElectiveTitle(item, language)}
                           </span>
                           {item.kind === "course" ? (
                             <span className="block text-sm text-slate-500">
-                              {localizedAcademicName(item, language)}
+                              {localizedCourseTitle(item, language)}
                             </span>
                           ) : null}
                         </td>

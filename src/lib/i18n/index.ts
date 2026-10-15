@@ -1,3 +1,5 @@
+import { electivePlaceholderLabel } from "@/lib/i18n/electiveLabels";
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import { translations, type Language } from "@/lib/i18n/translations";
 export type { Language } from "@/lib/i18n/translations";
 
@@ -116,14 +118,17 @@ export function localizedAcademicName(
   value: LocalizedName,
   language: Language,
 ) {
+  const preferred = language === "tr" ? value.nameTr : value.nameEn;
+  if (preferred?.trim()) return officialAcademicLabel(preferred, language);
   return [
-    language === "tr" ? value.nameTr : value.nameEn,
-    language === "tr" ? value.nameEn : value.nameTr,
     value.name,
     value.title,
+    language === "tr" ? value.nameTr : value.nameEn,
+    language === "tr" ? value.nameEn : value.nameTr,
     value.officialProgramCode,
     value.code,
-  ].find((name) => name?.trim()) ?? "";
+  ].map((name) => name ? officialAcademicLabel(name, language) : name)
+    .find((name) => name?.trim()) ?? "";
 }
 
 export function offeringDisplayName(
@@ -131,8 +136,8 @@ export function offeringDisplayName(
   language: Language,
 ) {
   const name = localizedAcademicName(value, language)
-    .replace(/\s+Lisans(?:\s+Programı)?$/iu, "")
-    .replace(/\s*\(Yandal\)\s*$/iu, "");
+    .replace(/\s+(?:Lisans(?:\s+Programı)?|Undergraduate(?:\s+Program)?)$/iu, "")
+    .replace(/\s*\((?:Yandal|Minor)\)\s*$/iu, "");
   if (value.planType === "cap")
     return `${name} – ${translate(language, "academicPrograms.suffixDoubleMajor")}`;
   if (value.planType === "yandal")
@@ -145,3 +150,14 @@ export function validLanguage(value: unknown): value is Language {
 }
 
 export { localizeRuntimeMessage } from "@/lib/i18n/runtimeMessages";
+
+/** Course names are source records, independent of the interface language. */
+export function localizedCourseTitle(value: LocalizedName, language?: Language) {
+  void language;
+  return [value.title, value.name, value.code].find((name) => name?.trim()) ?? "";
+}
+
+/** Elective groups are UI requirements, distinct from the courses inside them. */
+export function localizedElectiveTitle(value: LocalizedName, language: Language) {
+  return electivePlaceholderLabel(localizedAcademicName(value, language), language);
+}

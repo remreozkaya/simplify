@@ -2,6 +2,9 @@ import * as cheerio from "cheerio";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+const academicLabels = JSON.parse(await readFile(resolve(process.cwd(), "src/data/itu/academic-translations.json"), "utf8")).labels;
+const englishLabel = (name) => academicLabels[name];
+
 const ORIGIN = "https://obs.itu.edu.tr";
 const OUTPUT = resolve(process.cwd(), "src/data/itu/curriculum-catalog.json");
 const TYPES = [{ planType: "undergraduate", obs: "lisans" }, { planType: "cap", obs: "cap" }, { planType: "yandal", obs: "yandal" }];
@@ -44,7 +47,7 @@ function facultiesFrom(html) {
   const $ = cheerio.load(html);
   return $("#akademikBirimId option").map((_, option) => {
     const name = clean($(option).text());
-    return { id: clean($(option).attr("value")), name, nameTr: name };
+    return { id: clean($(option).attr("value")), name, nameTr: name, nameEn: englishLabel(name) };
   }).get().filter((item) => item.id);
 }
 
@@ -59,7 +62,7 @@ function plansFrom(html, program) {
     const href = $(link).attr("href");
     const id = Number(href?.match(/DersPlanDetay\/(\d+)/)?.[1]);
     const title = clean($(link).closest("tr").find("td").last().text());
-    return id ? { id, curriculumPlanId: id, programCode: program.code, targetProgramId: program.baseProgramId, programName: program.name, facultyId: program.facultyId, planType: program.planType, title, nameTr: title, validityPeriod: title.match(/\d{4}-\d{4}.*$/)?.[0] ?? null, sourceUrl: new URL(href, ORIGIN).href } : null;
+    return id ? { id, curriculumPlanId: id, programCode: program.code, targetProgramId: program.baseProgramId, programName: program.name, facultyId: program.facultyId, planType: program.planType, title, nameTr: title, nameEn: englishLabel(title), validityPeriod: title.match(/\d{4}-\d{4}.*$/)?.[0] ?? null, sourceUrl: new URL(href, ORIGIN).href } : null;
   }).get().filter(Boolean);
 }
 
@@ -141,7 +144,7 @@ async function main() {
         const code = clean(row?.programKodu);
         const name = clean(row?.programAdi);
         if (!code || !name) { failures.push({ scope: `${faculty.id}:${type.planType}`, error: "Malformed academic-program record" }); continue; }
-        programs.push({ id: `${faculty.id}:${type.planType}:${code}`, baseProgramId: baseProgramIdFromCode(code), officialProgramCode: code, code, name, nameTr: name, ...(officialEnglishName(code) ? { nameEn: officialEnglishName(code) } : {}), facultyId: faculty.id, facultyName: faculty.name, planType: type.planType });
+        programs.push({ id: `${faculty.id}:${type.planType}:${code}`, baseProgramId: baseProgramIdFromCode(code), officialProgramCode: code, code, name, nameTr: name, ...(officialEnglishName(code) || englishLabel(name) ? { nameEn: officialEnglishName(code) ?? englishLabel(name) } : {}), facultyId: faculty.id, facultyName: faculty.name, planType: type.planType });
       }
     } catch (error) { failures.push({ scope: `${faculty.id}:${type.planType}`, error: String(error) }); }
   }

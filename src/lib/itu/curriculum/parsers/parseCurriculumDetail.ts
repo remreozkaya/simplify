@@ -1,3 +1,4 @@
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import * as cheerio from "cheerio";
 
 import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression";
@@ -49,6 +50,8 @@ export function parseCurriculumDetail(
             id: `elective:${semester}:${groupMatch?.[1] ?? "unknown"}:${rowIndex}`,
             semester,
             title,
+            nameTr: title,
+            nameEn: officialAcademicLabel(title, "en"),
             creditOptions,
             ectsOptions,
             ...(category ? { category } : {}),

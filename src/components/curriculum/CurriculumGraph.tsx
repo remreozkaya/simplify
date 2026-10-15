@@ -17,7 +17,7 @@ import type { CourseDerivedStatus } from "@/lib/curriculum/types";
 import type { RequirementProgress } from "@/lib/curriculum/graduation";
 import type { ItuPlanType } from "@/lib/itu/curriculum/types";
 import { useLanguage } from "@/lib/i18n/client";
-import { localizedAcademicName, localizedCurriculumSection } from "@/lib/i18n";
+import { localizedCourseTitle, localizedElectiveTitle, localizedCurriculumSection } from "@/lib/i18n";
 
 const STATUS_STYLE: Record<CourseDerivedStatus, string> = {
   "not-taken":
@@ -228,7 +228,7 @@ export default function CurriculumGraph({
                   const prerequisiteRelated = prerequisiteNodeIds?.has(node.id);
                   const dependentRelated = dependentNodeIds?.has(node.id);
                   const [code, ...titleParts] = node.label.split("\n");
-                  const title = localizedAcademicName(
+                  const title = (node.kind === "course" || node.kind === "external" ? localizedCourseTitle : localizedElectiveTitle)(
                     {
                       name: titleParts.join(" ") || code,
                       nameTr: node.nameTr,

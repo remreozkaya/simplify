@@ -39,7 +39,7 @@ export default function CrnBookmarkletLink({ url, label, tooltip }: Props) {
       className={`relative rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-center text-sm font-semibold text-blue-700 shadow-sm transition-colors duration-200 after:content-[attr(data-label)] focus-visible:outline-2 focus-visible:outline-blue-500 ${url ? "cursor-grab hover:bg-blue-100 active:cursor-grabbing" : "cursor-not-allowed opacity-50"}`}
     >
       {/* Native link drags use textContent for the saved title. */}
-      <span className="sr-only" aria-hidden="true">CRN Doldur</span>
+      <span className="sr-only" aria-hidden="true">{label}</span>
     </a>
   );
 }

@@ -1,3 +1,4 @@
+import { officialAcademicLabel } from "@/lib/i18n/academicLabels";
 import * as cheerio from "cheerio";
 
 import type { ItuCurriculumPlan, ItuPlanType } from "@/lib/itu/curriculum/types";
@@ -21,6 +22,7 @@ export function parseCurriculumPlans(
       programCode,
       title,
       nameTr: title,
+      nameEn: officialAcademicLabel(title, "en"),
       isCurrent: /(?:sonrası|after|ve sonrası|and after)/i.test(title),
       planType,
       validityPeriod: title.match(/\d{4}-\d{4}[^]*$/)?.[0]?.trim(),
