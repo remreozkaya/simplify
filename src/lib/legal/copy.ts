@@ -37,7 +37,7 @@ export const legalCopy = {
     storageHeaders: ['Teknoloji / tanımlayıcı', 'Sağlayıcı ve kategori', 'Amaç', 'Ömür'],
     noExpiry: 'Otomatik süre sonu yok; siz silene veya tarayıcı temizleyene kadar.',
     firstParty: 'Simplify / istenen işlev', authProvider: 'Simplify alan adı / Supabase Auth / gerekli kimlik doğrulama',
-    storedPurposes: ['Adlandırılmış haftalık planlar ve seçilen dersler', 'Ders, gün, saat ve CRN tercihleri ile üretilen program', 'Ayrıştırılmış transkript: dersler, notlar, kredi ve dönemler', 'Her plan için manuel ve transkript kaynaklı ilerleme', 'Son seçilen program ve müfredat', 'Seçtiğiniz dili hatırlama', 'Seçtiğiniz temayı hatırlama'],
+    storedPurposes: ['Adlandırılmış haftalık planlar ve seçilen dersler', 'Ders, gün, saat ve CRN tercihleri ile üretilen program', 'Ayrıştırılmış transkript: dersler, notlar, kredi ve dönemler', 'Mevcut dönemin dersleri, kredileri ve tahmini notları', 'Her plan için manuel ve transkript kaynaklı ilerleme', 'Son seçilen program ve müfredat', 'Seçtiğiniz dili hatırlama', 'Seçtiğiniz temayı hatırlama'],
   },
   en: {
     titles: { privacy: 'KVKK Privacy Notice', storage: 'Cookie and Browser Storage Policy', terms: 'Terms of Use', requests: 'Privacy Requests and Contact' },
@@ -74,7 +74,7 @@ export const legalCopy = {
     storageHeaders: ['Technology / identifier', 'Provider and category', 'Purpose', 'Lifetime'],
     noExpiry: 'No automatic expiry; until you delete it or the browser clears it.',
     firstParty: 'Simplify / requested functionality', authProvider: 'Simplify domain / Supabase Auth / necessary authentication',
-    storedPurposes: ['Named weekly plans and selected courses', 'Course, day, time and CRN preferences and generated schedule', 'Parsed transcript: courses, grades, credits and terms', 'Manual and transcript-derived progress for each plan', 'Last selected program and curriculum', 'Remember your selected language', 'Remember your selected theme'],
+    storedPurposes: ['Named weekly plans and selected courses', 'Course, day, time and CRN preferences and generated schedule', 'Parsed transcript: courses, grades, credits and terms', 'Current semester courses, credits and projected grades', 'Manual and transcript-derived progress for each plan', 'Last selected program and curriculum', 'Remember your selected language', 'Remember your selected theme'],
   },
 } as const;
 

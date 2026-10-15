@@ -312,7 +312,7 @@ function ProgramAuditSection({
                     return (
                       <tr
                         key={item.id}
-                        className="border-t border-slate-200 dark:border-slate-700"
+                        className={`border-t border-slate-200 dark:border-slate-700 ${isPassed ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-red-50 dark:bg-red-950/30"}`}
                       >
                         <td className="p-3">
                           {completed?.courses
@@ -559,7 +559,7 @@ export default function GraduationCalculator() {
       };
       return { ...audit, progress };
     });
-    persistSharedTranscript(mergedTranscript);
+    persistSharedTranscript(mergedTranscript, parsed.attempts ?? allRecords);
     setSharedTranscript(mergedTranscript);
     setAudits(nextAudits);
     setReports(nextReports);

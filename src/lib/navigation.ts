@@ -19,4 +19,8 @@ export const planningTools = [
     href: "/graduation-calculator",
     label: "navigation.graduationCalculator",
   },
+  {
+    href: "/semesters",
+    label: "navigation.semesters",
+  },
 ] as const;

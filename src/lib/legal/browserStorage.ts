@@ -3,6 +3,7 @@ export const PLANNER_STORAGE_KEYS = [
   'simplify-weekly-programs',
   'simplify-schedule-generator-session',
   'simplify-transcript-v1',
+  'simplify-current-semester-v1',
   'simplify-curriculum-progress-v1',
   'simplify-saved-curriculum-v1',
   'simplify-language',

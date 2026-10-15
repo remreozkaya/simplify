@@ -17,6 +17,7 @@ function ToolIcon({ index }: { index: number }) {
     "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6",
     "M12 3v6M5 15v6M19 15v6M5 15V9h14v6M9 3h6M2 21h6M16 21h6",
     "M6 3h12v18H6zM9 7h6M9 11h1M14 11h1M9 15h1M14 15h1",
+    "M4 4h16v16H4zM4 9h16M8 2v4M16 2v4M8 13h3M8 17h7",
   ];
   return <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[index]} /></svg>;
 }

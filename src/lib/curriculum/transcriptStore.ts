@@ -25,6 +25,7 @@ const recordSchema = z.object({
 const storeSchema = z.object({
   version: z.literal(1),
   courses: z.array(recordSchema),
+  history: z.array(recordSchema).optional(),
   updatedAt: z.string().datetime(),
 });
 
@@ -69,8 +70,26 @@ export function transcriptFromLegacyProgressStore(value: string | null) {
   }
 }
 
-export function serializeSharedTranscript(courses: readonly TranscriptCourseRecord[], updatedAt = new Date().toISOString()) {
-  return JSON.stringify({ version: 1, courses, updatedAt });
+export function serializeSharedTranscript(courses: readonly TranscriptCourseRecord[], updatedAt = new Date().toISOString(), history?: readonly TranscriptCourseRecord[]) {
+  return JSON.stringify({ version: 1, courses, updatedAt, ...(history ? { history } : {}) });
+}
+
+export function parseTranscriptHistory(value: string | null): TranscriptCourseRecord[] {
+  if (!value) return [];
+  try {
+    const parsed = storeSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data.history ?? parsed.data.courses : [];
+  } catch { return []; }
+}
+
+/** Refresh same-term corrections while retaining previous semester attempts. */
+export function mergeTranscriptHistory(existing: readonly TranscriptCourseRecord[], incoming: readonly TranscriptCourseRecord[]) {
+  const attempts = new Map<string, TranscriptCourseRecord>();
+  for (const record of [...existing, ...incoming]) {
+    const courseCode = normalizeCourseCode(record.courseCode);
+    attempts.set(`${record.term}:${courseCode}`, { ...record, courseCode });
+  }
+  return [...attempts.values()].sort((a, b) => termOrder(a.term) - termOrder(b.term) || a.courseCode.localeCompare(b.courseCode));
 }
 
 function termOrder(term: string) {
@@ -108,8 +127,9 @@ export function mergeTranscriptCourses(
   );
 }
 
-export function persistSharedTranscript(courses: readonly TranscriptCourseRecord[]) {
-  localStorage.setItem(SHARED_TRANSCRIPT_STORAGE_KEY, serializeSharedTranscript(courses));
+export function persistSharedTranscript(courses: readonly TranscriptCourseRecord[], attempts: readonly TranscriptCourseRecord[] = courses) {
+  const history = courses.length ? mergeTranscriptHistory(parseTranscriptHistory(localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY)), [...courses, ...attempts]) : [];
+  localStorage.setItem(SHARED_TRANSCRIPT_STORAGE_KEY, serializeSharedTranscript(courses, new Date().toISOString(), history));
   window.dispatchEvent(new CustomEvent(SHARED_TRANSCRIPT_EVENT));
 }
 

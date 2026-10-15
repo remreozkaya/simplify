@@ -5,6 +5,8 @@ import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression
 
 export type TranscriptRowError = { line: number; row: string; reason: string };
 export type TranscriptParseResult = {
+  /** All valid attempts, before latest-attempt selection for graduation. */
+  attempts?: TranscriptCourseRecord[];
   calculatedCourses: TranscriptCourseRecord[];
   nonCalculatedCourses: TranscriptCourseRecord[];
   invalidRows: TranscriptRowError[];
@@ -99,6 +101,7 @@ export function parseTranscriptMarkdown(markdown: string): TranscriptParseResult
   const selectedCalculated = applicableAttempts(calculated);
   const selectedNonCalculated = applicableAttempts(nonCalculated);
   return {
+    attempts: [...calculated, ...nonCalculated].map(({ record }) => record),
     calculatedCourses: selectedCalculated.records,
     nonCalculatedCourses: selectedNonCalculated.records,
     invalidRows,
