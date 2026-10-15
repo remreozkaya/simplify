@@ -161,7 +161,7 @@ export default function MySemesters() {
   }
 
   const number = formatCredits;
-  const gpa = (value: number | null) => value === null ? "—" : formatNumber(language, value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const gpa = (value: number | null) => value === null ? "—" : formatNumber("en", value, { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
   const available = [...candidates.values()].filter(course => !current.some(selected => selected.courseCode === course.code));
   const matches = available.filter(course => `${course.code} ${localizedCourseTitle(course, language)}`.toLocaleLowerCase(language).includes(search.toLocaleLowerCase(language).trim()));
   const missingCredits = current.some(course => course.credit === null);

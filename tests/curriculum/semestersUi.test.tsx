@@ -33,7 +33,9 @@ it.each(["en", "tr"] as const)("renders saved projections before collapsible his
   expect(html).toContain(translate(language, "navigation.semesters"));
   expect(html).toContain(translate(language, "semesters.gradeSelection", { code: "MAT 104E" }));
   expect(html).toContain('<option value="AA" selected="">AA</option>');
-  expect(html).toContain(language === "en" ? "3.29" : "3,29");
+  expect(html).toContain(">3.29</span>");
+  expect(html).toContain(">3.50</strong>");
+  expect(html).not.toMatch(/>\d+,\d{2}</);
   expect(html).toContain(translate(language, "semesters.coursesCredits", { courses: 1, credits: "4.00" }));
   expect(html).toMatch(/>3\.00<\/td>/);
   expect(html).toContain(translate(language, "semesters.currentOverallGpa"));
