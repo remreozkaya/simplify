@@ -192,9 +192,10 @@ function ProgramAuditSection({
             <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
               {programGpa === null
                 ? "—"
-                : formatNumber(language, programGpa, {
+                : formatNumber("en", programGpa, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
+                    useGrouping: false,
                   })}
             </p>
             <OptionalHelp summary={t("graduationCalculator.gpaHelp")}>
@@ -735,9 +736,10 @@ export default function GraduationCalculator() {
               <p className="text-2xl font-semibold">
                 {gpa === null
                   ? "—"
-                  : formatNumber(language, gpa, {
+                  : formatNumber("en", gpa, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
+                      useGrouping: false,
                     })}
               </p>
             </div>
