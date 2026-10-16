@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useProfile } from "@/components/profile/ProfileProvider";
 import { loadWeeklyPrograms, WEEKLY_PROGRAMS_STORAGE_KEY } from "@/lib/calendar/persistence";
 import { GRADES, type Grade } from "@/lib/curriculum/grades";
-import { CURRICULUM_PROGRESS_EVENT, CURRICULUM_PROGRESS_STORAGE_KEY, parseCurriculumProgress } from "@/lib/curriculum/progress";
+import { CURRICULUM_PROGRESS_EVENT, CURRICULUM_PROGRESS_STORAGE_KEY } from "@/lib/curriculum/progress";
 import {
   CURRENT_SEMESTER_EVENT, CURRENT_SEMESTER_STORAGE_KEY,
   currentSemesterGpa, groupTranscriptSemesters, parseCurrentSemester, serializeCurrentSemester, semesterTermLabel, importWeeklySemesterCourses,
@@ -18,7 +18,7 @@ import { responseJson } from "@/lib/http/responseJson";
 import { formatCredits, formatNumber, localizedCourseTitle } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
 import type { ItuCurriculum, ItuElectiveCourse } from "@/lib/itu/curriculum/types";
-import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
+import { normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
 const panel = "rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900";
 const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-600 dark:bg-slate-950 dark:text-white";
@@ -106,24 +106,18 @@ export default function MySemesters() {
     })));
     return courses;
   }, [loaded, requestKey]);
-  const current = useMemo(() => resolveSemesterCourseCredits(storedCurrent, curriculumCourses, creditLookup.key === creditKey ? creditLookup.credits : {}), [storedCurrent, curriculumCourses, creditLookup, creditKey]);
+  const current = useMemo(() => resolveSemesterCourseCredits(storedCurrent, curriculumCourses, creditLookup.key === creditKey ? creditLookup.credits : {})
+    .sort((a, b) => a.courseCode.localeCompare(b.courseCode)), [storedCurrent, curriculumCourses, creditLookup, creditKey]);
 
   const candidates = useMemo(() => {
-    const passed = new Set(transcript.filter(course => course.completionStatus === "passed").map(course => normalizeCourseCode(course.courseCode)));
     const courses = new Map<string, ItuElectiveCourse>();
     if (loaded.key !== requestKey) return courses;
-    for (const curriculum of loaded.curricula) {
-      const progress = parseCurriculumProgress(progressValue, curriculum.planId);
-      Object.entries(progress.courses).forEach(([code, course]) => {
-        if (course.state === "passed") passed.add(normalizeCourseCode(course.courseCode ?? code));
-      });
-    }
     for (const curriculum of loaded.curricula) {
       for (const semester of curriculum.semesters) {
         for (const item of semester.items) {
           for (const course of item.kind === "course" ? [item] : item.courses) {
             const code = normalizeCourseCode(course.code);
-            if (!courseLanguageVariants(code).some(variant => passed.has(variant)) && course.creditOptions.length) {
+            if (course.creditOptions.length) {
               courses.set(code, { ...course, code });
             }
           }
@@ -131,7 +125,7 @@ export default function MySemesters() {
       }
     }
     return new Map([...courses].sort(([a], [b]) => a.localeCompare(b)));
-  }, [loaded, requestKey, progressValue, transcript]);
+  }, [loaded, requestKey]);
 
   function save(courses: CurrentSemesterCourse[]) {
     try {

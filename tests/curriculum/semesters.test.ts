@@ -60,10 +60,10 @@ it("replaces saved manual and missing credits with database values", () => {
   expect(resolveSemesterCourseCredits(courses, new Map(), {})[0].credit).toBeNull();
 });
 
-it("projects overall GPA by credit weight and replaces retaken courses", () => {
-  const transcript = [record({ courseCode: "MAT 103E", grade: "FF", transcriptCredit: 4 }), record({ courseCode: "FIZ 101", grade: "BB", transcriptCredit: 3 })];
+it.each([["FF", 0], ["DD", 1], ["CC", 2], ["BB", 3]] as const)("projects overall GPA by credit weight and replaces a previous %s on a retaken course", (grade, points) => {
+  const transcript = [record({ courseCode: "MAT 103E", grade, transcriptCredit: 4 }), record({ courseCode: "FIZ 101", grade: "BB", transcriptCredit: 3 })];
   expect(projectedOverallGpa(transcript, [{ courseCode: "MAT 103E", courseName: "Math", credit: 4, grade: "AA" }])).toBeCloseTo(25 / 7);
-  expect(projectedOverallGpa(transcript, [{ courseCode: "KIM 101", courseName: "Chemistry", credit: 2, grade: "AA" }])).toBeCloseTo(17 / 9);
+  expect(projectedOverallGpa(transcript, [{ courseCode: "KIM 101", courseName: "Chemistry", credit: 2, grade: "AA" }])).toBeCloseTo((4 * points + 17) / 9);
   expect(projectedOverallGpa(transcript, [])).toBeNull();
 });
 
