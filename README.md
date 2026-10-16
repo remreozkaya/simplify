@@ -1,155 +1,36 @@
 # Simplify
 
-Academic planning for İTÜ students, built with Next.js, React, TypeScript, Tailwind CSS, and Supabase Auth. Turkish is the default language; English and light/dark themes are available throughout the interface.
+Academic planning for İstanbul Technical University (İTÜ) students. Built with Next.js 16, React 19, TypeScript, Tailwind CSS 4, and Supabase Auth. The interface supports Turkish (default), English, and light/dark themes.
 
-## Development
+## Features
 
-```bash
+| Route | Purpose |
+| --- | --- |
+| `/` | Dashboard with enrolled programs, planning checklist, and tool links |
+| `/profile` | Personal details, main major, double majors, minors, password, and account export/deletion |
+| `/semester-planner` | Course recommendations across active programs, with credit targets, prerequisites, and registration warnings |
+| `/generator` | Generate and compare weekly schedules using course, section/CRN, day, and time preferences |
+| `/weekly-planner` | Create named schedules, reorder courses, inspect overlaps, export JPEGs, and access the CRN bookmarklet |
+| `/curriculum` | Explore program requirements, prerequisite graphs, and completion progress |
+| `/graduation-calculator` | Paste transcript text or Markdown, track degree requirements, and calculate GPA for each program |
+| `/semesters` | Review transcript history by semester, select current courses or import a weekly plan, and project semester and overall GPA |
+
+The semester planner can send selected courses and sections to the schedule generator. Generated schedules can be saved as named weekly plans. Automatic searches have finite work limits and report incomplete comparisons. Unknown availability and registration restrictions remain visible; academic results are advisory and should be checked in OBS.
+
+Transcript imports accumulate across semesters. The latest attempt determines current course results, while semester history supports reviewing previous attempts. Main-major, double-major, and minor requirements are evaluated independently against their selected curricula. Official course equivalences and Turkish/English language counterparts contribute to requirement matching. Manual completions are preserved when imported progress is reset. Current-semester grade estimates support projections without changing imported transcript results.
+
+## Local development
+
+Use Node.js 20.9 or newer and npm.
+
+```sh
 npm ci
 cp .env.example .env.local
-# Configure Supabase as described below.
+# Fill in the Supabase public values and use the local site URL below.
 npm run dev
 ```
 
-Open http://localhost:3000. Run the checks before merging changes:
-
-```bash
-npm run lint
-npm run typecheck
-npm run test:run
-npm run build
-```
-
-`npm test` runs Vitest in watch mode. `npm start` serves a production build. Tests use local fixtures and do not send email or refresh official data.
-
-## Tools and data
-
-| Route                    | Purpose                                                                     |
-| ------------------------ | --------------------------------------------------------------------------- |
-| `/`                      | Profile programs, planning steps, and links to all tools                     |
-| `/semester-planner`      | Recommend courses across the profile’s active programs                      |
-| `/generator`             | Generate and compare schedules using course, day, time, and CRN preferences |
-| `/weekly-planner`        | Manage named schedules, reorder courses, view overlaps, and export JPEGs    |
-| `/curriculum`            | Explore prerequisites and program progress                                  |
-| `/graduation-calculator` | Import transcripts and audit graduation requirements and GPA                |
-| `/profile`               | Manage personal details, main major, double majors, minors, and password    |
-
-The semester planner accepts a local-credit target, maximum course count (0 means unlimited), program priority, and the currently published semester. Recommendations retain prerequisite, availability, and registration warnings, with detailed reasoning available on demand. A confirmed schedule can be sent to the generator while preserving its day/time preferences, then saved and opened in the weekly planner. The planner considers recognized Turkish/English offering sections together while retaining the selected CRN and section identity. Candidate and section search have finite work limits; when reached, the interface explicitly reports that comparison is incomplete and shows only proven conflict-free selections.
-
-Transcript imports accumulate across semesters. Reimporting a course retains the most recent attempt; older input cannot overwrite a newer result. Each main-major, double-major, and minor enrollment is audited independently against its exact curriculum. Program GPA uses transcript credit weights for matched, numerically graded courses, counting each course once. Courses without numeric grades do not contribute to GPA. A course is allocated once per program audit; manual completions follow direct-course priority before elective slots. Shared transcript grades and credits remain authoritative for prerequisite eligibility, including courses outside the active degree requirements. Resetting the shared transcript clears transcript-derived progress in all saved plans, including inactive enrollments, while preserving manual completions. An intentionally empty transcript does not reimport legacy plan records.
-
-Profile details and enrollments are stored in Supabase user metadata. Weekly schedules, generator preferences, transcripts, curriculum progress, language, and theme are stored in this browser’s `localStorage`. They are shared by accounts using the same browser, are not synchronized across devices, and remain after logout. Cleanup must preserve existing storage keys and migrations. Official academic names use the requested language when supplied by OBS, with the source name as fallback.
-
-Public İTÜ data is advisory. Unknown availability, registration limits, and unstructured corequisite rules must stay visible; students should verify registration decisions in OBS.
-
-## Structure
-
-The repository uses the App Router with authenticated and public authentication route groups. The `@/` import alias resolves to `src/`. Domain calculations live in `src/lib/`; React components handle rendering, interaction, and browser persistence.
-
-```text
-simplify/
-├── src/
-│   ├── app/
-│   │   ├── (app)/             # protected layout, home, and tool pages
-│   │   │   ├── curriculum/
-│   │   │   ├── generator/
-│   │   │   ├── graduation-calculator/
-│   │   │   ├── profile/       # profile page and server actions
-│   │   │   ├── semester-planner/
-│   │   │   └── weekly-planner/
-│   │   ├── (auth)/            # login, signup, verify-email, forgot/reset-password
-│   │   ├── api/itu/           # branches, courses, curriculum catalog/detail APIs
-│   │   ├── auth/              # shared auth actions and callback route
-│   │   ├── layout.tsx         # Geist fonts, language/theme initialization
-│   │   ├── globals.css        # Tailwind, theme fallbacks, focus/motion styles
-│   │   ├── error.tsx
-│   │   └── not-found.tsx
-│   ├── components/
-│   │   ├── auth/              # account forms and shared input controls
-│   │   ├── calendar/          # weekly calendar, course rows, schedule generator
-│   │   ├── curriculum/        # curriculum graph, audit, and program tabs
-│   │   ├── profile/           # profile form and enrollment context
-│   │   ├── semester-planner/  # recommendation interface
-│   │   ├── AppNavigation.tsx  # tool navigation and account preview
-│   │   ├── PageShell.tsx      # shared page layout and skip-link target
-│   │   ├── OptionalHelp.tsx   # expandable secondary guidance
-│   │   ├── LocalizedText.tsx
-│   │   ├── LanguageToggle.tsx
-│   │   └── ThemeToggle.tsx
-│   ├── hooks/                # useItuCourseCatalog: live offering loading
-│   ├── lib/
-│   │   ├── auth/              # validation, redirects, cookies, verified users
-│   │   ├── supabase/          # server client and Proxy session refresh
-│   │   ├── calendar/          # layout, catalog lookup, persistence, JPEG export
-│   │   ├── curriculum/        # transcript, equivalencies, eligibility, GPA/audits
-│   │   ├── http/              # shared JSON response handling
-│   │   ├── i18n/              # TR/EN dictionaries and runtime messages
-│   │   ├── itu/               # OBS clients, parsers, schemas, and adapters
-│   │   │   ├── curriculum/    # catalog, detail, elective, prerequisite services
-│   │   │   └── equivalence/   # importer parsing and state management
-│   │   ├── profile/           # enrollment and profile validation
-│   │   ├── schedule/          # constraints, conflicts, scoring, generator session
-│   │   ├── semester-planner/  # bounded recommendation search
-│   │   └── navigation.ts      # shared tool links
-│   ├── data/itu/
-│   │   ├── curriculum-catalog.json
-│   │   ├── equivalence-targets.json
-│   │   └── equivalences.json
-│   ├── types/calendar.ts      # shared calendar types
-│   └── proxy.ts               # Next.js request Proxy entry point
-├── scripts/                   # controlled OBS snapshot importers
-├── tests/
-│   ├── auth/, profile/, i18n/, http/
-│   ├── calendar/, schedule/, semester-planner/
-│   ├── curriculum/, itu/
-│   └── fixtures/              # OBS HTML and sample transcript records
-├── .codex/agents/             # architecture, academic, design, reviewer TOML
-├── docs/quality/             # functional and translation audit
-├── AGENTS.md                  # Next.js-generated agent guidance
-├── CLAUDE.md                  # reference to AGENTS.md
-├── .env.example               # public Supabase/site configuration placeholders
-├── package.json
-├── package-lock.json          # pinned npm dependency tree
-├── next.config.ts
-├── tsconfig.json
-├── eslint.config.mjs
-├── postcss.config.mjs
-└── vitest.config.ts
-```
-
-The project agent definitions are read-only audit/review roles. Their TOML syntax has been validated; discovery and loading depend on the Codex client. They are not application runtime dependencies.
-
-Keep the committed official snapshots separate from importer caches and live-page captures. `.gitignore` excludes `.env.local`, `node_modules/`, `.next/`, coverage, TypeScript build metadata, and temporary importer files. Refresh snapshots through the import commands below.
-
-### Data flow and ownership
-
-- The protected layout validates the Supabase user and provides profile enrollments through `ProfileProvider`. Profile actions update user metadata.
-- ITU API routes serve catalog selectors and live OBS course/plan data. Server clients, parsing, and validation stay under `src/lib/itu/`; the UI uses the calendar adapter and catalog hook.
-- Curriculum and graduation views share a cumulative transcript, while each plan keeps its own manual progress and requirement allocation. The semester planner uses that evidence to evaluate eligibility across active programs.
-- Semester recommendations hand actual course/section identities to the schedule generator. Generated schedules can be saved into named weekly plans.
-- Browser storage retains schedules, transcript/progress, generator state, language, and theme. It is shared by accounts using the same browser profile; account-scoped storage and cloud synchronization are not implemented.
-
-## Authentication
-
-Simplify uses Supabase Auth for email/password accounts, provider-managed password hashing, email confirmation, password recovery, refresh-token rotation, and cookie-backed sessions. The Next.js request Proxy checks session claims for application pages and ITU API routes; the protected server layout additionally validates the current user's email confirmation before rendering. ITU API routes do not independently recheck email confirmation, so **Confirm email** must remain enabled in Supabase. Personal details and academic-program enrollments from the Profile page are stored in the authenticated user's Supabase metadata. Planner, curriculum progress, the shared transcript, and theme data remain in `localStorage` and are not deleted or uploaded by authentication.
-
-### 1. Create and configure Supabase
-
-Create a Supabase project, then open **Authentication → Providers → Email** and:
-
-- enable email/password sign-in;
-- enable **Confirm email** (required — an unverified user must not access Simplify);
-- configure a production SMTP provider before launch. Supabase's default sender is rate-limited and intended only for initial testing.
-
-No service-role key or application database table is required for this feature.
-
-### 2. Configure environment variables
-
-Copy the placeholder file and add the public values shown by **Supabase Dashboard → Connect**:
-
-```bash
-cp .env.example .env.local
-```
+Open [localhost:3000](http://localhost:3000).
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
@@ -157,77 +38,83 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-`NEXT_PUBLIC_SITE_URL` must be the deployment's public origin without a trailing slash. Local development defaults safely to `http://localhost:3000` when the variable is omitted; production must provide it (or Vercel's `VERCEL_PROJECT_PRODUCTION_URL`). These are public project identifiers, not service-role credentials. Never add a service-role key with a `NEXT_PUBLIC_` prefix.
+These Supabase values identify the public project. Account deletion additionally requires the server-only `SUPABASE_SECRET_KEY`; never expose an admin credential through a `NEXT_PUBLIC_` variable or commit real credentials.
 
-### 3. Configure authentication URLs
+### Supabase setup
 
-In **Authentication → URL Configuration**, set:
+1. Create a Supabase project and enable email/password authentication.
+2. Enable **Confirm email**. Protected pages require a verified user; ITU API routes check session claims and rely on the provider's confirmation setting.
+3. Set the authentication **Site URL** to your app origin and allow `/auth/callback` on each local or deployed origin, for example `http://localhost:3000/auth/callback`.
+4. Set `NEXT_PUBLIC_SITE_URL` to that origin without a trailing slash. Production can alternatively use `VERCEL_PROJECT_PRODUCTION_URL`.
+5. Configure production SMTP before launch. Confirmation and recovery emails use Supabase's email delivery.
 
-- **Site URL** to the deployed Simplify origin (use `http://localhost:3000` locally);
-- **Redirect URLs** to `http://localhost:3000/auth/callback` and `https://your-domain.example/auth/callback` for the environments you use.
+No application database tables are required. Profile details and program enrollments are saved in Supabase Auth user metadata. Signup verification and password recovery return through `/auth/callback`. Keep the provider's confirmation/recovery links intact if customizing email templates.
 
-Signup confirmations return through `/auth/callback` and then show `/verify-email`. Password recovery uses the same callback to establish a short-lived, single-purpose recovery session before `/reset-password`. The application constructs these URLs from `NEXT_PUBLIC_SITE_URL`; no production domain is hard-coded.
+**Remember me** controls persistent versus session-only auth cookies. Browser session restoration may retain session cookies. Passwords and auth tokens are not copied into application `localStorage`.
 
-If you customize Supabase email templates, preserve the provider's confirmation/recovery link or use the documented `TokenHash` server callback format. Do not place access tokens directly in custom application URLs.
+## Storage and privacy
 
-### Session behavior
+Schedules, generator preferences, shared transcripts, curriculum selections/progress, current-semester courses and grade estimates, language, and theme are stored in this browser's `localStorage`. They persist after logout, are shared by accounts using the same browser profile, and do not synchronize across devices. Transcript parsing and academic calculations run locally; catalog requests use same-origin API routes that fetch public İTÜ data server-side.
 
-With **Remember me** selected, Supabase refresh-token cookies retain the provider's persistent lifetime. Without it, Simplify removes persistent expiry attributes so the browser receives session-only auth cookies. Some browsers' “restore previous session” feature may restore session cookies; this is the closest secure cross-browser behavior Supabase's cookie-based SSR model supports. Passwords, emails, and session tokens are never copied into `localStorage`.
+Public bilingual pages at `/legal/privacy`, `/legal/storage`, `/legal/terms`, and `/legal/requests` describe data handling. The storage page offers browser-data export and clearing. Profile offers verified account export and, when the server credential is configured, password-confirmed account deletion. Deleting an account does not automatically clear browser records.
 
-### Manual authentication smoke test
+## Checks and builds
 
-Use a test inbox or local Supabase/Mailpit environment; automated tests never send email.
-
-1. Sign up at `/signup` and confirm that invalid email, short password, and mismatched passwords are rejected.
-2. Confirm the verification screen appears and protected URLs redirect to `/login` before verification.
-3. Follow the email link, log in, refresh, and open `/`, `/generator`, `/curriculum`, `/graduation-calculator`, and `/semester-planner`.
-4. Log out and verify a manually entered protected URL redirects to `/login` with its intended path preserved.
-5. Request a reset from `/forgot-password`, follow the link, set a new password, and confirm the old password no longer works.
-6. Exercise expired/used verification and recovery links and the verification resend cooldown.
-
-Provider-dependent email delivery, verification, and old-password invalidation require a configured Supabase project and cannot be completed with placeholder environment values.
-
-## Official course-equivalence data
-
-Course-equivalence rules are imported at build/development time from İTÜ OBS and stored in `src/data/itu/equivalences.json`; the browser never scrapes OBS for equivalences. Import targets are explicit so program and plan scope cannot be lost:
-
-```bash
-npm run equivalences:import
-npm run equivalences:import -- --plan=1561
+```sh
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
 ```
 
-The importer rate-limits and caches requests, retries temporary failures, updates rules by deterministic ID, marks missing verified rows stale, and preserves prior verified rows whenever an OBS response fails validation. Inspect the stored data without making network requests:
+`npm test` runs Vitest in watch mode. Unit and component tests use fixtures and mocks; they do not send email or refresh official snapshots. Optional browser regression runners and their setup instructions live under `tests/auth/browser`, `tests/calendar/browser`, and `tests/i18n/browser`; they require external browser tooling.
 
-```bash
-npm run equivalences:report
-npm run equivalences:report -- --plan=1561 --target="BLG 113"
-npm run equivalences:report -- --equivalent="BLG 111" --unverified
+`npm run build` compiles with webpack. `npm start` serves that build. Geist fonts and their OFL license are bundled in `src/app/fonts`, so builds do not download fonts. Server-rendered metadata is Turkish; client metadata follows the saved language preference.
+
+Deployment must use:
+
+```sh
+npm run build:production
 ```
 
-Add another officially mapped program/plan to `src/data/itu/equivalence-targets.json` before importing it. Never add inferred equivalences by hand.
+This runs `npm run legal:check` before compilation. Operator facts and required reviews in `src/lib/legal/operator.json` are currently unresolved, so the production gate fails until they are completed. Ordinary compilation does not establish launch readiness. See [operations and launch requirements](docs/legal/OPERATIONS.md), [legal requirements and sources](docs/legal/REQUIREMENTS.md), and [dependency licenses](docs/legal/DEPENDENCY-LICENSES.json).
 
-At resolution time, Turkish and English offerings of the same course are treated as language counterparts (`BBF 101` ↔ `BBF 101E`; laboratory forms `FIZ 101L` ↔ `FIZ 101EL`). This application policy also expands the target and alternatives of an official plan rule, but is stored as a distinct `language-equivalence` satisfaction type so it is not presented as a separate OBS record.
+Email delivery, provider session behavior, and live account deletion require a configured disposable Supabase account and cannot be established by fixture tests.
 
-## Curriculum catalog refresh
+## Official academic data
 
-Profile and academic program selectors use the server-side snapshot at `src/data/itu/curriculum-catalog.json`. Curriculum detail, elective pools and prerequisites are fetched from OBS when an academic tool loads a plan; the selector snapshot does not provide offline degree audits. Refresh it from the official İTÜ OBS faculty and plan selectors with:
+Bundled snapshots under `src/data/itu` provide curriculum catalog data, official academic translations, course-equivalence rules and import targets, and program-restriction identities/observations. Curriculum details, elective pools, prerequisites, and published course sections are also requested from OBS through server services. The app requires network access for live academic data; bundled selector data does not provide a complete offline workflow.
 
-```bash
-npm run curricula:import
+| Command | Purpose |
+| --- | --- |
+| `npm run curricula:import` | Refresh the official faculty, program, and curriculum snapshot |
+| `npm run curricula:prerequisites` | Refresh prerequisite data in the curriculum snapshot |
+| `npm run equivalences:import` | Refresh official equivalences for configured program/plan targets |
+| `npm run equivalences:report` | Inspect stored equivalences without network requests |
+| `npm run restrictions:import` | Refresh program identities and observed section restrictions |
+| `node scripts/import-academic-translations.mjs` | Refresh official Turkish/English academic labels |
+
+Equivalence commands accept filters such as `--plan=1561`. Import targets are maintained in `src/data/itu/equivalence-targets.json`; do not invent official equivalences. The app separately recognizes language counterparts such as `BBF 101` / `BBF 101E` and `FIZ 101L` / `FIZ 101EL`.
+
+Official academic labels use the selected language when an official translation is available. Course codes and source course titles remain unchanged by the interface language. Generic elective labels have interface translations; unavailable official names retain their source wording.
+
+Program registration restrictions are evaluated per section using exact official identity tokens. Unknown identities or stale/unavailable sources remain uncertain rather than being treated as unrestricted. See [program-restriction sources and refresh](docs/program-restrictions.md) for importer options and mapping rules.
+
+## Repository layout
+
+```text
+src/app/             App Router pages, auth/profile/privacy actions, and ITU APIs
+src/components/      Academic tools, calendars, account forms, and shared UI
+src/hooks/           Auth-form and live course-catalog hooks
+src/lib/             Academic calculations, scheduling, parsing, auth, storage, i18n
+src/data/itu/        Official academic snapshots and equivalence import targets
+src/proxy.ts         Session refresh and protected-route handling
+scripts/             Snapshot importers and deployment readiness check
+tests/               Unit/component tests, source fixtures, optional browser runners
+docs/                Operational, legal, licensing, and data-source documentation
+.codex/agents/       Optional repository audit/review agent configurations
 ```
 
-The importer discovers faculties and undergraduate, ÇAP, and Yandal programs; follows every plan version; imports associations, notes, courses, elective pools, and prerequisites; and replaces the snapshot atomically only after a non-empty run. A focused prerequisite repair is also available:
+The `@/` alias resolves to `src/`. Application pages use a protected route-group layout; authentication and legal pages are public. Domain calculations live in `src/lib`, with rendering and browser interaction in components.
 
-```bash
-npm run curricula:prerequisites
-```
-
-## Privacy and deployment readiness
-
-Public bilingual legal pages live at `/legal/privacy`, `/legal/storage`, `/legal/terms`, and `/legal/requests`. Collection-point notices explain server-saved profiles and browser-only academic data. Profile includes verified account export/deletion; the public storage policy also offers local download/clear. Local records remain shared by accounts in the same browser and survive logout; users are warned explicitly.
-
-Legal owner facts are centralized in `src/lib/legal/operator.json`. They are intentionally unresolved: notices remain pre-launch drafts. Account deletion additionally requires a **server-only** `SUPABASE_SECRET_KEY`; no admin credential is sent to clients. The request page opens a configured mail app and has no fake delivery form; contact/delivery must be confirmed before launch.
-
-Run `npm run legal:check` to see missing mandatory facts/reviews. Use **`npm run build:production` as the deployment build command**; ordinary `npm run build` only verifies compilation and does not authorize launch. Read [audit](docs/legal/AUDIT.md), [requirements and official sources](docs/legal/REQUIREMENTS.md), [operations and launch blockers](docs/legal/OPERATIONS.md), and [verification](docs/legal/VERIFICATION.md). No overseas-transfer arrangement, retention period, controller identity or university affiliation has been invented.
-
-The production compiler is explicitly webpack (`npm run build`). Geist fonts are bundled locally with their OFL license to avoid network-dependent font builds. Metadata is Turkish on the server and follows the browser language preference after hydration; search crawlers without JavaScript receive Turkish metadata. Generated audit screenshots/logs are kept outside the repository; browser regression runners write their evidence to temporary directories.
+Keep generated screenshots, test reports, audit logs, importer caches, and temporary captures out of version control. Historical feature-verification reports are not maintained as repository documentation. Official academic snapshots and test fixtures remain versioned; course data may contain source dates. Preserve existing browser storage keys and migrations when changing persistence.

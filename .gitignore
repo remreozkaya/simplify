@@ -46,5 +46,10 @@ course-*-live.html
 
 temp/
 
-# generated audit artifacts
+# generated screenshots, verification reports, and audit artifacts
 /docs/quality/evidence/
+/artifacts/
+/screenshots/
+/audit-logs/
+/test-results/
+/playwright-report/
