@@ -2,7 +2,7 @@ import type { ProgramMembership } from "@/lib/program-restrictions/eligibility";
 import type { CourseProgress, CurriculumProgress, MissingRequirement } from "@/lib/curriculum/types";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 import type { EnrollmentType, ProgramEnrollment } from "@/lib/profile/types";
-import type { GeneratorCourse } from "@/lib/schedule/types";
+import type { GeneratedSchedule, GeneratorCourse } from "@/lib/schedule/types";
 
 export type ProgramPriority = "balanced" | EnrollmentType;
 export type PlannerEligibility = "confirmed" | "conditional" | "unknown";
@@ -48,7 +48,7 @@ export type SemesterCourseCandidate = {
 
 export type SemesterPlannerOptions = {
   programMemberships?: readonly ProgramMembership[];
-  desiredCredits: number;
+  desiredCredits?: number;
   maxCourses?: number;
   priority: ProgramPriority;
   availabilityMode: "published" | "unknown";
@@ -89,15 +89,20 @@ export type PlannerNotice =
   | { kind: "program-restriction-blocked"; count: number }
   | { kind: "program-restriction-unknown" };
 
-export type SemesterPlan = {
-  searchLimited: boolean;
-  searchStats: { candidateVisits: number; scheduleVisitedNodes: number };
+export type SemesterWeeklyProgram = {
+  schedule: GeneratedSchedule;
   recommendations: SemesterCourseCandidate[];
-  alternatives: SemesterCourseCandidate[];
   programSummaries: PlannerProgramSummary[];
   selectedCredits: number;
   selectedEcts: number;
-  combinedRemainingCredits: number;
   compatibleSectionConstraints: PlannerSectionConstraint[];
   notices: PlannerNotice[];
+};
+
+export type SemesterPlan = Omit<SemesterWeeklyProgram, "schedule"> & {
+  schedule: GeneratedSchedule | null;
+  weeklyPrograms: SemesterWeeklyProgram[];
+  combinedRemainingCredits: number;
+  searchLimited: boolean;
+  searchStats: { candidateVisits: number; scheduleVisitedNodes: number };
 };

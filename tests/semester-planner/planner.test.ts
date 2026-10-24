@@ -118,6 +118,177 @@ function options(overrides: Partial<Parameters<typeof buildSemesterPlan>[1]> = {
 }
 
 describe("smart semester planner", () => {
+  it("returns distinct course programs without repeating section variations", () => {
+    const main = makeProgram("main30", "main", "undergraduate", [
+      course("a", "BLG 101"), course("b", "MAT 101"), course("c", "EKO 201"),
+    ]);
+    const courseOfferings = [
+      offering("BLG 101", "Monday", "09:00", "10:00", ["Friday", "09:00", "10:00"]),
+      offering("MAT 101", "Tuesday"), offering("EKO 201", "Wednesday"),
+    ];
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 2, courseOfferings }));
+    // Three distinct course pairs; section variations belong to the generator.
+    expect(plan.weeklyPrograms).toHaveLength(3);
+    expect(new Set(plan.weeklyPrograms.map(value => value.schedule.id)).size).toBe(3);
+    expect(plan.searchLimited).toBe(false);
+    for (const program of plan.weeklyPrograms) {
+      expect(program.selectedCredits).toBe(6);
+      expect(program.recommendations).toHaveLength(2);
+      expect(program.compatibleSectionConstraints).toEqual(program.schedule.selections);
+      expect(hasMeetingConflicts(program.schedule.meetings)).toBe(false);
+      expect(program.programSummaries[0].selectedCredits).toBe(6);
+      const regenerated = generateConflictFreeSchedules(program.compatibleSectionConstraints.map(constraint => ({
+        ...courseOfferings.find(value => value.courseId === constraint.courseId)!, pinnedSectionId: constraint.sectionId,
+      })));
+      expect(regenerated.schedules).toHaveLength(1);
+    }
+    expect(plan.recommendations).toEqual(plan.weeklyPrograms[0].recommendations);
+  });
+
+  it("verifies a conflict-free schedule without returning section-only alternatives", () => {
+    const main = makeProgram("main31", "main", "undergraduate", [course("a", "BLG 101"), course("b", "MAT 101")]);
+    const courseOfferings = [
+      offering("BLG 101", "Monday", "09:00", "10:00", ["Tuesday", "09:00", "10:00"]),
+      offering("MAT 101", "Monday", "09:00", "10:00", ["Wednesday", "09:00", "10:00"]),
+    ];
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, courseOfferings }));
+    expect(plan.weeklyPrograms).toHaveLength(1);
+    expect(plan.weeklyPrograms.every(value => value.recommendations.length === 2 && !hasMeetingConflicts(value.schedule.meetings))).toBe(true);
+  });
+
+  it("returns no weekly programs when no courses are available", () => {
+    const main = makeProgram("main32", "main", "undergraduate", [course("a", "BLG 101")]);
+    expect(buildSemesterPlan([main], options({ courseOfferings: [] })).weeklyPrograms).toEqual([]);
+  });
+
+  it("returns only the six best distinct programs without treating the shortlist as an incomplete search", () => {
+    const codes = Array.from({ length: 8 }, (_, index) => `BLG ${100 + index}`);
+    const main = makeProgram("main33", "main", "undergraduate", codes.map(code => course(code, code)));
+    const courseOfferings = codes.map(code => offering(code));
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 3, maxCourses: 1, courseOfferings, offeredCourseCodes: new Set(codes) }));
+    expect(plan.weeklyPrograms).toHaveLength(6);
+    expect(plan.searchLimited).toBe(false);
+    expect(plan.notices).not.toContainEqual({ kind: "search-limited" });
+    expect(new Set(plan.weeklyPrograms.map(program => program.recommendations.map(course => course.code).sort().join("|"))).size).toBe(6);
+  });
+
+  it("does not repeat a course set with hundreds of available sections", () => {
+    const main = makeProgram("main37", "main", "undergraduate", [course("a", "BLG 101")]);
+    const base = offering("BLG 101");
+    const courseOfferings = [{ ...base, sections: Array.from({ length: 510 }, (_, index) => ({
+      ...base.sections[0], id: String(index), crn: String(index),
+    })) }];
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 3, courseOfferings }));
+    expect(plan.weeklyPrograms).toHaveLength(1);
+    expect(plan.searchLimited).toBe(false);
+  });
+
+  it("excludes programs that are worse for both credit distance and course count", () => {
+    const main = makeProgram("main38", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 3), course("b", "MAT 101", 1, 6), course("c", "EKO 201", 1, 1),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 1 }));
+    expect(plan.weeklyPrograms).toHaveLength(1);
+    expect(plan.weeklyPrograms[0].selectedCredits).toBe(6);
+  });
+
+  it("keeps a useful course-count tradeoff alongside the closest credit match", () => {
+    const main = makeProgram("main39", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 6), course("b", "MAT 101", 1, 2), course("c", "EKO 201", 1, 2),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 2 }));
+    expect(plan.selectedCredits).toBe(6);
+    expect(plan.weeklyPrograms.some(program => program.selectedCredits === 4 && program.recommendations.length === 2)).toBe(true);
+    expect(plan.weeklyPrograms.some(program => program.selectedCredits === 2)).toBe(false);
+  });
+
+  it("prefers a course count closer to the maximum when credits match equally", () => {
+    const main = makeProgram("main40", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 6), course("b", "MAT 101", 1, 3), course("c", "EKO 201", 1, 3),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 2 }));
+    expect(plan.selectedCredits).toBe(6);
+    expect(plan.recommendations).toHaveLength(2);
+    expect(plan.weeklyPrograms).toHaveLength(1);
+  });
+
+  it("uses the credit target alone when the course maximum is unlimited", () => {
+    const main = makeProgram("main41", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 6), course("b", "MAT 101", 1, 2), course("c", "EKO 201", 1, 2),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 0 }));
+    expect(plan.weeklyPrograms).toHaveLength(1);
+    expect(plan.selectedCredits).toBe(6);
+  });
+
+  it("keeps course-count tradeoffs that add a course after reaching the credit target", () => {
+    const main = makeProgram("main42", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 6), course("b", "MAT 101", 1, 1),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: 2 }));
+    expect(plan.selectedCredits).toBe(6);
+    expect(plan.weeklyPrograms.some(program => program.selectedCredits === 7 && program.recommendations.length === 2)).toBe(true);
+  });
+
+  it("does not recommend positive-credit courses for a zero credit target", () => {
+    const main = makeProgram("main43", "main", "undergraduate", [course("a", "BLG 101")]);
+    expect(buildSemesterPlan([main], options({ desiredCredits: 0, maxCourses: 2 })).weeklyPrograms).toEqual([]);
+  });
+
+  it("plans with only a credit target and no course maximum", () => {
+    const main = makeProgram("main44", "main", "undergraduate", [course("a", "BLG 101"), course("b", "MAT 101")]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 6, maxCourses: undefined }));
+    expect(plan.selectedCredits).toBe(6);
+    expect(plan.recommendations).toHaveLength(2);
+  });
+
+  it("plans by course count without inventing a credit target", () => {
+    const main = makeProgram("main45", "main", "undergraduate", [
+      course("a", "BLG 101", 1, 12), course("b", "MAT 101", 1, 12), course("c", "EKO 201", 1, 12),
+    ]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: undefined, maxCourses: 3 }));
+    expect(plan.recommendations).toHaveLength(3);
+    expect(plan.selectedCredits).toBe(36);
+    expect(plan.weeklyPrograms.every(program => program.recommendations.length === 3)).toBe(true);
+    expect(plan.notices.some(notice => notice.kind === "target-shortfall" || notice.kind === "target-overage" || notice.kind === "collision-shortfall")).toBe(false);
+  });
+
+  it("requires a credit target or a finite course maximum", () => {
+    expect(() => buildSemesterPlan([], options({ desiredCredits: undefined, maxCourses: undefined }))).toThrow(RangeError);
+    expect(() => buildSemesterPlan([], options({ desiredCredits: undefined, maxCourses: 0 }))).toThrow(RangeError);
+  });
+
+  it("keeps per-program totals and notices accurate across credit and count tradeoffs", () => {
+    const main = makeProgram("main34", "main", "undergraduate", [course("a", "BLG 101"), course("b", "MAT 101")]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 4.5, maxCourses: 2 }));
+    const below = plan.weeklyPrograms.find(program => program.selectedCredits === 3)!;
+    const above = plan.weeklyPrograms.find(program => program.selectedCredits === 6)!;
+    expect(below.notices).toContainEqual({ kind: "target-shortfall", credits: 1.5 });
+    expect(above.notices).toContainEqual({ kind: "target-overage", credits: 1.5 });
+    expect(above.programSummaries[0].selectedCredits).toBe(6);
+  });
+
+  it("preserves language offering identities across every weekly program", () => {
+    const main = makeProgram("main35", "main", "undergraduate", [course("a", "MAT 101")]);
+    const courseOfferings = [offering("MAT 101"), offering("MAT 101E", "Tuesday")];
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 3, courseOfferings }));
+    expect(plan.weeklyPrograms).toHaveLength(1);
+    expect(["MAT 101", "MAT 101E"]).toContain(plan.compatibleSectionConstraints[0].courseId);
+    for (const program of plan.weeklyPrograms) {
+      expect(program.recommendations[0].code).toBe("MAT 101");
+      expect(program.schedule.meetings[0].sectionId).toBe(program.compatibleSectionConstraints[0].sectionId);
+    }
+    const repeated = buildSemesterPlan([main], options({ desiredCredits: 3, courseOfferings }));
+    expect(repeated.weeklyPrograms.map(program => program.schedule.id)).toEqual(plan.weeklyPrograms.map(program => program.schedule.id));
+  });
+
+  it("keeps the lower-credit option when under and over target are equally close", () => {
+    const main = makeProgram("main36", "main", "undergraduate", [course("a", "BLG 101"), course("b", "MAT 101")]);
+    const plan = buildSemesterPlan([main], options({ desiredCredits: 4.5, maxCourses: 2 }));
+    expect(plan.selectedCredits).toBe(3);
+    expect(plan.weeklyPrograms.map(program => program.selectedCredits)).toContain(6);
+  });
+
   it("bounds exploration of many incompatible candidates and keeps only proven compatible results", () => {
     const codes = Array.from({ length: 80 }, (_, index) => `BLG ${100 + index}`);
     const main = makeProgram("main24", "main", "undergraduate", codes.map(code => course(code, code)));
@@ -325,7 +496,7 @@ describe("smart semester planner", () => {
 
     expect(plan.recommendations).toHaveLength(2);
     expect(plan.recommendations.some((value) => value.code === "EKO 301")).toBe(true);
-    expect([...plan.recommendations, ...plan.alternatives].some((value) => value.code === "BLG 999")).toBe(false);
+    expect([...plan.recommendations, ...plan.weeklyPrograms.flatMap((program) => program.recommendations)].some((value) => value.code === "BLG 999")).toBe(false);
   });
 
   it("never combines courses whose published sections all collide", () => {

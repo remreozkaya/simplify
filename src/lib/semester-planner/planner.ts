@@ -28,12 +28,14 @@ import type {
   PlannerProgramSummary,
   SemesterCourseCandidate,
   SemesterPlan,
+  SemesterWeeklyProgram,
   SemesterPlannerOptions,
   SemesterPlannerProgram,
 } from "@/lib/semester-planner/types";
 
 export const MAX_PLANNER_CREDITS = 60;
 export const MAX_PLANNER_COURSES = 30;
+export const MAX_RECOMMENDED_PROGRAMS = 6;
 // Operational work limits, independent of academic registration policy.
 export const MAX_PLANNER_CANDIDATE_VISITS = 2_000;
 export const MAX_PLANNER_SCHEDULE_NODES = 20_000;
@@ -353,7 +355,10 @@ function candidateSelectionScore(
 }
 
 function validateOptions(options: SemesterPlannerOptions) {
-  if (!Number.isFinite(options.desiredCredits) || options.desiredCredits < 0 || options.desiredCredits > MAX_PLANNER_CREDITS) {
+  if (options.desiredCredits === undefined && !(options.maxCourses !== undefined && options.maxCourses > 0)) {
+    throw new RangeError("Provide a credit target or a positive course maximum.");
+  }
+  if (options.desiredCredits !== undefined && (!Number.isFinite(options.desiredCredits) || options.desiredCredits < 0 || options.desiredCredits > MAX_PLANNER_CREDITS)) {
     throw new RangeError(`desiredCredits must be between 0 and ${MAX_PLANNER_CREDITS}.`);
   }
   if (options.maxCourses !== undefined && (
@@ -408,14 +413,23 @@ function scheduleForCourses(
     stopAfterFirst: true,
     programMemberships: options.programMemberships,
   });
-  const schedule = generated.schedules[0];
   const diagnostics = { visitedNodes: generated.visitedNodes, limited: Boolean(generated.searchLimitReached || generated.truncated) };
-  if (!schedule) return { schedule: null, ...diagnostics };
   function restoreIdentity<T extends { sectionId: string; branchCode: string; courseId: string }>(value: T): T {
     const identity = identities.get(value.sectionId)!;
     return { ...value, branchCode: identity.offering.branchCode, courseId: identity.offering.courseId, sectionId: identity.sectionId };
   }
-  return { schedule: { ...schedule, selections: schedule.selections.map(restoreIdentity), meetings: schedule.meetings.map(restoreIdentity) }, ...diagnostics };
+  const schedule = generated.schedules[0];
+  if (!schedule) return { schedule: null, ...diagnostics };
+  const selections = schedule.selections.map(restoreIdentity);
+  return {
+    schedule: {
+      ...schedule,
+      id: JSON.stringify(selections.map(({ courseCode, branchCode, courseId, sectionId }) => [courseCode, branchCode, courseId, sectionId]).sort()),
+      selections,
+      meetings: schedule.meetings.map(restoreIdentity),
+    },
+    ...diagnostics,
+  };
 }
 
 function comparisonForSelection(
@@ -425,9 +439,10 @@ function comparisonForSelection(
 ) {
   const credits = selected.reduce((sum, course) => sum + course.credits, 0);
   return {
-    distance: Math.abs(options.desiredCredits - credits),
-    overTarget: credits > options.desiredCredits ? 1 : 0,
+    distance: options.desiredCredits === undefined ? 0 : Math.abs(options.desiredCredits - credits),
+    overTarget: options.desiredCredits !== undefined && credits > options.desiredCredits ? 1 : 0,
     score: candidateSelectionScore(selected, programSummaries, options),
+    courseCountDistance: options.maxCourses && options.maxCourses > 0 ? options.maxCourses - selected.length : 0,
     courses: selected.length,
     codeKey: selected.map((course) => course.code).sort().join("|"),
   };
@@ -437,11 +452,12 @@ function isBetterSelection(
   candidate: ReturnType<typeof comparisonForSelection>,
   current: ReturnType<typeof comparisonForSelection>,
 ) {
-  return candidate.distance < current.distance ||
-    (candidate.distance === current.distance && candidate.overTarget < current.overTarget) ||
-    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score > current.score) ||
-    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score === current.score && candidate.courses < current.courses) ||
-    (candidate.distance === current.distance && candidate.overTarget === current.overTarget && candidate.score === current.score && candidate.courses === current.courses && candidate.codeKey < current.codeKey);
+  if (candidate.distance !== current.distance) return candidate.distance < current.distance;
+  if (candidate.overTarget !== current.overTarget) return candidate.overTarget < current.overTarget;
+  if (candidate.courseCountDistance !== current.courseCountDistance) return candidate.courseCountDistance < current.courseCountDistance;
+  if (candidate.score !== current.score) return candidate.score > current.score;
+  if (candidate.courses !== current.courses) return candidate.courses < current.courses;
+  return candidate.codeKey < current.codeKey;
 }
 
 export function semesterPlannerCandidateCodes(programs: readonly SemesterPlannerProgram[]) {
@@ -517,7 +533,7 @@ export function buildSemesterPlan(
     ? Math.min(options.maxCourses, available.length)
     : available.length;
   const maximumSingleCredit = Math.max(0, ...available.map((candidate) => candidate.credits));
-  const maximumUsefulCredits = options.desiredCredits + maximumSingleCredit;
+  const maximumUsefulCredits = options.desiredCredits === undefined ? Infinity : options.desiredCredits + maximumSingleCredit;
   let selected: SemesterCourseCandidate[] = [];
   let compatibleSchedule: GeneratedSchedule | null = null;
   let bestComparison = comparisonForSelection(selected, programSummaries, options);
@@ -526,6 +542,11 @@ export function buildSemesterPlan(
   const preparedCourses = new Map<string, GeneratorCourse>();
   const identities = new Map<string, OfferingIdentity>();
   const scheduleCache = new Map<string, ScheduleSearch>();
+  const feasibleSelections: Array<{
+    courses: SemesterCourseCandidate[];
+    schedule: GeneratedSchedule;
+    comparison: ReturnType<typeof comparisonForSelection>;
+  }> = [];
 
   function scheduleForSelection(courses: readonly SemesterCourseCandidate[]): ScheduleSearch {
     const key = courses.map((course) => course.code).sort().join("|");
@@ -559,7 +580,8 @@ export function buildSemesterPlan(
       if (!visitCandidate()) return;
       const candidate = available[index];
       if (candidate.credits < 0 || !Number.isFinite(candidate.credits)) continue;
-      if (currentCredits >= options.desiredCredits && candidate.credits > 0) continue;
+      if (options.desiredCredits !== undefined && currentCredits >= options.desiredCredits && candidate.credits > 0 &&
+        (!options.maxCourses || options.desiredCredits === 0)) continue;
       if (currentCredits + candidate.credits > maximumUsefulCredits) continue;
       const requirementKeys = candidate.contributions.map(contributionKey);
       if (requirementKeys.every((key) => usedRequirements.has(key))) continue;
@@ -567,6 +589,7 @@ export function buildSemesterPlan(
       const { schedule } = scheduleForSelection(next);
       if (!schedule) continue;
       const comparison = comparisonForSelection(next, programSummaries, options);
+      feasibleSelections.push({ courses: next, schedule, comparison });
       if (isBetterSelection(comparison, bestComparison)) {
         selected = next;
         compatibleSchedule = schedule;
@@ -580,22 +603,38 @@ export function buildSemesterPlan(
 
   explore(0, [], new Set());
 
-  // Reflect actual section status; preserve candidate identity for alternative exclusion.
-  selected.forEach((candidate) => {
-    const chosen = (compatibleSchedule as GeneratedSchedule | null)?.selections.find((selection) => selection.courseCode === candidate.code);
-    if (chosen?.programEligibility) candidate.programEligibility = chosen.programEligibility === "eligible" ? "eligible" : "unknown";
-  });
+  // Keep complete course sets: a subset adds no alternative when a valid
+  // superset meets the credit target at least as closely.
+  const completeSelections = feasibleSelections.filter((selection) =>
+    !feasibleSelections.some((other) =>
+      other.courses.length > selection.courses.length &&
+      isBetterSelection(other.comparison, selection.comparison) &&
+      selection.courses.every((course) => other.courses.includes(course)),
+    ),
+  ).sort((a, b) => isBetterSelection(a.comparison, b.comparison) ? -1 : isBetterSelection(b.comparison, a.comparison) ? 1 : 0);
+  // Exclude weaker matches on both targets. Equal matches remain available
+  // for academic-priority ranking; section-only variants never become programs.
+  const rankedAssignments = completeSelections.filter((selection) =>
+    !completeSelections.some((other) => {
+      const first = other.comparison;
+      const second = selection.comparison;
+      const creditsAtLeastAsClose = first.distance < second.distance ||
+        (first.distance === second.distance && first.overTarget <= second.overTarget);
+      const closerCredits = first.distance < second.distance ||
+        (first.distance === second.distance && first.overTarget < second.overTarget);
+      return creditsAtLeastAsClose && first.courseCountDistance <= second.courseCountDistance &&
+        (closerCredits || first.courseCountDistance < second.courseCountDistance);
+    }),
+  ).slice(0, MAX_RECOMMENDED_PROGRAMS);
+  if (rankedAssignments.length) {
+    selected = rankedAssignments[0].courses;
+    compatibleSchedule = rankedAssignments[0].schedule;
+  }
   const selectedCredits = selected.reduce((sum, course) => sum + course.credits, 0);
-  const selectedEcts = selected.reduce((sum, course) => sum + course.ects, 0);
-  programSummaries.forEach((summary) => {
-    const contributing = selected.filter((candidate) => candidate.contributions.some((value) => value.enrollmentId === summary.enrollmentId));
-    summary.selectedCredits = contributing.reduce((sum, candidate) => sum + candidate.credits, 0);
-    summary.selectedCourses = contributing.length;
-  });
-
-  if (selectedCredits < options.desiredCredits) notices.push({ kind: "target-shortfall", credits: options.desiredCredits - selectedCredits });
-  if (selectedCredits > options.desiredCredits) notices.push({ kind: "target-overage", credits: selectedCredits - options.desiredCredits });
-  const collisionBlocked = available.some((candidate) => {
+  if (options.desiredCredits !== undefined && selectedCredits < options.desiredCredits) notices.push({ kind: "target-shortfall", credits: options.desiredCredits - selectedCredits });
+  if (options.desiredCredits !== undefined && selectedCredits > options.desiredCredits) notices.push({ kind: "target-overage", credits: selectedCredits - options.desiredCredits });
+  const collisionBlocked = options.desiredCredits !== undefined && available.some((candidate) => {
+    if (options.desiredCredits === undefined) return false;
     if (!visitCandidate()) return false;
     if (selected.includes(candidate)) return false;
     if (options.maxCourses && options.maxCourses > 0 && selected.length >= options.maxCourses) return false;
@@ -614,25 +653,55 @@ export function buildSemesterPlan(
   if (selected.some((course) => course.programEligibility === "unknown")) notices.push({ kind: "program-restriction-unknown" });
   notices.push({ kind: "registration-limit-unknown" }, { kind: "corequisites-unknown" });
 
-  const selectedSchedule = compatibleSchedule as GeneratedSchedule | null;
-  const compatibleSectionConstraints = selectedSchedule?.selections.map((selection) => ({
-    courseCode: selection.courseCode,
-    branchCode: selection.branchCode,
-    courseId: selection.courseId,
-    sectionId: selection.sectionId,
-    crn: selection.crn,
-  })) ?? [];
+  const sharedNotices = notices.filter((notice) =>
+    notice.kind !== "target-shortfall" && notice.kind !== "target-overage" &&
+    notice.kind !== "collision-shortfall" && notice.kind !== "max-courses" &&
+    notice.kind !== "program-restriction-unknown",
+  );
+  const weeklyPrograms: SemesterWeeklyProgram[] = rankedAssignments.map(({ courses, schedule }) => {
+    const recommendations = courses.map((course) => {
+      const chosen = schedule.selections.find((selection) => selection.courseCode === course.code);
+      return { ...course, ...(chosen?.programEligibility ? {
+        programEligibility: chosen.programEligibility === "eligible" ? "eligible" as const : "unknown" as const,
+      } : {}) };
+    });
+    const credits = recommendations.reduce((sum, course) => sum + course.credits, 0);
+    const programNotices: PlannerNotice[] = [...sharedNotices];
+    if (options.desiredCredits !== undefined && credits < options.desiredCredits) programNotices.push({ kind: "target-shortfall", credits: options.desiredCredits - credits });
+    if (options.desiredCredits !== undefined && credits > options.desiredCredits) programNotices.push({ kind: "target-overage", credits: credits - options.desiredCredits });
+    if (options.maxCourses && recommendations.length >= options.maxCourses && available.length > recommendations.length) {
+      programNotices.push({ kind: "max-courses", count: options.maxCourses });
+    }
+    if (recommendations.some((course) => course.programEligibility === "unknown")) programNotices.push({ kind: "program-restriction-unknown" });
+    if (schedule.id === compatibleSchedule?.id && notices.some((notice) => notice.kind === "collision-shortfall")) programNotices.push({ kind: "collision-shortfall" });
+    return {
+      recommendations,
+      schedule,
+      selectedCredits: credits,
+      selectedEcts: recommendations.reduce((sum, course) => sum + course.ects, 0),
+      compatibleSectionConstraints: schedule.selections,
+      programSummaries: programSummaries.map((summary) => {
+        const contributing = recommendations.filter((course) => course.contributions.some((value) => value.enrollmentId === summary.enrollmentId));
+        return { ...summary, selectedCredits: contributing.reduce((sum, course) => sum + course.credits, 0), selectedCourses: contributing.length };
+      }),
+      notices: programNotices,
+    };
+  });
 
+  const primaryProgram = weeklyPrograms[0] ?? {
+    recommendations: [],
+    schedule: null,
+    programSummaries,
+    selectedCredits: 0,
+    selectedEcts: 0,
+    compatibleSectionConstraints: [],
+    notices,
+  };
   return {
+    ...primaryProgram,
+    weeklyPrograms,
     searchLimited,
     searchStats,
-    recommendations: selected,
-    alternatives: available.filter((candidate) => !selected.includes(candidate)).sort((first, second) => second.score - first.score || first.code.localeCompare(second.code)),
-    programSummaries,
-    selectedCredits,
-    selectedEcts,
     combinedRemainingCredits: combinedRemainingCredits(programs),
-    compatibleSectionConstraints,
-    notices,
   };
 }

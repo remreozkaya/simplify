@@ -54,3 +54,19 @@ it("includes a minor's own elective requirement through minor-only section permi
  expect(elective.programEligibility).toBe("eligible");
  expect(elective.contributions).toMatchObject([{enrollmentType:"minor",requirementKind:"elective"}]);
 });
+
+it("prefers fewer unverified restrictions over a more compact alternative timetable", () => {
+  const main = program("BLG_LS", "BLG 101");
+  const second = program("MAT_LS", "MAT 101", "double-major");
+  const unknown = offering("BLG 101", undefined);
+  const verified = offering("MAT 101", "MAT_LS", "Tuesday");
+  const fallback = offering("MAT 101", undefined);
+  const data = [unknown, { ...verified, sections: [
+    { ...verified.sections[0], id: "verified", crn: "verified" },
+    { ...fallback.sections[0], id: "unknown", crn: "unknown", meetings: [{ id: "later", day: "Monday" as const, startTime: "10:00", endTime: "11:00" }] },
+  ] }];
+  const plan = buildSemesterPlan([main, second], options(data));
+  expect(plan.weeklyPrograms).toHaveLength(1);
+  expect(plan.weeklyPrograms[0].schedule.unknownRestrictionCount).toBe(1);
+  expect(plan.weeklyPrograms[0].recommendations.find(course => course.code === "MAT 101")?.programEligibility).toBe("eligible");
+});

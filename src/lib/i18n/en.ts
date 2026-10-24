@@ -297,16 +297,16 @@ const en = {
     completeProfile: "Complete your academic profile",
     completeProfileDescription:
       "Select your main program and curriculum plan before generating semester recommendations.",
-    targetSemester: "Target Semester",
-    publishedSemester: "Current published semester",
     desiredCredits: "Credits",
-    localCreditHint: "Uses local credits, not ECTS.",
     maximumCourses: "Max Course Count",
     programPriority: "Priority",
     balanced: "Balanced",
     generate: "Generate Recommendations",
     checkingOfferings: "Checking offerings…",
     offeringsWarning: "Some course offerings could not be verified: {error}",
+    optional: "Optional",
+    missingLimits: "Enter credits or a maximum course count greater than 0.",
+    targetCourseCount: "Up to {count} courses",
     invalidCredits: "Credits must be a valid number from 0 to {max}.",
     invalidMaximumCourses:
       "Max Course Count must be a whole number from 0 to {max}; 0 means unlimited.",
@@ -326,7 +326,10 @@ const en = {
       "No suitable recommendation was found for this target and the currently known conditions.",
     removedCourses: "Removed courses",
     restore: "Restore",
-    alternatives: "{count} academic alternatives",
+    alternativePrograms: "{count} alternative programs",
+    weeklyProgram: "Program {number}",
+    programCourseCount: "{count} courses",
+    selectProgram: "Select this program",
     emptyState: "No semester plan yet.",
     eligibility_confirmed: "Eligibility confirmed",
     eligibility_conditional: "Conditional on passing",
@@ -346,9 +349,9 @@ const en = {
     locked: "Locked",
     replace: "Remove and replace",
     notice_target_shortfall:
-      "The closest valid plan is {credits} credits below your target.",
+      "This program is {credits} credits below your target.",
     notice_target_overage:
-      "The closest valid plan is {credits} credits above your target.",
+      "This program is {credits} credits above your target.",
     notice_collision_shortfall:
       "Published meeting conflicts prevent an exact credit target. The best conflict-free plan is shown.",
     notice_max_courses: "The {count}-course maximum was reached.",

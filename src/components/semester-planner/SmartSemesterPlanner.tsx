@@ -41,8 +41,6 @@ import {
 } from "@/lib/itu/courseCode.mjs";
 import { orderedEnrollments } from "@/lib/profile/validation";
 import {
-  GENERATOR_SESSION_STORAGE_KEY,
-  parseGeneratorSession,
   persistGeneratorSession,
 } from "@/lib/schedule/session";
 import {
@@ -98,13 +96,13 @@ export default function SmartSemesterPlanner() {
   const [programs, setPrograms] = useState<SemesterPlannerProgram[]>([]);
   const [loading, setLoading] = useState(enrollments.length > 0);
   const [error, setError] = useState("");
-  const [targetSemester, setTargetSemester] = useState("published");
-  const [desiredCreditsInput, setDesiredCreditsInput] = useState("18.00");
-  const [maxCoursesInput, setMaxCoursesInput] = useState("6");
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const [desiredCreditsInput, setDesiredCreditsInput] = useState("");
+  const [maxCoursesInput, setMaxCoursesInput] = useState("");
   const [priority, setPriority] = useState<ProgramPriority>("balanced");
   const [request, setRequest] = useState<{
-    desiredCredits: number;
-    maxCourses: number;
+    desiredCredits?: number;
+    maxCourses?: number;
     priority: ProgramPriority;
   } | null>(null);
   const [validationError, setValidationError] = useState("");
@@ -194,7 +192,7 @@ export default function SmartSemesterPlanner() {
   );
 
   const programsCurrent = JSON.stringify(enrollments) === JSON.stringify(programs.map((program) => program.enrollment));
-  const plan = useMemo<SemesterPlan | null>(() => {
+  const generatedPlan = useMemo<SemesterPlan | null>(() => {
     if (!request || !programsCurrent || !enrollments.length) return null;
     return buildSemesterPlan(programs, {
       desiredCredits: request.desiredCredits,
@@ -212,37 +210,48 @@ export default function SmartSemesterPlanner() {
     });
   }, [request, programs, loadedBranchCodes, courseCatalog, courseOfferings, profile.programEnrollments, programsCurrent, enrollments.length]);
 
+  const selectedProgramIndex = Math.max(0, generatedPlan?.weeklyPrograms.findIndex(
+    (program) => program.schedule.id === selectedProgramId,
+  ) ?? 0);
+  const selectedProgram = generatedPlan?.weeklyPrograms[selectedProgramIndex];
+  const plan = generatedPlan ? { ...generatedPlan, ...selectedProgram } : null;
+  const alternativePrograms = generatedPlan?.weeklyPrograms
+    .map((program, index) => ({ program, index }))
+    .filter(({ program }) => program.schedule.id !== selectedProgram?.schedule.id) ?? [];
+
   useEffect(() => {
     if (plan?.recommendations.length) recordPlanningMilestone("semester");
-  }, [plan]);
+  }, [plan?.recommendations.length]);
 
   async function generateRecommendations() {
     setError("");
     setValidationError("");
-    const desiredCredits = Number(desiredCreditsInput);
-    const maxCourses = Number(maxCoursesInput);
-    if (
-      !desiredCreditsInput.trim() ||
+    const desiredCredits = desiredCreditsInput.trim() ? Number(desiredCreditsInput) : undefined;
+    const maxCourses = maxCoursesInput.trim() ? Number(maxCoursesInput) : undefined;
+    if (desiredCredits !== undefined && (
       !Number.isFinite(desiredCredits) ||
       desiredCredits < 0 ||
       desiredCredits > MAX_PLANNER_CREDITS
-    ) {
+    )) {
       setValidationError(
         t("semesterPlanner.invalidCredits", { max: formatCredits(MAX_PLANNER_CREDITS) }),
       );
       return;
     }
-    if (
-      !maxCoursesInput.trim() ||
+    if (maxCourses !== undefined && (
       !Number.isInteger(maxCourses) ||
       maxCourses < 0 ||
       maxCourses > MAX_PLANNER_COURSES
-    ) {
+    )) {
       setValidationError(
         t("semesterPlanner.invalidMaximumCourses", {
           max: MAX_PLANNER_COURSES,
         }),
       );
+      return;
+    }
+    if (desiredCredits === undefined && !(maxCourses !== undefined && maxCourses > 0)) {
+      setValidationError(t("semesterPlanner.missingLimits"));
       return;
     }
     const nextRequest = { desiredCredits, maxCourses, priority };
@@ -252,6 +261,7 @@ export default function SmartSemesterPlanner() {
         ...new Set(semesterPlannerCandidateCodes(programs).map(branchForCode)),
       ];
       await Promise.all(branches.map((branch) => loadBranch(branch)));
+      setSelectedProgramId(null);
       setRequest(nextRequest);
     } catch (reason: unknown) {
       setError(
@@ -266,15 +276,6 @@ export default function SmartSemesterPlanner() {
 
   function sendToGenerator() {
     if (!plan?.recommendations.length) return;
-    let previous = null;
-    try {
-      const value = localStorage.getItem(GENERATOR_SESSION_STORAGE_KEY);
-      previous = value
-        ? parseGeneratorSession(JSON.parse(value) as unknown)
-        : null;
-    } catch {
-      previous = null;
-    }
     const courses = plan.recommendations.map((recommendation, index) => {
       const constraint = plan.compatibleSectionConstraints.find(
         (value) => value.courseCode === recommendation.code,
@@ -298,14 +299,10 @@ export default function SmartSemesterPlanner() {
     const saved = persistGeneratorSession({
       version: 2,
       courses,
-      earliestStartTime: previous?.earliestStartTime ?? "",
-      latestEndTime: previous?.latestEndTime ?? "",
-      excludedDays: previous?.excludedDays ?? [],
+      earliestStartTime: "",
+      latestEndTime: "",
+      excludedDays: [],
       source: "semester-planner",
-      targetSemester,
-      plannerAlternatives: plan.alternatives
-        .slice(0, 8)
-        .map((course) => course.code),
     });
     if (!saved) {
       setError(t("home.planningStorageError"));
@@ -354,29 +351,14 @@ export default function SmartSemesterPlanner() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div
           data-testid="planner-config-fields"
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
         >
-          <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
-            {t("semesterPlanner.targetSemester")}
-            <select
-              value={targetSemester}
-              onChange={(event) => setTargetSemester(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal dark:border-slate-700 dark:bg-slate-950"
-            >
-              <option value="published">
-                {t("semesterPlanner.publishedSemester")}
-              </option>
-            </select>
-          </label>
           <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
             {t("semesterPlanner.desiredCredits")}
             <input
-              aria-describedby="planner-credit-hint"
-              type="number"
-              lang="en"
-              min={0}
-              max={MAX_PLANNER_CREDITS}
-              step={0.5}
+              type="text"
+              inputMode="decimal"
+              placeholder={t("semesterPlanner.optional")}
               value={desiredCreditsInput}
               onChange={(event) => setDesiredCreditsInput(event.target.value)}
               onBlur={() => {
@@ -387,17 +369,12 @@ export default function SmartSemesterPlanner() {
               }}
               className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal dark:border-slate-700 dark:bg-slate-950"
             />
-            <span
-              id="planner-credit-hint"
-              className="mt-1 block text-xs font-normal text-slate-500"
-            >
-              {t("semesterPlanner.localCreditHint")}
-            </span>
           </label>
           <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
             {t("semesterPlanner.maximumCourses")}
             <input
               aria-describedby="planner-max-hint"
+              placeholder={t("semesterPlanner.optional")}
               type="number"
               min={0}
               max={MAX_PLANNER_COURSES}
@@ -483,9 +460,9 @@ export default function SmartSemesterPlanner() {
             <Summary
               label={t("semesterPlanner.courseCount")}
               value={String(plan.recommendations.length)}
-              detail={t("semesterPlanner.targetCount", {
-                credits: number(request?.desiredCredits ?? 0),
-              })}
+              detail={request?.desiredCredits !== undefined
+                ? t("semesterPlanner.targetCount", { credits: number(request.desiredCredits) })
+                : request?.maxCourses ? t("semesterPlanner.targetCourseCount", { count: request.maxCourses }) : undefined}
             />
             <Summary
               label={t("semesterPlanner.combinedRemaining")}
@@ -584,47 +561,35 @@ export default function SmartSemesterPlanner() {
             )}
           </section>
 
-          {plan.alternatives.length ? (
+          {alternativePrograms.length ? (
             <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <summary className="cursor-pointer font-semibold">
-                {t("semesterPlanner.alternatives", {
-                  count: plan.alternatives.length,
-                })}
+                {t("semesterPlanner.alternativePrograms", { count: alternativePrograms.length })}
               </summary>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {plan.alternatives.slice(0, 12).map((course) => (
-                  <div
-                    key={course.code}
-                    className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950"
-                  >
-                    <p className="font-semibold">
-                      {course.code} ·{" "}
-                      {localizedCourseTitle(
-                        {
-                          name: course.title,
-                          nameTr: course.titleTr,
-                          nameEn: course.titleEn,
-                        },
-                        language,
-                      )}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatCredits(course.credits)} {t("common.credit")} ·{" "}
-                      {course.contributions
-                        .map((value) =>
-                          localizedAcademicName(
-                            {
-                              name: value.programName,
-                              nameTr: value.programNameTr,
-                              nameEn: value.programNameEn,
-                            },
-                            language,
-                          ),
-                        )
-                        .join(" / ")}
-                    </p>
-                  </div>
+              <div className="mt-4 space-y-4">
+                {alternativePrograms.map(({ program, index }) => (
+                  <details key={program.schedule.id} className="rounded-xl bg-slate-50 p-4 dark:bg-slate-950">
+                    <summary className="cursor-pointer font-semibold">
+                      {t("semesterPlanner.weeklyProgram", { number: index + 1 })}
+                      <span className="ml-3 text-sm font-normal text-slate-600 dark:text-slate-300">
+                        {formatCredits(program.selectedCredits)} {t("common.credit")} · {t("semesterPlanner.programCourseCount", { count: program.recommendations.length })}
+                      </span>
+                      <span className="mt-1 block text-sm font-normal text-slate-500">
+                        {program.recommendations.map((course) => course.code).join(" · ")}
+                      </span>
+                    </summary>
+                    <div className="mt-4 space-y-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {program.recommendations.map((course) => <CourseCard key={course.code} course={course} />)}
+                      </div>
+                      {program.notices.filter((notice) => notice.kind === "target-shortfall" || notice.kind === "target-overage" || notice.kind === "program-restriction-unknown").map((notice) => <Notice key={notice.kind} notice={notice} />)}
+                      <button type="button" onClick={() => setSelectedProgramId(program.schedule.id)} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+                        {t("semesterPlanner.selectProgram")}
+                      </button>
+                    </div>
+                  </details>
                 ))}
+
               </div>
             </details>
           ) : null}

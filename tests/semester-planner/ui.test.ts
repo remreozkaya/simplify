@@ -10,14 +10,14 @@ const componentSource = readFileSync(
 );
 
 describe("smart semester planner interface", () => {
-  it("renders only the four requested configuration fields", () => {
+  it("renders only the three requested configuration fields", () => {
     const configBlock = componentSource.match(/data-testid="planner-config-fields"[^]*?<\/div>/u)?.[0] ?? "";
 
-    expect(configBlock).toContain('semesterPlanner.targetSemester');
+    expect(componentSource).not.toContain('targetSemester');
     expect(configBlock).toContain('semesterPlanner.desiredCredits');
     expect(configBlock).toContain('semesterPlanner.maximumCourses');
     expect(configBlock).toContain('semesterPlanner.programPriority');
-    expect(configBlock.match(/<label/g)).toHaveLength(4);
+    expect(configBlock.match(/<label/g)).toHaveLength(3);
     expect(componentSource).not.toMatch(/includeCourses|excludeCourses|inProgressCourses|targetGraduationDate/u);
   });
 
@@ -28,14 +28,14 @@ describe("smart semester planner interface", () => {
   });
 
   it("provides Turkish and English labels", () => {
-    expect(translate("tr", "semesterPlanner.targetSemester")).toBe("Hedef Dönem");
+    expect(translate("tr", "semesterPlanner.selectProgram")).toBe("Bu programı seç");
     expect(translate("tr", "semesterPlanner.desiredCredits")).toBe("Kredi");
-    expect(translate("en", "semesterPlanner.targetSemester")).toBe("Target Semester");
+    expect(translate("en", "semesterPlanner.alternativePrograms", { count: 3 })).toBe("3 alternative programs");
     expect(translate("en", "semesterPlanner.maximumCourses")).toBe("Max Course Count");
     expect(translate("en", "semesterPlanner.generate")).toBe("Generate Recommendations");
   });
 
-  it("uses responsive one, two, and four-column layouts for the inputs", () => {
-    expect(componentSource).toContain("grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4");
+  it("uses responsive one and three-column layouts for the inputs", () => {
+    expect(componentSource).toContain("grid-cols-1 gap-4 sm:grid-cols-3");
   });
 });
