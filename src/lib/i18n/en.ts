@@ -512,6 +512,10 @@ const en = {
     openWeekly: "Open weekly planner",
   },
   weeklyPlanner: {
+    openCourseInformation: "Open ITU course information (opens in a new tab)",
+    courseInformationMissing: "Information unavailable in ITU",
+    courseInformationLoading: "Checking ITU course information…",
+    courseInformationUnknown: "Could not verify ITU course information. Try reopening this popup.",
     unspecified: "Not specified",
     courseDetails: "Course details",
     closeDetails: "Close course details",

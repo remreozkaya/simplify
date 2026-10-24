@@ -11,6 +11,7 @@
     "test:run": "vitest run",
     "equivalences:import": "node scripts/import-course-equivalences.mjs",
     "equivalences:report": "node scripts/import-course-equivalences.mjs --report",
+    "course-information:audit": "node scripts/audit-course-information.mjs",
     "restrictions:import": "node scripts/import-program-restrictions.mjs",
     "curricula:import": "node scripts/import-itu-curricula.mjs",
     "curricula:prerequisites": "node scripts/import-itu-curricula.mjs --prerequisites-only",

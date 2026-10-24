@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import CourseInformationLink from "@/components/calendar/CourseInformationLink";
 import { localizedWeekday } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
 import type { CourseBlock, CourseSectionOption } from "@/types/calendar";
@@ -51,7 +52,7 @@ export default function CourseDetails({
       <div className="p-5">
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 id="course-details-title" className="text-lg font-semibold">
-            {t("weeklyPlanner.courseDetails")} · {course.code}
+            {t("weeklyPlanner.courseDetails")} · <CourseInformationLink code={course.code} />
           </h2>
           <button
             type="button"

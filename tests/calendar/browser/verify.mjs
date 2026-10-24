@@ -27,7 +27,17 @@ const catalog = { facultyCode: "MAT", semester, fetchedAt: new Date().toISOStrin
   { id: "d", code: "MAT 104", title: "Invalid CRN", localCredits: 1, sections: [section("d1", "invalid", [meeting("dl", "Friday")])] },
 ] };
 const selection = (id, courseId, sectionId) => ({ id, facultyCode: "MAT", courseId, sectionId, courseBlockIds: [] });
-const program = (id, courseSelections) => ({ id, name: id, courseSelections, courseBlocks: [], updatedAt: new Date().toISOString() });
+const program = (id, courseSelections) => {
+  const courseBlocks = courseSelections.flatMap(selection => {
+    const course = catalog.courses.find(course => course.id === selection.courseId);
+    const section = course.sections.find(section => section.id === selection.sectionId);
+    const blocks = section.meetings.map(meeting => ({ ...meeting, id: `${selection.id}-${meeting.id}`, selectionId: selection.id,
+      code: course.code, title: course.title, crn: section.crn, semester }));
+    selection.courseBlockIds = blocks.map(block => block.id);
+    return blocks;
+  });
+  return { id, name: id, courseSelections, courseBlocks, updatedAt: new Date().toISOString() };
+};
 const plans = [program("First", [selection("s1", "a", "a1"), selection("s2", "b", "b1")]), program("Second", [selection("s3", "b", "b1")]), program("Empty", [])];
 
 try {
@@ -36,6 +46,11 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, acceptDownloads: true });
   await context.route("**/api/itu/branches", (route) => route.fulfill({ json: { branches: [{ id: 1, code: "MAT" }] } }));
   await context.route("**/api/itu/courses?**", (route) => route.fulfill({ json: { catalog } }));
+  let informationState = "available";
+  await context.route("**/api/itu/course-information?**", (route) => route.fulfill({
+    status: informationState === "unknown" ? 502 : 200,
+    json: { state: informationState },
+  }));
   await context.addInitScript((plans) => {
     localStorage.setItem("simplify-weekly-programs", JSON.stringify(plans));
   }, plans);
@@ -46,6 +61,30 @@ try {
   const link = page.getByRole("link", { name: /^Fill CRNs:/ });
   const credit = (text) => page.getByRole("status").filter({ hasText: text });
   await credit("Credits: 5.5").waitFor();
+  const courseBlock = page.locator('button[aria-haspopup="dialog"]').first();
+  for (const state of ["available", "missing", "unknown"]) {
+    informationState = state;
+    await courseBlock.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    if (state === "available") {
+      const informationLink = dialog.getByRole("link", { name: /MAT 101/ });
+      await informationLink.waitFor();
+      assert.equal(await informationLink.getAttribute("href"), "https://obs.itu.edu.tr/public/DersBilgi?bransKodu=MAT&dersNo=101");
+      assert.equal(await informationLink.getAttribute("target"), "_blank");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: resolve(screenshots, "course-information-mobile.png"), fullPage: true });
+      const bounds = await dialog.boundingBox();
+      assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390);
+      await page.setViewportSize({ width: 1280, height: 1000 });
+    } else {
+      await dialog.getByRole("status").filter({ hasText: state === "missing" ? "Information unavailable" : "Could not verify" }).waitFor();
+      assert.equal(await dialog.getByRole("link").count(), 0);
+    }
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+  }
+  informationState = "available";
   const crns = async () => JSON.parse((await link.getAttribute("href")).match(/var crns=(\[[^;]+\]);/)[1]);
   assert.deepEqual(await crns(), ["00123", "98765"]);
   const snapshot = await link.getAttribute("href");
@@ -137,7 +176,7 @@ try {
       window.dispatchEvent(new Event("simplify-language-change"));
     }, language);
     await page.locator("#weekly-program").selectOption("Empty");
-    await credit(language === "en" ? "Credits: 3.5" : "Kredi: 3,5").waitFor();
+    await credit(language === "en" ? "Credits: 3.50" : "Kredi: 3.50").waitFor();
     for (const width of [1280, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });
       const exportButton = page.getByRole("button", { name: language === "en" ? "Export" : "Dışa Aktar", exact: true });
@@ -179,7 +218,7 @@ try {
   assert.deepEqual(await registration.evaluate(() => window.fixtureEvents), ["input:first:true", "input:second:true", "submit", "confirm"]);
   assert.deepEqual(await registration.locator('input[type="number"]').evaluateAll((inputs) => inputs.map((input) => input.value)), ["", "", "00123", "", "98765", ""]);
   assert.deepEqual(errors, []);
-  console.log("PASS: planner selection changes, plan switching, reordering, CRNs, native drag data, click suppression, JPEG, English/Turkish and 4 viewport widths.");
+  console.log("PASS: course information links, missing/error states, mobile popup, planner selection changes, plan switching, reordering, CRNs, native drag data, click suppression, JPEG, English/Turkish and 4 viewport widths.");
   console.log(`Screenshots: ${screenshots}`);
 } finally {
   await browser?.close();

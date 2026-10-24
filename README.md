@@ -91,8 +91,11 @@ Bundled snapshots under `src/data/itu` provide curriculum catalog data, official
 | `npm run curricula:prerequisites` | Refresh prerequisite data in the curriculum snapshot |
 | `npm run equivalences:import` | Refresh official equivalences for configured program/plan targets |
 | `npm run equivalences:report` | Inspect stored equivalences without network requests |
+| `npm run course-information:audit` | Check every current undergraduate course for an ITU information page |
 | `npm run restrictions:import` | Refresh program identities and observed section restrictions |
 | `node scripts/import-academic-translations.mjs` | Refresh official Turkish/English academic labels |
+
+The weekly planner links verified course codes to ITU course information in a new tab. Lookups are cached in memory for 24 hours. The audit command checks the current schedule and writes its report under `/tmp/simplify-course-information-audit/`, outside the app bundle. ITU errors remain unverified rather than being classified as missing.
 
 Equivalence commands accept filters such as `--plan=1561`. Import targets are maintained in `src/data/itu/equivalence-targets.json`; do not invent official equivalences. The app separately recognizes language counterparts such as `BBF 101` / `BBF 101E` and `FIZ 101L` / `FIZ 101EL`.
 

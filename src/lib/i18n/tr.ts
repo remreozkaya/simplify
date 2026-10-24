@@ -506,6 +506,10 @@ const tr = {
     openWeekly: "Haftalık planlayıcıyı aç",
   },
   weeklyPlanner: {
+    openCourseInformation: "İTÜ ders bilgisini aç (yeni sekmede açılır)",
+    courseInformationMissing: "İTÜ ders bilgisi mevcut değil",
+    courseInformationLoading: "İTÜ ders bilgisi kontrol ediliyor…",
+    courseInformationUnknown: "İTÜ ders bilgisi doğrulanamadı. Bu pencereyi yeniden açmayı deneyin.",
     unspecified: "Belirtilmedi",
     courseDetails: "Ders bilgileri",
     closeDetails: "Ders bilgilerini kapat",
