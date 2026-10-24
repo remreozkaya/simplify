@@ -67,6 +67,16 @@ function makeRecord(cells: string[], section: Exclude<Section, null>): string | 
   };
 }
 
+function makeSemesterRecord(cells: string[]): string | TranscriptCourseRecord | null {
+  const [term, crn, code, name, language, grade, counted, credit] = cells;
+  if (!grade?.trim()) return null; // Future/ungraded requirements are not attempts.
+  const countedValue = parseCredit(counted ?? "");
+  const creditValue = parseCredit(credit ?? "");
+  if (!countedValue || !creditValue) return "Credit must be a number or counted/transcript pair.";
+  const record = makeRecord([term, crn, code, name, `${countedValue.countedCredit}/${creditValue.transcriptCredit}`, grade], "calculated");
+  return typeof record === "string" ? record : { ...record, ...(language ? { courseLanguage: language.toUpperCase() } : {}) };
+}
+
 function applicableAttempts(records: Array<{ record: TranscriptCourseRecord; line: number; row: string }>) {
   const byCode = new Map<string, { record: TranscriptCourseRecord; line: number; row: string }>();
   const duplicates: TranscriptRowError[] = [];
@@ -84,29 +94,75 @@ function applicableAttempts(records: Array<{ record: TranscriptCourseRecord; lin
 export function parseTranscriptMarkdown(markdown: string): TranscriptParseResult {
   let section: Section = null;
   const calculated: Array<{ record: TranscriptCourseRecord; line: number; row: string }> = [];
+  const semesterCourses: typeof calculated = [];
   const nonCalculated: Array<{ record: TranscriptCourseRecord; line: number; row: string }> = [];
   const invalidRows: TranscriptRowError[] = [];
+  let semesterMode = false;
+  let pending: { cells: string[]; line: number; row: string } | null = null;
+
+  function flushPending() {
+    if (!pending) return;
+    const { cells, line, row } = pending;
+    pending = null;
+    if (cells.length < 8) {
+      invalidRows.push({ line, row, reason: "Incomplete semester course row." });
+      return;
+    }
+    const record = makeSemesterRecord(cells);
+    if (typeof record === "string") invalidRows.push({ line, row, reason: record });
+    else if (record) semesterCourses.push({ record, line, row });
+  }
+
   markdown.split(/\r?\n/).forEach((row, index) => {
-    const cells = cellsOf(row);
+    const cleanedRow = row.replace(/\\\s*$/, "").replace(/^(\d+)\\\./, "$1.");
+    const cells = cellsOf(cleanedRow);
     if (!cells.length) return;
     const first = cells[0].toLocaleLowerCase("tr-TR");
-    if (first === "completed english courses" || first === "ingilizce tamamlanan dersler") { section = "calculated"; return; }
-    if (first === "non-calculated courses" || first === "kullanılmayan dersler") { section = "non-calculated"; return; }
+    if (/^\d+\s*\.?\s*(?:yarıyıl|yariyil|semester)$/iu.test(first) || /^\d+(?:st|nd|rd|th)\s+semester$/iu.test(first)) {
+      flushPending(); semesterMode = true; section = "calculated"; return;
+    }
+    if (first === "completed english courses" || first === "ingilizce tamamlanan dersler") { flushPending(); semesterMode = false; section = "calculated"; return; }
+    if (first === "non-calculated courses" || first === "kullanılmayan dersler") { flushPending(); semesterMode = false; section = "non-calculated"; return; }
+    if (isHeader(cells) && cells.some((cell) => ["sayılan kredi", "counted credit"].includes(cell.toLocaleLowerCase("tr-TR")))) {
+      flushPending(); semesterMode = true; section = "calculated"; return;
+    }
     if (isSeparator(cells) || isHeader(cells) || cells.every((cell) => !cell)) return;
+    if (semesterMode) {
+      if (first === "tamamlanan" || first === "completed") { flushPending(); return; }
+      if (/^\d+$/.test(first) || (!pending && cells.length >= 8)) {
+        flushPending();
+        pending = { cells, line: index + 1, row };
+      } else if (pending) {
+        pending.cells.push(...cells);
+        pending.row += `\n${row}`;
+      }
+      if (pending && pending.cells.length >= 8) flushPending();
+      return;
+    }
     if (!section) { invalidRows.push({ line: index + 1, row, reason: "Course row appears outside a recognized section." }); return; }
     const record = makeRecord(cells, section);
     if (typeof record === "string") { invalidRows.push({ line: index + 1, row, reason: record }); return; }
     (section === "calculated" ? calculated : nonCalculated).push({ record, line: index + 1, row });
   });
-  const selectedCalculated = applicableAttempts(calculated);
+  flushPending();
+  // The English summary repeats semester rows but omits language/zero-credit courses.
+  // Prefer the detailed row for the same attempt, without reporting a duplicate import.
+  const detailedAttempts = new Set(semesterCourses.map(({ record }) => `${record.term}:${record.courseCode}`));
+  const allCalculated = [...calculated.filter(({ record }) => !detailedAttempts.has(`${record.term}:${record.courseCode}`)), ...semesterCourses];
+  const selectedCalculated = applicableAttempts(allCalculated);
   const selectedNonCalculated = applicableAttempts(nonCalculated);
   return {
-    attempts: [...calculated, ...nonCalculated].map(({ record }) => record),
+    attempts: [...allCalculated, ...nonCalculated].map(({ record }) => record),
     calculatedCourses: selectedCalculated.records,
     nonCalculatedCourses: selectedNonCalculated.records,
     invalidRows,
     duplicateRows: [...selectedCalculated.duplicates, ...selectedNonCalculated.duplicates],
   };
+}
+
+/** Total passed credits across the transcript, including unused courses. */
+export function calculateEarnedCredits(records: readonly TranscriptCourseRecord[]): number {
+  return records.reduce((sum, record) => sum + (record.completionStatus === "passed" ? record.countedCredit : 0), 0);
 }
 
 export function calculateGpa(records: readonly TranscriptCourseRecord[]): number | null {

@@ -1,0 +1,158 @@
+1. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+202420	20484
+FIZ 101E
+Physics I	EN	BA+	3	3
+202510	10167
+FIZ 101EL
+Physics I Laboratory	EN	AA	1	1
+202510	15158
+BBF 101E
+Introduction to Information Systems	EN	AA	2	2
+202510	13544
+BLG 113E
+Intr.toComp.Eng.and Ethics	EN	AA	1.5	1,5
+202420	20418
+MAT 103E
+Mathematics I	EN	AA	4	4
+202510	15163
+BBF 102E
+Linear Algebra and Applications	EN	AA	3	3
+202420	22315
+ING 100
+EAP Through Global Goals	EN	AA	3	3
+Tamamlanan	17.5	17	7
+2. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+202520	22586
+BBF 103E
+Discrete Mathematics	EN	BA+	3	3
+202420	21328
+BLG 102E
+Intr to Sci&Eng Comp (C)	EN	AA	4	4
+202510	10029
+MAT 104E
+Mathematics II	EN	AA	4	4
+202510	10226
+FIZ 102E
+Physics II	EN	AA	3	3
+202420	20531
+FIZ 102EL
+Physics II Laboratory	EN	AA	1	1
+202510	10363
+ING 112A
+Basics of Academic Writing	EN	AA	2	2
+202520	22673
+DAN 102
+Girişimcilik & Kariyer Danış.	TR	BL	0	0
+Tamamlanan	17	17	7
+3. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+202610	15121
+MAT 210E
+Engineering Mathematics	EN	AA	4	4
+202610	13495
+BLG 231E
+Digital Circuits	EN	BA	3	3
+202610	15945
+BLG 223E
+Data Structures	EN	AA	3.5	3,5
+EHB 222E
+Introduction to Electronics	EN		0	3
+202610	14356
+EEF 211E
+Basics of Electrical Circuits	EN	AA	3	3
+202520	20248
+ING 201A
+Essentials of Res.Paper Writ.	EN	AA	2	2
+Tamamlanan	15.5	18	5
+4. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+202520	22605
+BLG 252E
+Object Oriented Programming	EN	CC	3	3
+202620	23728
+BLG 222E
+Computer Organization	EN	AA	3	3
+202620	23734
+BLG 242E
+Logic Circuits Laboratory	EN	BA	1	1
+202520	22592
+BLG 202E
+Numerical Methods in CE	EN	BA+	3	3
+202620	23744
+BBF 204E
+Formal Languages and Automata	EN	BB	3	3
+202510	10705
+TUR 121
+Türk Dili I	TR	BL	0	0
+202520	20527
+ISP 101
+İspanyolca I 	EN	AA	3	3
+Tamamlanan	16	16	7
+5. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+BLG 335E
+Analysis of Algorithms I	EN		0	3
+MAT 271E
+Probability and Statistics	EN		0	3
+BLG 351E
+Microcomputer Lab.	EN		0	1
+202420	24881
+TUR 122
+Türk Dili II	TR	BL	0	0
+BLG 317E
+Database Systems	EN		0	3
+BLG 212E
+Microprocessor Systems	EN		0	3
+EHB 311E
+Intr.to Electronics Laboratory	EN		0	1
+5th Semester Elective Course (TM)	EN		0	3
+Tamamlanan	0	17	1
+6. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+BLG 322E
+Computer Architecture	EN		0	3
+202620	23819
+BLG 312E
+Computer Operating Systems	EN	AA	3	3
+BLG 336E
+Analysis of Algorithms II	EN		0	3
+202420	20772
+ATA 121
+Atatürk İlk & İnkılap Trh I	TR	BL	0	0
+BLG 354E
+Signal&Systems for Comp.Eng.	EN		0	3
+202620	23874
+BLG 374E
+Tech. Communic.for Comp.Eng.	EN	BA	1	1
+6th Semester Elective Course (TM)	EN		0	3
+Tamamlanan	4	16	3
+7. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+202510	10626
+ATA 122
+Atatürk İlk & İnkılap Trh II	TR	BL	0	0
+BLG 411E
+Software Engineering	EN		0	3
+BLG 4901E
+Computer Engineering Design I	EN		0	3
+202620	23900
+BLG 478E
+Network Security 	EN	BB+	2	2 / 3
+7th Semester Elective Course II (MT)	EN		0	2 / 3
+202520	20670
+SNT 226E
+Philosophy of Art 	EN	AA	3	3
+Tamamlanan	5	13	3
+8. Yarıyıl
+Dönem	CRN	Ders Kodu	Ders Adı	Ders Dili	Not	Sayılan Kredi	Kredi	Durum
+BLG 4902E
+Computer Engineering Design II	EN		0	5
+202420	20714
+EKO 201E
+Economics	EN	AA	3	3
+8th Semester Elective Course I (MT)	EN		0	2 / 3
+8th Semester Elective Course II (TM)	EN		0	3
+8th Semester Elective Course III (MT)	EN		0	2 / 3
+Tamamlanan	3	15	1

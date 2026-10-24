@@ -226,7 +226,7 @@ const tr = {
     openProfile: "Profili Aç",
     sharedTranscript: "Transkript",
     sharedDescription:
-      "OBS transkriptinizi yapıştırın. Önceki dersleriniz korunur.",
+      "Yarıyıl tabloları dahil tam OBS transkriptinizi yapıştırın. Önceki dersleriniz korunur.",
     importCourses: "Dersleri içe aktar",
     clearInput: "Girdiyi temizle",
     resetImported: "Transkripti sıfırla",
@@ -235,17 +235,17 @@ const tr = {
     rowsAttention: "İncelenecek satırlar",
     reviewRows: "Transkript satırlarını incele",
     transcriptCourses: "Transkript dersleri",
-    transcriptCredits: "Transkript kredileri",
+    transcriptCredits: "Toplam kazanılan kredi",
     gpaOnce: "Transkript GNO’su",
-    nonCalculated: "Hesaplanmayan dersler",
-    nonCalculatedDescription: "Bu dersler GNO ve mezuniyet hesabına katılmaz.",
+    nonCalculated: "Kullanılmayan dersler",
+    nonCalculatedDescription: "Başarıyla tamamlanan kullanılmayan dersler toplam kazanılan krediye dahildir. Programın mezuniyet gereklilikleri ayrıca değerlendirilir.",
     resetConfirm:
-      "İçe aktarılan ortak transkript ve tüm programlardaki eşleşen ilerleme sıfırlansın mı? Elle girilen ders durumları korunur.",
+      "Ortak transkript ve tüm programlardaki bütün ders durumları, elle girilen ve sıfır kredili dersler dahil sıfırlansın mı?",
     importHelp: "Transkript biçimi",
     importFormat:
-      "“İngilizce Tamamlanan Dersler” veya “Kullanılmayan Dersler” başlığını ve sütunları ekleyin: Dönem, CRN, Ders Kodu, Ders Adı, Kredi, Not. OBS’den kopyalanan sekmeli metin ve Markdown tabloları desteklenir. Kullanılmayan derslerde kredi öncesinde dil sütunu olabilir.",
+      "OBS’deki yarıyıl tablolarını Dönem, CRN, Ders Kodu, Ders Adı, Ders Dili, Not, Sayılan Kredi, Kredi ve Durum sütunlarıyla kopyalayın. Bölünmüş satırlar ve sıfır kredili BL dersleri desteklenir; notsuz satırlar ve yarıyıl toplamları atlanır. Ardındaki İngilizce tamamlanan ve kullanılmayan ders özetlerini de ekleyebilirsiniz. Eski tablo biçimi de desteklenir.",
     transcriptPlaceholder:
-      "İngilizce Tamamlanan Dersler\nDönem\tCRN\tDers Kodu\tDers Adı\tKredi\tNot",
+      "1. Yarıyıl\nDönem\tCRN\tDers Kodu\tDers Adı\tDers Dili\tNot\tSayılan Kredi\tKredi\tDurum\n202510\t10705\tTUR 121\tTürk Dili I\tTR\tBL\t0\t0",
     auditHelp:
       "Her program kendi ders planıyla değerlendirilir. Tekrar alınan derslerde en güncel dönem kullanılır.",
     gpaHelp: "GNO hesabı",

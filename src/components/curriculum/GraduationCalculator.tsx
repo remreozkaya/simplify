@@ -20,16 +20,17 @@ import {
 } from "@/lib/curriculum/graduation";
 import {
   CURRICULUM_PROGRESS_STORAGE_KEY,
+  emptyProgress,
   parseCurriculumProgress,
   persistCurriculumProgress,
-  resetImportedProgress,
-  resetAllImportedProgress,
+  resetAllCurriculumProgress,
 } from "@/lib/curriculum/progress";
 import {
   parseSavedCurriculum,
   SAVED_CURRICULUM_STORAGE_KEY,
 } from "@/lib/curriculum/selection";
 import {
+  calculateEarnedCredits,
   calculateGpa,
   parseTranscriptMarkdown,
   type TranscriptParseResult,
@@ -508,10 +509,7 @@ export default function GraduationCalculator() {
   const calculated = sharedTranscript.filter((course) => course.calculated);
   const nonCalculated = sharedTranscript.filter((course) => !course.calculated);
   const gpa = calculateGpa(calculated);
-  const calculatedCredit = calculated.reduce(
-    (sum, course) => sum + course.transcriptCredit,
-    0,
-  );
+  const earnedCredit = calculateEarnedCredits(sharedTranscript);
   const activeAudit =
     audits.find((audit) => audit.enrollment.id === activeEnrollmentId) ??
     audits[0];
@@ -567,10 +565,10 @@ export default function GraduationCalculator() {
 
   function resetImported() {
     if (!window.confirm(t("graduationCalculator.resetConfirm"))) return;
-    resetAllImportedProgress();
+    resetAllCurriculumProgress();
     const nextAudits = audits.map((audit) => ({
       ...audit,
-      progress: withoutTranscriptCopy(resetImportedProgress(audit.progress)),
+      progress: emptyProgress(audit.progress.planId),
     }));
     persistSharedTranscript([]);
     setSharedTranscript([]);
@@ -727,7 +725,7 @@ export default function GraduationCalculator() {
               <p className="text-xs font-bold uppercase text-slate-500">
                 {t("graduationCalculator.transcriptCredits")}
               </p>
-              <p className="text-2xl font-semibold">{value(calculatedCredit)}</p>
+              <p className="text-2xl font-semibold">{value(earnedCredit)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
               <p className="text-xs font-bold uppercase text-slate-500">

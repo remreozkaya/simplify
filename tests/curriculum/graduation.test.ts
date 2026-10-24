@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { EquivalenceRule } from "@/lib/curriculum/equivalence";
 import { applyTranscriptImport, calculateProgramGpa, curriculumTotals, progressForRequirement, reconcileImportedProgress } from "@/lib/curriculum/graduation";
 import { getStoredEquivalenceRules } from "@/lib/curriculum/equivalenceStore";
-import { emptyProgress, parseCurriculumProgress, resetImportedProgress, updateStoredCurriculumProgress } from "@/lib/curriculum/progress";
+import { emptyProgress, parseCurriculumProgress, updateStoredCurriculumProgress } from "@/lib/curriculum/progress";
 import { calculateGpa, parseTranscriptMarkdown } from "@/lib/curriculum/transcript";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
+import { parseElectiveGroup } from "@/lib/itu/curriculum/parsers/parseElectiveGroup";
 
 const curriculum: ItuCurriculum = {
   planId: 10, programCode: "TEST_LS", title: "Test", planTitle: "2026", totalCredit: 7,
@@ -36,6 +39,31 @@ function withRules(...rules: EquivalenceRule[]): ItuCurriculum {
 }
 
 describe("graduation progress", () => {
+  it("counts all five zero-credit BL requirements imported from the semester tables", () => {
+    const plan = structuredClone(curriculum);
+    plan.semesters = [{ semester: 1, items: ["DAN 102", "TUR 121", "TUR 122", "ATA 121", "ATA 122"].map((code) => ({
+      kind: "course", id: code, code, title: code, semester: 1, requirementType: "compulsory", creditOptions: [0], ectsOptions: [0],
+    })) }];
+    const parsed = parseTranscriptMarkdown(readFileSync(join(process.cwd(), "tests/fixtures/transcript/semester-tr.txt"), "utf8"));
+    const result = applyTranscriptImport(plan, emptyProgress(10), parsed);
+    expect(curriculumTotals(plan, result.progress)).toMatchObject({ earnedCourses: 5, earnedCredit: 0 });
+    plan.semesters[0].items.forEach((item) => expect(progressForRequirement(item, result.progress, plan)?.course).toMatchObject({ state: "passed", grade: "BL", transcriptCredit: 0 }));
+    expect(calculateProgramGpa(plan, result.progress)).toBeNull();
+  });
+
+  it("shows and counts a taken elective from the current OBS plain-text course list", () => {
+    const plan = structuredClone(curriculum);
+    const slot = plan.semesters[0].items[1];
+    if (slot.kind !== "elective-slot") throw new Error("fixture");
+    slot.courses = parseElectiveGroup(readFileSync(join(process.cwd(), "tests/fixtures/itu/curriculum/elective-plain-text.html"), "utf8")).courses;
+    const result = applyTranscriptImport(plan, emptyProgress(10), transcript("| 202620 | 1 | BLG 337E | Principles of Computer Comm. | 3 | AA |"));
+    expect(result.unmatched).toEqual([]);
+    expect(progressForRequirement(slot, result.progress, plan)).toMatchObject({
+      code: "BLG 337E", name: "Principles of Computer Comm.", course: { state: "passed", grade: "AA" },
+    });
+    expect(curriculumTotals(plan, result.progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3 });
+  });
+
   it("keeps the exact manual language code on its direct requirement before elective allocation", () => {
     const shared = structuredClone(curriculum);
     const slot = shared.semesters[0].items[1];
@@ -145,7 +173,7 @@ describe("graduation progress", () => {
     expect(result.progress.requirementSatisfactions?.["elective-a"]?.satisfactionType).toBe("elective");
   });
 
-  it("deduplicates persisted imports and reset preserves manual progress", () => {
+  it("deduplicates persisted imports while preserving manual progress", () => {
     const manual = emptyProgress(10);
     manual.courses["MAN 100"] = { state: "passed", source: "manual", grade: "BL" };
     const parsed = transcript("| 202520 | 1 | MAT 103E | Math | 4 | AA |");
@@ -154,7 +182,7 @@ describe("graduation progress", () => {
     expect(second.importedCourses).toHaveLength(1);
     const stored = updateStoredCurriculumProgress(null, second);
     expect(parseCurriculumProgress(stored, 10).courses["MAT 103E"].crn).toBe("1");
-    expect(resetImportedProgress(second).courses).toEqual({ "MAN 100": manual.courses["MAN 100"] });
+    expect(second.courses["MAN 100"]).toEqual(manual.courses["MAN 100"]);
   });
 
   it("resolves a directional, plan-specific one-to-one equivalence", () => {

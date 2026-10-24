@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { applyTranscriptImport, curriculumTotals } from "@/lib/curriculum/graduation";
 import { emptyProgress } from "@/lib/curriculum/progress";
 import { calculateGpa, parseTranscriptMarkdown } from "@/lib/curriculum/transcript";
-import { mergeTranscriptCourses, parseSharedTranscript, serializeSharedTranscript, transcriptFromLegacyProgress, transcriptFromLegacyProgressStore, transcriptParseResult } from "@/lib/curriculum/transcriptStore";
+import { mergeTranscriptCourses, parseSharedTranscript, serializeSharedTranscript, transcriptFromLegacyProgressStore, transcriptParseResult } from "@/lib/curriculum/transcriptStore";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 
 function curriculum(planId: number, programCode: string, requirementCode: string): ItuCurriculum {
@@ -29,7 +29,6 @@ describe("multi-program transcript audits", () => {
   it("stores one shared transcript and restores legacy plan imports", () => {
     const courses = [...parsed.calculatedCourses, ...parsed.nonCalculatedCourses];
     expect(parseSharedTranscript(serializeSharedTranscript(courses, "2026-09-02T00:00:00.000Z"))).toEqual(courses);
-    expect(transcriptFromLegacyProgress([{ ...emptyProgress(1), importedCourses: courses }, emptyProgress(2)])).toEqual(courses);
     expect(transcriptFromLegacyProgressStore(JSON.stringify({ version: 3, plans: { "1": { version: 3, planId: 1, courses: {}, importedCourses: courses } } }))).toEqual(courses);
   });
 

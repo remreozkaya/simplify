@@ -229,7 +229,7 @@ const en = {
     openProfile: "Open Profile",
     sharedTranscript: "Transcript",
     sharedDescription:
-      "Paste your OBS transcript. Previously imported courses are kept.",
+      "Paste your full OBS transcript, including the semester tables. Previously imported courses are kept.",
     importCourses: "Import courses",
     clearInput: "Clear input",
     resetImported: "Reset transcript",
@@ -238,18 +238,18 @@ const en = {
     rowsAttention: "Rows needing attention",
     reviewRows: "Review transcript rows",
     transcriptCourses: "Transcript courses",
-    transcriptCredits: "Transcript credits",
+    transcriptCredits: "Total earned credits",
     gpaOnce: "Transcript GPA",
-    nonCalculated: "Non-calculated courses",
+    nonCalculated: "Unused courses",
     nonCalculatedDescription:
-      "These courses do not count toward GPA or graduation.",
+      "Passed unused courses are included in total earned credits. Program graduation requirements are evaluated separately.",
     resetConfirm:
-      "Reset the shared imported transcript and matched progress for every program? Manual course states will be preserved.",
+      "Reset the shared transcript and all course states for every program, including manually entered and zero-credit courses?",
     importHelp: "Transcript format",
     importFormat:
-      "Include “Completed English Courses” or “Non-Calculated Courses” and the columns: Term, CRN, Course Code, Course Name, Credit, Grade. Tab-separated OBS text and Markdown tables are supported. Non-calculated courses may include a language column before credit.",
+      "Copy the semester tables from OBS with Term, CRN, Course Code, Course Name, Course Language, Grade, Counted Credit, Credit, and Status. Split lines and zero-credit BL courses are supported; ungraded rows and semester totals are skipped. You can include the following English-course and unused-course summaries. The older table format is also supported.",
     transcriptPlaceholder:
-      "Completed English Courses\nTerm\tCRN\tCourse Code\tCourse Name\tCredit\tGrade",
+      "1. Semester\nTerm\tCRN\tCourse Code\tCourse Name\tCourse Language\tGrade\tCounted Credit\tCredit\tStatus\n202510\t10705\tTUR 121\tTurkish I\tTR\tBL\t0\t0",
     auditHelp:
       "Each program uses its own curriculum. For repeated courses, the latest term is used.",
     gpaHelp: "GPA calculation",

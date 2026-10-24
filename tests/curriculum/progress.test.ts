@@ -50,11 +50,18 @@ describe("curriculum progress persistence", () => {
 
 
 describe("transcript reset across stored plans", () => {
-  it("clears inactive plan imports and preserves manual completions", () => {
+  it("clears every course across active and inactive plans, including manual and zero-credit completions", () => {
     const record = { term: "202510", crn: "1", courseCode: "MAT 103E", courseName: "Math", grade: "BA", countedCredit: 4, transcriptCredit: 4, completionStatus: "passed", source: "transcript", calculated: true };
     const plans = Object.fromEntries([10, 20].map((planId) => [String(planId), {
       version: 3, planId,
-      courses: { "MAT 103E": { state: "passed", source: "transcript" }, "MAN 100": { state: "passed", source: "manual", grade: "BB" } },
+      courses: {
+        "MAT 103E": { state: "passed", source: "transcript" },
+        "MAN 100": { state: "passed", source: "manual", grade: "BB" },
+        "TUR 121": { state: "passed", source: "manual", grade: "BL", countedCredit: 0, transcriptCredit: 0 },
+        "ATA 121": { state: "passed", source: "transcript", grade: "BL", countedCredit: 0, transcriptCredit: 0 },
+        "DAN 102": { state: "passed", countedCredit: 0 },
+        "TUR 122": { state: "failed", source: "manual", countedCredit: 0 },
+      },
       importedCourses: [record],
       requirementSatisfactions: {
         imported: { requirementId: "imported", requirementCourseCode: "MAT 103E", satisfiedByCourseCodes: ["MAT 103E"], satisfactionType: "direct" },
@@ -65,9 +72,9 @@ describe("transcript reset across stored plans", () => {
     const cleared = resetStoredCurriculumProgress(JSON.stringify({ version: 3, plans }));
     for (const planId of [10, 20]) {
       const progress = parseCurriculumProgress(cleared, planId);
-      expect(progress.courses).toEqual({ "MAN 100": { state: "passed", source: "manual", grade: "BB" } });
+      expect(progress.courses).toEqual({});
       expect(progress.importedCourses).toEqual([]);
-      expect(Object.keys(progress.requirementSatisfactions ?? {})).toEqual(["manual"]);
+      expect(progress.requirementSatisfactions).toEqual({});
     }
   });
   it("handles absent and malformed progress safely", () => {

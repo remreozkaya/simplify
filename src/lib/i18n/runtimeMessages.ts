@@ -47,6 +47,7 @@ const runtimeMessages: Record<string, string> = {
     "Kredi bir sayı veya sayılan/transkript çifti olmalıdır.",
   "Course row appears outside a recognized section.":
     "Ders satırı tanınan bir bölümün dışında görünüyor.",
+  "Incomplete semester course row.": "Yarıyıl ders satırı eksik.",
   "Invalid email or password.": "E-posta veya parola yanlış.",
   "Password must contain at least 8 characters.":
     "Parola en az 8 karakter olmalıdır.",

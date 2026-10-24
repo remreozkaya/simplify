@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { GRADES } from "@/lib/curriculum/grades";
-import type { CourseProgress, CurriculumProgress, TranscriptCourseRecord } from "@/lib/curriculum/types";
+import type { CourseProgress, TranscriptCourseRecord } from "@/lib/curriculum/types";
 import { normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 import type { TranscriptParseResult } from "@/lib/curriculum/transcript";
 
@@ -53,10 +53,6 @@ export function loadSharedTranscript(value: string | null, legacyProgress: strin
   if (stored !== null) return { courses: stored, migrated: false };
   const courses = transcriptFromLegacyProgressStore(legacyProgress);
   return { courses, migrated: courses.length > 0 };
-}
-
-export function transcriptFromLegacyProgress(progresses: readonly CurriculumProgress[]) {
-  return progresses.find((progress) => progress.importedCourses?.length)?.importedCourses ?? [];
 }
 
 export function transcriptFromLegacyProgressStore(value: string | null) {
