@@ -11,16 +11,36 @@ function clean(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function parseElectiveGroup(html: string): ParsedElectiveGroup {
+export function parseElectiveGroup(
+  html: string,
+  knownCourses: readonly Pick<ItuElectiveCourse, "code" | "title">[] = [],
+): ParsedElectiveGroup {
   const $ = cheerio.load(html);
   const courses: ItuElectiveCourse[] = [];
   $("table.datalist tbody tr").each((_, row) => {
     const cells = $(row).find("td");
     if (cells.length < 4) return;
-    const code = normalizeCourseCode(clean($(cells[0]).find("a").first().text()));
+    const courseCell = $(cells[0]).clone();
+    courseCell.find("br").replaceWith(" ");
+    const whole = clean(courseCell.text());
+    // OBS also renders codes as plain text followed by a <br> and the title.
+    let rawCode = clean($(cells[0]).find("a").first().text()) || whole.match(/^[A-ZÇĞİÖŞÜ]{2,8}\s*\d{2,5}[A-Z]{0,3}(?=\s|$)/u)?.[0] || "";
+    let code = normalizeCourseCode(rawCode);
+    // Some live OBS rows omit the number entirely (e.g. "ISP" / "İspanyolca I").
+    // Recover only an unambiguous identity from this same group's official snapshot.
+    const incomplete = !rawCode && whole.match(/^([A-ZÇĞİÖŞÜ]{2,8})\s+(.+)$/u);
+    if (incomplete) {
+      const matches = new Set(knownCourses.filter((course) =>
+        normalizeCourseCode(course.code).split(" ")[0] === incomplete[1] &&
+        clean(course.title).normalize("NFC") === incomplete[2].normalize("NFC"),
+      ).map((course) => normalizeCourseCode(course.code)));
+      if (matches.size === 1) {
+        rawCode = incomplete[1];
+        code = [...matches][0];
+      }
+    }
     if (!/^[A-ZÇĞİÖŞÜ]{2,8}\s\d{2,5}[A-Z]{0,3}$/u.test(code)) return;
-    const whole = clean($(cells[0]).text());
-    const title = clean(whole.slice(whole.indexOf(code) + code.length));
+    const title = clean(whole.slice(whole.indexOf(rawCode) + rawCode.length));
     if (!title) return;
     const language = normalizeCourseLanguage($(cells[1]).text());
     courses.push({

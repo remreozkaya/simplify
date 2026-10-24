@@ -85,6 +85,32 @@ describe("ITU curriculum parsers", () => {
     expect(group.courses[1].ectsOptions).toEqual([4, 5]);
   });
 
+  it("parses the plain-text course codes in current OBS elective groups", () => {
+    const group = parseElectiveGroup(fixture("elective-plain-text.html"));
+    expect(group.title).toBe("TM Elective I");
+    expect(group.courses).toHaveLength(9);
+    expect(group.courses.find((course) => course.code === "BLG 337E")).toMatchObject({
+      title: "Principles of Computer Comm.", language: "EN", creditOptions: [3], ectsOptions: [5],
+    });
+    expect(group.courses.find((course) => course.code === "BLG 442E")?.title).toBe("Tech.&Innov. Mng.for Inf.Tech.");
+  });
+
+  it("recovers incomplete language codes only from a unique same-group official identity", () => {
+    const html = fixture("elective-incomplete-codes.html");
+    const identities = [
+      { code: "ISP 101", title: "İspanyolca I" },
+      { code: "ISP 102", title: "İspanyolca II" },
+      { code: "ALM 101", title: "Almanca I" },
+    ];
+    const courses = parseElectiveGroup(html, identities).courses;
+    expect(courses.find((course) => course.code === "ISP 101")).toMatchObject({ title: "İspanyolca I", creditOptions: [3], language: "İspanyolca" });
+    expect(courses.find((course) => course.code === "ALM 101")?.title).toBe("Almanca I");
+    expect(courses.find((course) => course.code === "ARB 101")).toBeDefined();
+    expect(courses.some((course) => course.code === "ISP 201")).toBe(false);
+    expect(parseElectiveGroup(html).courses.some((course) => course.code === "ISP 101")).toBe(false);
+    expect(parseElectiveGroup(html, [...identities, { code: "ISP 999", title: "İspanyolca I" }]).courses.some((course) => course.code === "ISP 101")).toBe(false);
+  });
+
   it("deduplicates repeated elective group requests across distinct slots", () => {
     const curriculum = parseCurriculumDetail(
       fixture("detail.html"),

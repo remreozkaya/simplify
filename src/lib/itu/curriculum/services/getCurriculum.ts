@@ -17,6 +17,7 @@ import type {
 } from "@/lib/itu/curriculum/types";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
 import { getStoredEquivalenceRules } from "@/lib/curriculum/equivalenceStore";
+import { readStoredCurriculumCatalog } from "@/lib/itu/curriculum/catalogStore";
 
 export function collectElectiveGroupIds(curriculum: ParsedCurriculum): number[] {
   return [
@@ -67,10 +68,17 @@ export async function getCurriculum(
   }
   const warnings: string[] = [];
   const groupIds = collectElectiveGroupIds(parsed);
+  const storedCatalog = groupIds.length ? await readStoredCurriculumCatalog() : null;
   const groupEntries = await Promise.all(
     groupIds.map(async (groupId) => {
       try {
-        return [groupId, parseElectiveGroup(await fetchElectiveGroupPage(groupId))] as const;
+        const knownCourses = (storedCatalog?.electiveGroups?.[String(groupId)]?.courses ?? [])
+          .filter((course): course is { code: string; title: string } =>
+            typeof course === "object" && course !== null &&
+            "code" in course && typeof course.code === "string" &&
+            "title" in course && typeof course.title === "string",
+          );
+        return [groupId, parseElectiveGroup(await fetchElectiveGroupPage(groupId), knownCourses)] as const;
       } catch {
         warnings.push(`Elective group ${groupId} could not be loaded.`);
         return [groupId, undefined] as const;
