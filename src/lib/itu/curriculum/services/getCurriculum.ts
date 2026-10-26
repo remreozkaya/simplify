@@ -16,7 +16,8 @@ import type {
   ParsedCurriculum,
 } from "@/lib/itu/curriculum/types";
 import { ItuObsUpstreamError } from "@/lib/itu/errors";
-import { getStoredEquivalenceRules } from "@/lib/curriculum/equivalenceStore";
+import { courseLanguageVariants } from "@/lib/itu/courseCode.mjs";
+import { getStoredEquivalenceRules, getStoredEquivalenceCoverage } from "@/lib/curriculum/equivalenceStore";
 import { readStoredCurriculumCatalog } from "@/lib/itu/curriculum/catalogStore";
 
 export function collectElectiveGroupIds(curriculum: ParsedCurriculum): number[] {
@@ -66,7 +67,10 @@ export async function getCurriculum(
   if (parsed.semesters.length === 0) {
     throw new ItuObsUpstreamError("İTÜ OBS returned a curriculum without course data.");
   }
-  const warnings: string[] = [];
+  const warnings: string[] = [getStoredEquivalenceCoverage(programCode, planId) === "unavailable"
+    ? "Official equivalence coverage is unavailable for this curriculum."
+    : "Official equivalence coverage is incomplete for this curriculum."];
+
   const groupIds = collectElectiveGroupIds(parsed);
   const storedCatalog = groupIds.length ? await readStoredCurriculumCatalog() : null;
   const groupEntries = await Promise.all(
@@ -102,7 +106,7 @@ export async function getCurriculum(
       item.kind === "elective-slot" ? item.courses.map((course) => course.code) : [],
     ),
   );
-  const allKnownCourseCodes = new Set([...courseCodes, ...electiveCourseCodes]);
+  const allKnownCourseCodes = new Set([...courseCodes, ...electiveCourseCodes].flatMap(courseLanguageVariants));
   const neededBranches = collectPrerequisiteBranchCodes(parsed);
   const prerequisites: Record<string, ItuCoursePrerequisite> = {};
   const prerequisiteBranchesLoaded: string[] = [];
@@ -132,6 +136,15 @@ export async function getCurriculum(
     prerequisiteDataAvailable = false;
     warnings.push("Prerequisite information is temporarily unavailable.");
   }
+
+  // Keep the published record authoritative. Under the existing language
+  // counterpart model, use its evidence only where the exact code is absent.
+  [...courseCodes, ...electiveCourseCodes].forEach((code) => {
+    if (prerequisites[code]) return;
+    const counterpart = courseLanguageVariants(code).slice(1)
+      .map((variant) => prerequisites[variant]).find(Boolean);
+    if (counterpart) prerequisites[code] = { ...counterpart, courseCode: code };
+  });
 
   return {
     ...parsed,

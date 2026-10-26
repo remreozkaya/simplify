@@ -1,13 +1,15 @@
+import { mergePrerequisiteProgress } from "@/lib/curriculum/progress";
 import { evaluateProgramEligibility, resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
 import {
-  evaluatePrerequisiteExpression,
+  evaluateCourseEligibility,
   getMissingPrerequisites,
 } from "@/lib/curriculum/eligibility";
 import {
   progressForRequirement,
+  requirementCredit,
   resolvedCourseProgress,
 } from "@/lib/curriculum/graduation";
-import type { CourseProgress, RequirementEvaluation } from "@/lib/curriculum/types";
+import type { CourseProgress } from "@/lib/curriculum/types";
 import { courseBranch } from "@/lib/curriculum/availability";
 import type {
   ItuCoursePrerequisite,
@@ -45,12 +47,13 @@ type MutableCandidate = Omit<SemesterCourseCandidate, "programEligibility" | "el
   prerequisiteSources: Array<{ prerequisite?: ItuCoursePrerequisite; prerequisiteKnown: boolean }>;
 };
 
-function firstCredit(item: ItuCurriculumItem) {
-  return item.creditOptions[0] ?? 0;
+function uniqueOption(options: readonly number[]): number | null {
+  const values = [...new Set(options)];
+  return values.length === 1 ? values[0] : null;
 }
 
-function firstEcts(item: ItuCurriculumItem) {
-  return item.ectsOptions[0] ?? 0;
+function requirementEcts(item: ItuCurriculumItem) {
+  return uniqueOption(item.ectsOptions);
 }
 
 function isRequirementCompleted(item: ItuCurriculumItem, program: SemesterPlannerProgram) {
@@ -90,35 +93,7 @@ function combinedProgress(programs: readonly SemesterPlannerProgram[]) {
   const canonical = new Map(programs.flatMap((program) =>
     Object.entries(program.prerequisiteProgress ?? {}).map(([code, progress]) => [normalizeCourseCode(code), progress] as const),
   ));
-  canonical.forEach((progress, code) => {
-    result[code] = progress;
-    courseLanguageVariants(code).forEach((variant) => {
-      if (!canonical.has(variant)) result[variant] = progress;
-    });
-  });
-  return result;
-}
-
-function earnedCredits(progress: Record<string, CourseProgress>) {
-  const seen = new Set<string>();
-  return Object.entries(progress).reduce((sum, [code, course]) => {
-    const actual = normalizeCourseCode(course.courseCode ?? code);
-    if (course.state !== "passed" || seen.has(actual)) return sum;
-    seen.add(actual);
-    return sum + (course.countedCredit ?? 0);
-  }, 0);
-}
-
-function evaluatePrerequisite(
-  prerequisite: ItuCoursePrerequisite | undefined,
-  progress: Record<string, CourseProgress>,
-  known: boolean,
-): RequirementEvaluation {
-  if (!known) return "unknown";
-  if (!prerequisite) return "satisfied";
-  if (prerequisite.minimumCredits !== undefined && earnedCredits(progress) < prerequisite.minimumCredits) return "unknown";
-  if (!prerequisite.expression) return "satisfied";
-  return evaluatePrerequisiteExpression(prerequisite.expression, progress);
+  return mergePrerequisiteProgress(result, Object.fromEntries(canonical));
 }
 
 function evaluateCandidateEligibility(
@@ -131,9 +106,9 @@ function evaluateCandidateEligibility(
   const missing = sources.flatMap(({ prerequisite }) => getMissingPrerequisites(prerequisite, confirmedProgress));
 
   for (const { prerequisite, prerequisiteKnown } of sources) {
-    const confirmed = evaluatePrerequisite(prerequisite, confirmedProgress, prerequisiteKnown);
+    const confirmed = evaluateCourseEligibility(prerequisite, confirmedProgress, prerequisiteKnown);
     if (confirmed === "satisfied") continue;
-    const projected = evaluatePrerequisite(prerequisite, projectedProgress, prerequisiteKnown);
+    const projected = evaluateCourseEligibility(prerequisite, projectedProgress, prerequisiteKnown);
     if (confirmed === "unsatisfied" && projected === "satisfied") {
       conditional = true;
       continue;
@@ -194,8 +169,8 @@ function unlocksForCandidate(
       reverseEdges.set(dependency, targets);
     });
     if (!dependencies.includes(code) || !prerequisitesKnown(program, target)) return;
-    const before = evaluatePrerequisite(prerequisite, progress, true);
-    const after = evaluatePrerequisite(prerequisite, simulated, true);
+    const before = evaluateCourseEligibility(prerequisite, progress, true);
+    const after = evaluateCourseEligibility(prerequisite, simulated, true);
     if (before !== "satisfied" && after === "satisfied") immediate.add(target);
   }));
 
@@ -221,6 +196,7 @@ function contributionKey(contribution: PlannerContribution) {
 
 function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
   const candidates = new Map<string, MutableCandidate>();
+  let unknownCredits = false;
   programs.forEach((program) => {
     const chosenForProgram = new Map<string, PlannerContribution>();
     program.curriculum.semesters.forEach((semester) => semester.items.forEach((item) => {
@@ -230,8 +206,8 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
         title: item.title,
         titleTr: item.nameTr,
         titleEn: item.nameEn,
-        credits: firstCredit(item),
-        ects: firstEcts(item),
+        credits: requirementCredit(item),
+        ects: requirementEcts(item),
         direct: true,
         kind: item.requirementType,
       }] : item.courses.map((course) => ({
@@ -239,13 +215,18 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
         title: course.title,
         titleTr: course.nameTr,
         titleEn: course.nameEn,
-        credits: course.creditOptions[0] ?? firstCredit(item),
-        ects: course.ectsOptions[0] ?? firstEcts(item),
+        credits: course.creditOptions.length ? uniqueOption(course.creditOptions) : requirementCredit(item),
+        ects: course.ectsOptions.length ? uniqueOption(course.ectsOptions) : requirementEcts(item),
         direct: false,
         kind: "elective" as const,
       }));
 
       choices.forEach((choice) => {
+        if (choice.ects === null) unknownCredits = true;
+        if (choice.credits === null) {
+          unknownCredits = true;
+          return;
+        }
         const code = normalizeCourseCode(choice.code);
         const contribution: PlannerContribution = {
           enrollmentId: program.enrollment.id,
@@ -274,7 +255,7 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
           prerequisiteSources: [],
         };
         existing.credits = Math.max(existing.credits, choice.credits);
-        existing.ects = Math.max(existing.ects, choice.ects);
+        existing.ects = existing.ects === null || choice.ects === null ? null : Math.max(existing.ects, choice.ects);
         const source = {
           prerequisite: prerequisiteForCode(program, code),
           prerequisiteKnown: prerequisitesKnown(program, code),
@@ -292,27 +273,32 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
       }
     });
   });
-  return candidates;
+  return { candidates, unknownCredits };
 }
 
-function remainingCreditsForProgram(program: SemesterPlannerProgram) {
-  return program.curriculum.semesters.reduce((sum, semester) => sum + semester.items.reduce((semesterSum, item) =>
-    semesterSum + (isRequirementCompleted(item, program) ? 0 : firstCredit(item)), 0), 0);
+function remainingCreditsForProgram(program: SemesterPlannerProgram): number | null {
+  let total = 0;
+  for (const semester of program.curriculum.semesters) for (const item of semester.items) {
+    if (isRequirementCompleted(item, program)) continue;
+    const credit = requirementCredit(item);
+    if (credit === null) return null;
+    total += credit;
+  }
+  return total;
 }
 
-function combinedRemainingCredits(programs: readonly SemesterPlannerProgram[]) {
+function combinedRemainingCredits(programs: readonly SemesterPlannerProgram[]): number | null {
   const direct = new Map<string, number>();
   let nonShareable = 0;
-  programs.forEach((program) => program.curriculum.semesters.forEach((semester) => semester.items.forEach((item) => {
-    if (isRequirementCompleted(item, program)) return;
+  for (const program of programs) for (const semester of program.curriculum.semesters) for (const item of semester.items) {
+    if (isRequirementCompleted(item, program)) continue;
+    const credit = requirementCredit(item);
+    if (credit === null) return null;
     if (item.kind === "course") {
       const code = normalizeCourseCode(item.code);
-      direct.set(code, Math.max(direct.get(code) ?? 0, firstCredit(item)));
-    } else {
-      // Elective overlap is not assumed to be shareable without an explicit rule.
-      nonShareable += firstCredit(item);
-    }
-  })));
+      direct.set(code, Math.max(direct.get(code) ?? 0, credit));
+    } else nonShareable += credit;
+  }
   return [...direct.values()].reduce((sum, credit) => sum + credit, nonShareable);
 }
 
@@ -340,11 +326,11 @@ function candidateSelectionScore(
     ), 0);
   }
 
-  const completionRatios = programSummaries.map((program) => {
+  const completionRatios = programSummaries.filter((program) => program.remainingCredits !== null).map((program) => {
     const selectedCredits = selected
       .filter((course) => course.contributions.some((contribution) => contribution.enrollmentId === program.enrollmentId))
       .reduce((sum, course) => sum + course.credits, 0);
-    return program.remainingCredits > 0 ? selectedCredits / program.remainingCredits : 1;
+    return program.remainingCredits !== null && program.remainingCredits > 0 ? selectedCredits / program.remainingCredits : 1;
   });
   const coveredPrograms = completionRatios.filter((ratio) => ratio > 0).length;
   const spread = completionRatios.length
@@ -461,7 +447,7 @@ function isBetterSelection(
 }
 
 export function semesterPlannerCandidateCodes(programs: readonly SemesterPlannerProgram[]) {
-  return [...collectCandidates(programs).keys()].sort();
+  return [...collectCandidates(programs).candidates.keys()].sort();
 }
 
 export function buildSemesterPlan(
@@ -481,7 +467,7 @@ export function buildSemesterPlan(
   let restrictedCourseCount = 0;
   const confirmedProgress = combinedProgress(programs);
   const notices: PlannerNotice[] = [];
-  const candidateMap = collectCandidates(programs);
+  const { candidates: candidateMap, unknownCredits } = collectCandidates(programs);
   const candidates: SemesterCourseCandidate[] = [];
   let hasUnknownEligibility = false;
   let hasUnknownAvailability = options.availabilityMode === "unknown";
@@ -528,6 +514,7 @@ export function buildSemesterPlan(
     selectedCredits: 0,
     selectedCourses: 0,
   }));
+  if (unknownCredits || programSummaries.some((program) => program.remainingCredits === null)) notices.push({ kind: "credit-data-unknown" });
   const available = candidates.sort((first, second) => second.score - first.score || first.code.localeCompare(second.code));
   const maximumCourses = options.maxCourses && options.maxCourses > 0
     ? Math.min(options.maxCourses, available.length)
@@ -678,7 +665,7 @@ export function buildSemesterPlan(
       recommendations,
       schedule,
       selectedCredits: credits,
-      selectedEcts: recommendations.reduce((sum, course) => sum + course.ects, 0),
+      selectedEcts: recommendations.reduce<number | null>((sum, course) => sum === null || course.ects === null ? null : sum + course.ects, 0),
       compatibleSectionConstraints: schedule.selections,
       programSummaries: programSummaries.map((summary) => {
         const contributing = recommendations.filter((course) => course.contributions.some((value) => value.enrollmentId === summary.enrollmentId));

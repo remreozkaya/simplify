@@ -567,3 +567,34 @@ describe("smart semester planner", () => {
     expect(minorFirst.recommendations[0].code).toBe("EKO 201");
   });
 });
+
+it("keeps unresolved requirement totals unknown while using an explicit elective choice credit", () => {
+  const slot = elective("variable", "Variable elective", ["BLG 101"]);
+  slot.creditOptions = [3, 4];
+  if (slot.kind !== "elective-slot") throw new Error("fixture");
+  slot.courses[0].creditOptions = [4];
+  const program = makeProgram("main47", "main", "undergraduate", [slot]);
+  const plan = buildSemesterPlan([program], options({ desiredCredits: 4 }));
+  expect(plan.selectedCredits).toBe(4);
+  expect(plan.programSummaries[0].remainingCredits).toBeNull();
+  expect(plan.combinedRemainingCredits).toBeNull();
+  expect(plan.notices).toContainEqual({ kind: "credit-data-unknown" });
+});
+
+it("does not invent a first-option credit for an unresolved course recommendation", () => {
+  const item = course("variable", "BLG 101");
+  item.creditOptions = [3, 4];
+  const plan = buildSemesterPlan([makeProgram("main48", "main", "undergraduate", [item])], options({ desiredCredits: 3 }));
+  expect(plan.recommendations).toEqual([]);
+  expect(plan.notices).toContainEqual({ kind: "credit-data-unknown" });
+});
+
+it("keeps a course with known local credit eligible when its ECTS is unresolved", () => {
+  const item = course("unknown-ects", "BLG 101");
+  item.ectsOptions = [];
+  const plan = buildSemesterPlan([makeProgram("main49", "main", "undergraduate", [item])], options({ desiredCredits: 3 }));
+  expect(plan.recommendations.map(course => course.code)).toEqual(["BLG 101"]);
+  expect(plan.selectedCredits).toBe(3);
+  expect(plan.selectedEcts).toBeNull();
+  expect(plan.notices).toContainEqual({ kind: "credit-data-unknown" });
+});

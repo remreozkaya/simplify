@@ -1,5 +1,7 @@
 "use client";
 
+import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
+
 import { resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
 
 import { responseJson } from "@/lib/http/responseJson";
@@ -348,6 +350,12 @@ export default function SmartSemesterPlanner() {
 
   return (
     <div className="space-y-6">
+      {programs.map((program) => program.curriculum.warnings.length ? (
+        <div key={program.enrollment.id} className="space-y-2">
+          <p className="text-sm font-semibold">{localizedAcademicName({ name: program.enrollment.programName, nameTr: program.enrollment.programNameTr, nameEn: program.enrollment.programNameEn }, language)}</p>
+          <CurriculumWarnings warnings={program.curriculum.warnings} />
+        </div>
+      ) : null)}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div
           data-testid="planner-config-fields"
@@ -639,6 +647,8 @@ function Notice({ notice }: { notice: PlannerNotice }) {
       {t(
         notice.kind === "search-limited"
           ? "semesterPlanner.searchLimited"
+          : notice.kind === "credit-data-unknown"
+          ? "curriculum.creditUncertainty"
           : `semesterPlanner.notice_${notice.kind.replaceAll("-", "_")}`,
         parameters,
       )}

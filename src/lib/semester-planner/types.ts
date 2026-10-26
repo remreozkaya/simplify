@@ -36,7 +36,7 @@ export type SemesterCourseCandidate = {
   titleTr?: string;
   titleEn?: string;
   credits: number;
-  ects: number;
+  ects: number | null;
   contributions: PlannerContribution[];
   eligibility: PlannerEligibility;
   availability: PlannerAvailability;
@@ -71,12 +71,13 @@ export type PlannerProgramSummary = {
   programName: string;
   programNameTr?: string;
   programNameEn?: string;
-  remainingCredits: number;
+  remainingCredits: number | null;
   selectedCredits: number;
   selectedCourses: number;
 };
 
 export type PlannerNotice =
+  | { kind: "credit-data-unknown" }
   | { kind: "target-shortfall"; credits: number }
   | { kind: "target-overage"; credits: number }
   | { kind: "collision-shortfall" }
@@ -94,7 +95,7 @@ export type SemesterWeeklyProgram = {
   recommendations: SemesterCourseCandidate[];
   programSummaries: PlannerProgramSummary[];
   selectedCredits: number;
-  selectedEcts: number;
+  selectedEcts: number | null;
   compatibleSectionConstraints: PlannerSectionConstraint[];
   notices: PlannerNotice[];
 };
@@ -102,7 +103,7 @@ export type SemesterWeeklyProgram = {
 export type SemesterPlan = Omit<SemesterWeeklyProgram, "schedule"> & {
   schedule: GeneratedSchedule | null;
   weeklyPrograms: SemesterWeeklyProgram[];
-  combinedRemainingCredits: number;
+  combinedRemainingCredits: number | null;
   searchLimited: boolean;
   searchStats: { candidateVisits: number; scheduleVisitedNodes: number };
 };

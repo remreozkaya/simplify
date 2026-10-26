@@ -49,7 +49,11 @@ export async function saveProfileAction(input: unknown): Promise<ProfileActionSt
         enrollment.primaryProgramCode = main.programCode;
         enrollment.targetProgramCode = enrollment.programCode;
         const associated = officialPlan.associatedPrimaryProgramCodes ?? [];
-        if (!isPrimaryProgramEligible(associated, main.programCode)) {
+        const eligible = isPrimaryProgramEligible(associated, main.programCode);
+        if (eligible === undefined) {
+          return { status: "error", message: "Eligibility for the selected secondary curriculum could not be verified. Review the official main-program associations." };
+        }
+        if (!eligible) {
           return { status: "error", message: "The selected secondary plan is not available to the main program.", fieldErrors: { programEnrollments: "Select a plan associated with the main program." } };
         }
         enrollment.associatedPrimaryProgramCodes = associated;

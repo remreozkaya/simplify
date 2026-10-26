@@ -1,6 +1,8 @@
 import { translations, type Language } from "@/lib/i18n/translations";
 
 const runtimeMessages: Record<string, string> = {
+  "Official equivalence coverage is unavailable for this curriculum.": "Bu ders planı için resmî denklik kapsamı verisi mevcut değil.",
+  "Official equivalence coverage is incomplete for this curriculum.": "Bu ders planı için resmî denklik kapsamı eksik.",
   "Email is required.": "E-posta gereklidir.",
   "Enter a valid email address.": "Geçerli bir e-posta adresi girin.",
   "Password is required.": "Parola gereklidir.",
@@ -27,6 +29,8 @@ const runtimeMessages: Record<string, string> = {
   "Your profile could not be saved right now. Try again.":
     "Profiliniz şu anda kaydedilemedi. Yeniden deneyin.",
   "Profile saved.": "Profil kaydedildi.",
+  "Eligibility for the selected secondary curriculum could not be verified. Review the official main-program associations.":
+    "Seçilen ikincil ders planı için uygunluk doğrulanamadı. Resmî anadal programı ilişkilerini inceleyin.",
   "Password changed.": "Parola değiştirildi.",
   "The request failed.": "İstek başarısız oldu.",
   "Faculties could not be loaded.": "Fakülteler yüklenemedi.",

@@ -120,6 +120,7 @@ const tr = {
     changingPassword: "Parola değiştiriliyor…",
     facultiesLoadError: "Fakülteler yüklenemedi.",
     programsLoadError: "Programlar yüklenemedi.",
+    planEligibilityUnknown: "Uygunluk doğrulanamadı",
     plansLoadError: "Ders planları yüklenemedi.",
     nameField: "ad",
     surnameField: "soyad",
@@ -366,6 +367,7 @@ const tr = {
     planNotices: "Plan uyarıları",
   },
   curriculum: {
+    creditUncertainty: "Geçerli ders planı kredileri belirsiz olduğundan bazı kredi toplamları hesaplanamıyor.",
     notTaken: "Alınmadı",
     passed: "Geçti",
     failed: "Kaldı",

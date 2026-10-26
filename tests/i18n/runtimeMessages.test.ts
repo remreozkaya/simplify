@@ -110,3 +110,10 @@ describe("runtime message localization", () => {
     expect(localizeRuntimeMessage("en", tr)).toBe(en);
   });
 });
+
+it.each([
+  ["Official equivalence coverage is unavailable for this curriculum.", "Bu ders planı için resmî denklik kapsamı verisi mevcut değil."],
+  ["Official equivalence coverage is incomplete for this curriculum.", "Bu ders planı için resmî denklik kapsamı eksik."],
+])("localizes equivalence coverage limitations: %s", (message, expected) => {
+  expect(localizeRuntimeMessage("tr", message)).toBe(expected);
+});

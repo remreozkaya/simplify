@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseCurriculumProgress,
+  mergePrerequisiteProgress,
   resetStoredCurriculumProgress,
   updateStoredCurriculumProgress,
 } from "@/lib/curriculum/progress";
@@ -81,4 +82,22 @@ describe("transcript reset across stored plans", () => {
     expect(JSON.parse(resetStoredCurriculumProgress(null)).plans).toEqual({});
     expect(JSON.parse(resetStoredCurriculumProgress("broken")).plans).toEqual({});
   });
+});
+
+
+it.each(["MAT 103", "MAT 103E"])("keeps canonical transcript grades over manual %s prerequisites", (manualCode) => {
+  const merged = mergePrerequisiteProgress({
+    [manualCode]: { state: "passed", grade: "AA", source: "manual" },
+  }, { "MAT 103": { state: "failed", grade: "FF", source: "transcript", courseCode: "MAT 103" } });
+  expect(merged["MAT 103"]).toMatchObject({ state: "failed", grade: "FF" });
+  expect(merged["MAT 103E"]).toMatchObject({ state: "failed", grade: "FF" });
+});
+
+it("retains each exact transcript attempt when both language codes are present", () => {
+  const merged = mergePrerequisiteProgress({}, {
+    "FIZ 101": { state: "failed", grade: "FF" },
+    "FIZ 101E": { state: "passed", grade: "BA" },
+  });
+  expect(merged["FIZ 101"].grade).toBe("FF");
+  expect(merged["FIZ 101E"].grade).toBe("BA");
 });

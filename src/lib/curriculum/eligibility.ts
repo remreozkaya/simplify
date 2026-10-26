@@ -9,7 +9,7 @@ import type {
   RequirementEvaluation,
 } from "@/lib/curriculum/types";
 import { GRADE_POINTS } from "@/lib/curriculum/grades";
-import { courseLanguageVariants } from "@/lib/itu/courseCode.mjs";
+import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
 export function evaluatePrerequisiteExpression(
   expression: PrerequisiteExpression,
@@ -42,6 +42,22 @@ export function evaluatePrerequisiteExpression(
   return "unsatisfied";
 }
 
+/** A lower bound from explicit counted credits; aliases cannot add credits twice. */
+function establishedEarnedCredits(progress: Record<string, CourseProgress>): number {
+  const creditsByCourse = new Map<string, number | null>();
+  Object.entries(progress).forEach(([code, course]) => {
+    if (course.state !== "passed") return;
+    const actualCode = course.courseCode
+      ? normalizeCourseCode(course.courseCode)
+      : [...courseLanguageVariants(code)].sort()[0];
+    const credit = course.countedCredit;
+    const known = typeof credit === "number" && Number.isFinite(credit) && credit >= 0 ? credit : null;
+    if (!creditsByCourse.has(actualCode)) creditsByCourse.set(actualCode, known);
+    else if (creditsByCourse.get(actualCode) !== known) creditsByCourse.set(actualCode, null);
+  });
+  return [...creditsByCourse.values()].reduce<number>((sum, credit) => sum + (credit ?? 0), 0);
+}
+
 export function evaluateCourseEligibility(
   prerequisite: ItuCoursePrerequisite | undefined,
   progress: Record<string, CourseProgress>,
@@ -49,9 +65,12 @@ export function evaluateCourseEligibility(
 ): RequirementEvaluation {
   if (!prerequisiteDataKnown) return "unknown";
   if (!prerequisite) return "satisfied";
-  if (prerequisite.minimumCredits !== undefined) return "unknown";
-  if (!prerequisite.expression) return "satisfied";
-  return evaluatePrerequisiteExpression(prerequisite.expression, progress);
+  const expression = prerequisite.expression
+    ? evaluatePrerequisiteExpression(prerequisite.expression, progress)
+    : "satisfied";
+  if (expression === "unsatisfied") return "unsatisfied";
+  if (prerequisite.minimumCredits !== undefined && establishedEarnedCredits(progress) < prerequisite.minimumCredits) return "unknown";
+  return expression;
 }
 
 export function getCourseStatus(
@@ -96,7 +115,7 @@ export function getMissingPrerequisites(
 ): MissingRequirement[] {
   if (!prerequisite) return [];
   const missing: MissingRequirement[] = [];
-  if (prerequisite.minimumCredits !== undefined) {
+  if (prerequisite.minimumCredits !== undefined && establishedEarnedCredits(progress) < prerequisite.minimumCredits) {
     missing.push({ kind: "credits", minimumCredits: prerequisite.minimumCredits });
   }
   if (!prerequisite.expression) return missing;

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   evaluatePrerequisiteExpression,
+  evaluateCourseEligibility,
+  getMissingPrerequisites,
   getCourseStatus,
   isCourseTakeableThisSemester,
 } from "@/lib/curriculum/eligibility";
@@ -133,5 +135,33 @@ describe("curriculum eligibility", () => {
       {},
       new Set(["YZV 411"]),
     )).toBe(true);
+  });
+});
+
+
+describe("minimum-credit prerequisite evidence", () => {
+  const requirement = { courseCode: "BLG 4901E", minimumCredits: 6 };
+  it("accepts a threshold established by unique passed counted credits", () => {
+    const progress = {
+      "MAT 103": { state: "passed" as const, courseCode: "MAT 103", countedCredit: 4 },
+      "MAT 103E": { state: "passed" as const, courseCode: "MAT 103", countedCredit: 4 },
+      "FIZ 101E": { state: "passed" as const, courseCode: "FIZ 101E", countedCredit: 2 },
+    };
+    expect(evaluateCourseEligibility(requirement, progress)).toBe("satisfied");
+    expect(getMissingPrerequisites(requirement, progress)).toEqual([]);
+    expect(isCourseTakeableThisSemester("BLG 4901E", requirement, progress, new Set(["BLG 4901E"]))).toBe(true);
+  });
+  it("keeps insufficient or conflicting credit evidence unknown", () => {
+    expect(evaluateCourseEligibility(requirement, {
+      "MAT 103": { state: "passed", courseCode: "MAT 103", countedCredit: 4 },
+      "MAT 103E": { state: "passed", courseCode: "MAT 103", countedCredit: 4 },
+    })).toBe("unknown");
+    expect(evaluateCourseEligibility(requirement, {
+      "MAT 103": { state: "passed", courseCode: "MAT 103", countedCredit: 6 },
+      "MAT 103E": { state: "passed", courseCode: "MAT 103", countedCredit: 3 },
+    })).toBe("unknown");
+  });
+  it("reports an unmet course requirement even when earned-credit evidence is incomplete", () => {
+    expect(evaluateCourseEligibility({ ...requirement, expression: { kind: "course", courseCode: "MAT 103E" } }, {})).toBe("unsatisfied");
   });
 });

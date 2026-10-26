@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 import { GRADES } from "@/lib/curriculum/grades";
 import type { CourseProgress, CurriculumProgress, RequirementSatisfaction, TranscriptCourseRecord } from "@/lib/curriculum/types";
 
@@ -95,4 +96,21 @@ export function resetStoredCurriculumProgress(storedValue: string | null): strin
 export function resetAllCurriculumProgress(): void {
   localStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, resetStoredCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY)));
   window.dispatchEvent(new CustomEvent(CURRICULUM_PROGRESS_EVENT));
+}
+
+
+/** Shared transcript attempts override local progress, including failed aliases. */
+export function mergePrerequisiteProgress(
+  localProgress: Record<string, CourseProgress>,
+  transcriptProgress: Record<string, CourseProgress>,
+): Record<string, CourseProgress> {
+  const merged = { ...localProgress };
+  const canonical = new Map(Object.entries(transcriptProgress).map(([code, course]) => [normalizeCourseCode(code), course]));
+  canonical.forEach((course, code) => {
+    merged[code] = course;
+    courseLanguageVariants(code).forEach((variant) => {
+      if (!canonical.has(variant)) merged[variant] = course;
+    });
+  });
+  return merged;
 }

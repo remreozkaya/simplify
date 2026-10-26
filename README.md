@@ -97,7 +97,16 @@ Bundled snapshots under `src/data/itu` provide curriculum catalog data, official
 
 The weekly planner links verified course codes to ITU course information in a new tab. Lookups are cached in memory for 24 hours. The audit command checks the current schedule and writes its report under `/tmp/simplify-course-information-audit/`, outside the app bundle. ITU errors remain unverified rather than being classified as missing.
 
-Equivalence commands accept filters such as `--plan=1561`. Import targets are maintained in `src/data/itu/equivalence-targets.json`; do not invent official equivalences. The app separately recognizes language counterparts such as `BBF 101` / `BBF 101E` and `FIZ 101L` / `FIZ 101EL`.
+Equivalence commands accept filters such as `--plan=1561`. The default refresh selection in `src/data/itu/equivalence-targets.json` currently contains six Computer Engineering plans; it is not a university-wide coverage manifest. Supply another verified target set without editing that file:
+
+```sh
+npm run equivalences:import -- --targets=/absolute/path.json
+npm run equivalences:import -- --targets=/absolute/path.json --plan=1561
+```
+
+The external JSON uses the same array schema as the bundled targets: `programId`, `programCode`, `planTypeId`, `planType`, and `planId`. Copy these identities from official OBS evidence; do not guess program IDs or invent equivalences. Existing rules outside the selected refresh targets are preserved.
+
+The stored rules and import failures do not record a completed inventory of every official equivalence scope. An empty result therefore means evidence is unavailable, not that the curriculum has no equivalents. Existing verified rows remain usable, but exhaustive coverage is unproven and the curriculum, graduation calculator, and semester planner show an incomplete-coverage warning. Refresh selection files are not evidence of completed coverage. The app separately recognizes language counterparts such as `BBF 101` / `BBF 101E` and `FIZ 101L` / `FIZ 101EL`.
 
 Official academic labels use the selected language when an official translation is available. Course codes and source course titles remain unchanged by the interface language. Generic elective labels have interface translations; unavailable official names retain their source wording.
 

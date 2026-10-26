@@ -124,6 +124,7 @@ const en = {
     changingPassword: "Changing password…",
     facultiesLoadError: "Faculties could not be loaded.",
     programsLoadError: "Programs could not be loaded.",
+    planEligibilityUnknown: "Eligibility unverified",
     plansLoadError: "Curriculum plans could not be loaded.",
     nameField: "name",
     surnameField: "surname",
@@ -370,6 +371,7 @@ const en = {
     planNotices: "Plan notices",
   },
   curriculum: {
+    creditUncertainty: "Some credit totals are unavailable because the applicable curriculum credits are uncertain.",
     notTaken: "Not Taken",
     passed: "Passed",
     failed: "Failed",

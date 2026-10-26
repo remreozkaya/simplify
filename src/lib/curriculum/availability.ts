@@ -21,7 +21,7 @@ export function availableCoursesForElectiveSlot(
   resolvedProgress: Record<string, CourseProgress>,
   offeredCourseCodes: ReadonlySet<string>,
 ): ItuElectiveCourse[] {
-  if (progressForRequirement(slot, progress)?.course.state === "passed") return [];
+  if (progressForRequirement(slot, progress, curriculum)?.course.state === "passed") return [];
 
   return slot.courses.filter((course) =>
     isCourseTakeableThisSemester(
@@ -41,7 +41,7 @@ export function isCurriculumItemAvailableThisSemester(
   resolvedProgress: Record<string, CourseProgress>,
   offeredCourseCodes: ReadonlySet<string>,
 ): boolean {
-  if (progressForRequirement(item, progress)?.course.state === "passed") return false;
+  if (progressForRequirement(item, progress, curriculum)?.course.state === "passed") return false;
 
   if (item.kind === "elective-slot") {
     return availableCoursesForElectiveSlot(

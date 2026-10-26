@@ -1,5 +1,7 @@
 "use client";
 
+import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
+
 import { responseJson } from "@/lib/http/responseJson";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,6 +35,7 @@ import {
   CURRICULUM_PROGRESS_STORAGE_KEY,
   parseCurriculumProgress,
   persistCurriculumProgress,
+  mergePrerequisiteProgress,
 } from "@/lib/curriculum/progress";
 import {
   applyTranscriptImport,
@@ -55,6 +58,7 @@ import {
 } from "@/lib/curriculum/selection";
 import type {
   CourseDerivedStatus,
+  CourseProgress,
   CurriculumProgress,
   MissingRequirement,
 } from "@/lib/curriculum/types";
@@ -64,6 +68,7 @@ import type {
   ItuCurriculumPlan,
   ItuElectiveCourse,
   ItuElectiveSlot,
+  ItuFaculty,
   ItuUndergraduateProgram,
 } from "@/lib/itu/curriculum/types";
 import {
@@ -206,6 +211,7 @@ export default function CurriculumExplorer() {
   });
   const [showTakeableCourses, setShowTakeableCourses] = useState(false);
   const [offeringLookupKey, setOfferingLookupKey] = useState("");
+  const [unavailableProgramFaculties, setUnavailableProgramFaculties] = useState<ItuFaculty[]>([]);
   const {
     branches: courseBranches,
     courseCatalog,
@@ -249,13 +255,26 @@ export default function CurriculumExplorer() {
     }
     const controller = new AbortController();
     void fetch(
-      "/api/itu/curriculum/programs?facultyId=10&planType=undergraduate",
+      "/api/itu/curriculum/faculties",
       { signal: controller.signal },
     )
-      .then((response) =>
-        responseJson<{ programs: ItuUndergraduateProgram[] }>(response),
-      )
-      .then(({ programs: loaded }) => {
+      .then((response) => responseJson<{ faculties: ItuFaculty[] }>(response))
+      .then(async ({ faculties }) => {
+        const results = await Promise.allSettled(faculties.map(async (item) => {
+          const response = await fetch(
+            `/api/itu/curriculum/programs?facultyId=${encodeURIComponent(item.id)}&planType=undergraduate`,
+            { signal: controller.signal },
+          );
+          return (await responseJson<{ programs: ItuUndergraduateProgram[] }>(response)).programs;
+        }));
+        return {
+          programs: results.flatMap((result) => result.status === "fulfilled" ? result.value : []),
+          unavailableFaculties: faculties.filter((_, index) => results[index].status === "rejected"),
+        };
+      })
+      .then(({ programs: loaded, unavailableFaculties }) => {
+        if (controller.signal.aborted) return;
+        setUnavailableProgramFaculties(unavailableFaculties);
         setProgramsLoading(false);
         setPrograms(loaded);
         const saved = parseSavedCurriculum(
@@ -263,9 +282,9 @@ export default function CurriculumExplorer() {
         );
         const programToRestore =
           requestedProgram ?? (defaultProfileProgram || saved?.programCode);
-        const restoredProgram =
-          loaded.find((program) => program.code === programToRestore) ??
-          loaded[0];
+        const restoredProgram = programToRestore
+          ? loaded.find((program) => program.code === programToRestore)
+          : loaded[0];
         const restored = restoredProgram?.code ?? "";
         setFaculty(restoredProgram?.faculty ?? "Other Faculty");
         setMajor(restoredProgram?.major ?? "");
@@ -324,18 +343,25 @@ export default function CurriculumExplorer() {
               : saved?.programCode === programCode
                 ? saved.planId
                 : null;
-        const restored = loaded.find((plan) => plan.id === planToRestore);
+        const selectablePlans = loaded.filter((plan) => plan.primaryProgramEligibility !== "unknown");
+        const restored = selectablePlans.find((plan) => plan.id === planToRestore);
         const nextPlanId =
           restored?.id ??
-          loaded.find((plan) => plan.isCurrent)?.id ??
-          loaded[0]?.id ??
+          selectablePlans.find((plan) => plan.isCurrent)?.id ??
+          selectablePlans[0]?.id ??
           null;
+        if (nextPlanId === null) {
+          setCurriculum(null);
+          setProgress(null);
+        }
         setCurriculumLoading(Boolean(nextPlanId));
         setPlanId(nextPlanId);
         setError(
-          loaded.length
+          selectablePlans.length
             ? ""
-            : "No curriculum versions are available for this program.",
+            : loaded.length
+              ? "Eligibility for the selected secondary curriculum could not be verified. Review the official main-program associations."
+              : "No curriculum versions are available for this program.",
         );
       })
       .catch((fetchError: unknown) => {
@@ -486,12 +512,12 @@ export default function CurriculumExplorer() {
   );
   const relevantBranchesKey = relevantBranchCodes.join(",");
   const resolvedProgress = useMemo(
-    () => ({
-      ...sharedCompletedCourses,
-      ...(curriculum && progress
+    () => mergePrerequisiteProgress(
+      curriculum && progress
         ? resolvedCourseProgress(curriculum, progress)
-        : (progress?.courses ?? {})),
-    }),
+        : (progress?.courses ?? {}),
+      sharedCompletedCourses,
+    ),
     [curriculum, progress, sharedCompletedCourses],
   );
 
@@ -916,13 +942,16 @@ export default function CurriculumExplorer() {
                 disabled={!plans.length}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-normal text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
+                {!planId ? <option value="">{t("academicPrograms.selectPlan")}</option> : null}
                 {plans.map((plan) => (
                   <option
                     key={`${plan.planType}:${plan.programCode}:${plan.id}`}
                     value={plan.id}
+                    disabled={plan.primaryProgramEligibility === "unknown"}
                   >
                     {localizedAcademicName(plan, language)}
                     {plan.isCurrent ? ` · ${t("common.current")}` : ""}
+                    {plan.primaryProgramEligibility === "unknown" ? ` · ${t("profile.planEligibilityUnknown")}` : ""}
                   </option>
                 ))}
               </select>
@@ -943,6 +972,12 @@ export default function CurriculumExplorer() {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {!enrolledPrograms.length && unavailableProgramFaculties.length ? (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t("profile.programsLoadError")} {unavailableProgramFaculties.map((item) => localizedAcademicName(item, language)).join(", ")}
+        </p>
       ) : null}
 
       {(loadingStage || error) && (
@@ -966,6 +1001,7 @@ export default function CurriculumExplorer() {
               }
             : {})}
         >
+          <CurriculumWarnings warnings={curriculum.warnings} />
           <section className="grid gap-4 border-b border-slate-200 pb-5 text-slate-900 lg:grid-cols-[1fr_auto]">
             <div>
               <p className="text-sm font-medium text-slate-500">
@@ -1023,6 +1059,9 @@ export default function CurriculumExplorer() {
                     percent: formatNumber(language, completionPercentage),
                   })}
                 </p>
+              ) : null}
+              {auditTotals && [auditTotals.earnedCredit, auditTotals.requiredCredit, auditTotals.earnedEnglishCredit, auditTotals.requiredEnglishCredit].some((credit) => credit === null) ? (
+                <p role="status" className="mt-2 text-sm text-amber-700 dark:text-amber-300">{t("curriculum.creditUncertainty")}</p>
               ) : null}
             </div>
             <div className="grid grid-cols-3 gap-2 self-center text-center">
@@ -1166,6 +1205,7 @@ export default function CurriculumExplorer() {
                       slot={selectedItem}
                       curriculum={curriculum}
                       progress={progress}
+                      resolvedProgress={resolvedProgress}
                       onlyTakeable={showTakeableCourses && !offeringsLoading}
                       availableCourseCodes={availableCourseCodes}
                       onSelectCourse={(course) => {
@@ -1459,10 +1499,11 @@ export default function CurriculumExplorer() {
   );
 }
 
-function ElectiveDetails({
+export function ElectiveDetails({
   slot,
   curriculum,
   progress,
+  resolvedProgress,
   onlyTakeable,
   availableCourseCodes,
   onSelectCourse,
@@ -1470,12 +1511,13 @@ function ElectiveDetails({
   slot: ItuElectiveSlot;
   curriculum: ItuCurriculum;
   progress: CurriculumProgress;
+  resolvedProgress: Record<string, CourseProgress>;
   onlyTakeable: boolean;
   availableCourseCodes: Set<string>;
   onSelectCourse: (course: ItuElectiveCourse) => void;
 }) {
   const { language, t } = useLanguage();
-  const effectiveProgress = resolvedCourseProgress(curriculum, progress);
+  const effectiveProgress = resolvedProgress;
   const displayedCourses = onlyTakeable
     ? availableCoursesForElectiveSlot(
         slot,

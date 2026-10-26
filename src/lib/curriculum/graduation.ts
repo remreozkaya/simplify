@@ -51,6 +51,58 @@ function applicableRules(curriculum: ItuCurriculum) {
   );
 }
 
+/** Maximize occupied slots, then exact-code matches, using residual augmenting paths. */
+function matchElectiveRequirements<T>(rows: T[], candidates: (row: T) => Array<{ item: ItuCurriculumItem; exact: boolean }>) {
+  const available = rows.map(candidates);
+  const items = [...new Map(available.flat().map(({ item }) => [item.id, item])).values()];
+  const source = 0, rowStart = 1, itemStart = rowStart + rows.length, sink = itemStart + items.length;
+  type Edge = { to: number; reverse: number; capacity: number; cost: number };
+  const graph: Edge[][] = Array.from({ length: sink + 1 }, () => []);
+  function edge(from: number, to: number, cost: number) {
+    const forward = { to, reverse: graph[to].length, capacity: 1, cost };
+    graph[from].push(forward);
+    graph[to].push({ to: from, reverse: graph[from].length - 1, capacity: 0, cost: -cost });
+    return forward;
+  }
+  const itemNodes = new Map(items.map((item, index) => [item.id, itemStart + index]));
+  items.forEach((_, index) => edge(itemStart + index, sink, 0));
+  const assignments = rows.map((_, index) => {
+    edge(source, rowStart + index, 0);
+    return available[index].map(({ item, exact }) => ({ item, exact, edge: edge(rowStart + index, itemNodes.get(item.id)!, exact ? -1 : 0) }));
+  });
+  // A shortest residual path can move an earlier exact assignment to another
+  // exact slot while admitting a counterpart, rather than locking a greedy tier.
+  while (true) {
+    const distance = Array<number>(graph.length).fill(Infinity);
+    const previous = Array<{ from: number; index: number } | undefined>(graph.length);
+    distance[source] = 0;
+    for (let pass = 1; pass < graph.length; pass += 1) {
+      let changed = false;
+      graph.forEach((edges, from) => edges.forEach((candidate, index) => {
+        if (candidate.capacity && distance[from] + candidate.cost < distance[candidate.to]) {
+          distance[candidate.to] = distance[from] + candidate.cost;
+          previous[candidate.to] = { from, index };
+          changed = true;
+        }
+      }));
+      if (!changed) break;
+    }
+    if (!previous[sink]) break;
+    let node = sink;
+    while (node !== source) {
+      const step = previous[node]!;
+      const selected = graph[step.from][step.index];
+      selected.capacity = 0;
+      graph[node][selected.reverse].capacity = 1;
+      node = step.from;
+    }
+  }
+  return rows.flatMap((row, index) => {
+    const assigned = assignments[index].find((candidate) => candidate.edge.capacity === 0);
+    return assigned ? [{ row, item: assigned.item, exact: assigned.exact }] : [];
+  });
+}
+
 /** Shared resolution order: exact, language counterpart, official plan equivalence, then elective. */
 export function applyTranscriptImport(curriculum: ItuCurriculum, current: CurriculumProgress, parsed: TranscriptParseResult): ImportResult {
   const items = allItems(curriculum);
@@ -175,19 +227,18 @@ export function applyTranscriptImport(curriculum: ItuCurriculum, current: Curric
     if (!conflictedRequirements.has(candidate.item.id) && candidate.records.every((record) => !ambiguousCodes.has(normalizeCourseCode(record.courseCode)))) assign(candidate.item, candidate.records, "equivalence", candidate.rule);
   });
 
-  // 4. Existing elective matching runs after exact/language/official equivalence.
-  records.forEach((record, code) => {
-    if (handled.has(code) || used.has(code) || ambiguousCodes.has(code) || record.completionStatus !== "passed") return;
-    const candidates = (elective.get(code) ?? []).filter((item) => !occupied.has(item.id));
-    const requirement = earliestRequirement(candidates);
-    if (requirement) assign(requirement, [record], "elective");
-  });
-  records.forEach((record, code) => {
-    if (handled.has(code) || used.has(code) || ambiguousCodes.has(code) || record.completionStatus !== "passed") return;
-    const candidates = (electiveLanguage.get(code) ?? []).filter((item) => !occupied.has(item.id));
-    const requirement = earliestRequirement(candidates);
-    if (requirement) assign(requirement, [record], "language-equivalence");
-  });
+  // 4. Maximize elective completion, then prefer exact-code assignments.
+  const availableElectives = [...records].filter(([code, record]) =>
+    !handled.has(code) && !used.has(code) && !ambiguousCodes.has(code) && record.completionStatus === "passed",
+  );
+  matchElectiveRequirements(availableElectives, ([code]) => {
+    const exact = elective.get(code) ?? [];
+    const counterparts = electiveLanguage.get(code) ?? [];
+    return [...new Map([...exact, ...counterparts].map((item) => [item.id, item])).values()]
+      .filter((item) => !occupied.has(item.id))
+      .sort((a, b) => a.semester - b.semester || (itemOrder.get(a.id) ?? 0) - (itemOrder.get(b.id) ?? 0))
+      .map((item) => ({ item, exact: exact.some((candidate) => candidate.id === item.id) }));
+  }).forEach(({ row: [, record], item, exact }) => assign(item, [record], exact ? "elective" : "language-equivalence"));
   // Preserve the prior failed-elective display behavior without treating it as completion.
   records.forEach((record, code) => {
     if (handled.has(code) || ambiguousCodes.has(code) || record.completionStatus !== "failed") return;
@@ -248,11 +299,12 @@ function allocateManualProgress(curriculum: ItuCurriculum, progress: CurriculumP
     ));
     if (item) assign(item, code, course);
   }));
-  manual.forEach(([code, course]) => {
-    if (used.has(normalizeCourseCode(code))) return;
-    const item = items.find((item) => item.kind === "elective-slot" && !occupied.has(item.id) && item.courses.some((choice) => courseLanguageVariants(choice.code).includes(normalizeCourseCode(code))));
-    if (item) assign(item, code, course);
-  });
+  const availableElectives = manual.filter(([code]) => !used.has(normalizeCourseCode(code)));
+  matchElectiveRequirements(availableElectives, ([code]) => items.flatMap((item) => {
+    if (item.kind !== "elective-slot" || occupied.has(item.id)) return [];
+    if (!item.courses.some((choice) => courseLanguageVariants(choice.code).includes(normalizeCourseCode(code)))) return [];
+    return [{ item, exact: item.courses.some((choice) => normalizeCourseCode(choice.code) === normalizeCourseCode(code)) }];
+  })).forEach(({ row: [code, course], item }) => assign(item, code, course));
   return { ...progress, courses };
 }
 
@@ -334,27 +386,47 @@ export function resolvedCourseProgress(curriculum: ItuCurriculum, progress: Curr
   return resolved;
 }
 
-export function curriculumTotals(curriculum: ItuCurriculum, progress: CurriculumProgress) {
+/** Resolve source credit options without selecting an arbitrary first value. */
+export function requirementCredit(item: ItuCurriculumItem, completedCourseCode?: string): number | null {
+  const options = [...new Set(item.creditOptions)];
+  if (options.length === 1) return options[0];
+  if (item.kind !== "elective-slot" || !completedCourseCode) return null;
+  const variants = new Set(courseLanguageVariants(completedCourseCode));
+  const exact = item.courses.filter((course) => normalizeCourseCode(course.code) === normalizeCourseCode(completedCourseCode));
+  const choices = exact.length ? exact : item.courses.filter((course) => variants.has(normalizeCourseCode(course.code)));
+  const possible = [...new Set(choices.flatMap((course) => course.creditOptions).filter((credit) => options.includes(credit)))];
+  return possible.length === 1 ? possible[0] : null;
+}
+
+export function curriculumTotals(curriculum: ItuCurriculum, progress: CurriculumProgress): {
+  requiredCourses: number;
+  requiredCredit: number | null;
+  requiredEnglishCredit: number | null;
+  earnedCourses: number;
+  earnedCredit: number | null;
+  earnedEnglishCredit: number | null;
+} {
   const items = allItems(curriculum);
-  let earnedCourses = 0, earnedCredit = 0, earnedEnglishCredit = 0, requiredEnglishCredit = 0;
+  let earnedCourses = 0;
+  let earnedCredit: number | null = 0, earnedEnglishCredit: number | null = 0;
+  let requiredCredit: number | null = 0, requiredEnglishCredit: number | null = 0;
+  const add = (total: number | null, credit: number | null) => total === null || credit === null ? null : total + credit;
   items.forEach((item) => {
-    const requiredCredit = item.creditOptions[0] ?? 0;
-    const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : item.courses.length && item.courses.every((course) => normalizeCourseLanguage(course.language) === "EN") ? "EN" : undefined;
-    if (requiredLanguage === "EN") requiredEnglishCredit += requiredCredit;
     const completed = progressForRequirement(item, progress, curriculum);
+    const credit = requirementCredit(item, completed?.course.state === "passed" ? completed.code : undefined);
+    requiredCredit = add(requiredCredit, credit);
+    const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : item.courses.length && item.courses.every((course) => normalizeCourseLanguage(course.language) === "EN") ? "EN" : undefined;
+    if (requiredLanguage === "EN") requiredEnglishCredit = add(requiredEnglishCredit, credit);
     if (completed?.course.state !== "passed") return;
     earnedCourses += 1;
-    // Degree audits count the target requirement's credit. Transcript credit is
-    // retained separately for GPA and transcript reporting.
-    const credit = requiredCredit;
-    earnedCredit += credit;
-    // A language counterpart can complete the requirement without changing
-    // the actual teaching language of the completed course.
-    if (normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit += credit;
+    // Fixed requirements retain their own credit; variable slots use the
+    // completed pool choice. Transcript weights remain separate for GPA.
+    earnedCredit = add(earnedCredit, credit);
+    if (normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit = add(earnedEnglishCredit, credit);
   });
   return {
     requiredCourses: items.length,
-    requiredCredit: curriculum.totalCredit ?? items.reduce((sum, item) => sum + (item.creditOptions[0] ?? 0), 0),
+    requiredCredit: curriculum.totalCredit ?? requiredCredit,
     requiredEnglishCredit, earnedCourses, earnedCredit, earnedEnglishCredit,
   };
 }
@@ -367,6 +439,7 @@ export function calculateProgramGpa(curriculum: ItuCurriculum, progress: Curricu
   const seen = new Set<string>();
   let weightedPoints = 0;
   let credits = 0;
+  let unknownCredits = false;
 
   allItems(curriculum).forEach((item) => {
     const matched = progressForRequirement(item, progress, curriculum);
@@ -377,7 +450,8 @@ export function calculateProgramGpa(curriculum: ItuCurriculum, progress: Curricu
       const courseCode = normalizeCourseCode(course.courseCode ?? matched.code);
       const identity = `${courseCode}:${course.term ?? ""}:${course.crn ?? ""}`;
       if (seen.has(identity)) return;
-      const courseCredits = course.transcriptCredit ?? course.countedCredit ?? item.creditOptions[0] ?? 0;
+      const courseCredits = course.transcriptCredit ?? course.countedCredit ?? requirementCredit(item, matched.code);
+      if (courseCredits === null) { unknownCredits = true; return; }
       if (courseCredits <= 0) return;
       seen.add(identity);
       weightedPoints += points * courseCredits;
@@ -385,5 +459,5 @@ export function calculateProgramGpa(curriculum: ItuCurriculum, progress: Curricu
     });
   });
 
-  return credits > 0 ? weightedPoints / credits : null;
+  return !unknownCredits && credits > 0 ? weightedPoints / credits : null;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
+
 import { responseJson } from "@/lib/http/responseJson";
 
 import OptionalHelp from "@/components/OptionalHelp";
@@ -16,6 +18,7 @@ import {
   calculateProgramGpa,
   curriculumTotals,
   progressForRequirement,
+  requirementCredit,
   type CourseMatchIssue,
 } from "@/lib/curriculum/graduation";
 import {
@@ -96,7 +99,7 @@ function withoutTranscriptCopy(
   return { ...progress, importedCourses: [] };
 }
 
-function ProgramAuditSection({
+export function ProgramAuditSection({
   audit,
   report,
 }: {
@@ -204,6 +207,12 @@ function ProgramAuditSection({
             </OptionalHelp>
           </div>
         </div>
+        <CurriculumWarnings warnings={curriculum.warnings} />
+        {[totals.earnedCredit, totals.requiredCredit, totals.earnedEnglishCredit, totals.requiredEnglishCredit].some(credit => credit === null) ? (
+          <p role="status" className="mt-4 text-sm text-amber-800 dark:text-amber-200">
+            {t("curriculum.creditUncertainty")}
+          </p>
+        ) : null}
         {report && (report.unmatched.length || report.ambiguous.length) ? (
           <details className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
             <summary className="cursor-pointer font-bold">
@@ -233,13 +242,18 @@ function ProgramAuditSection({
         const passed = semesterRows.filter(
           ({ completed }) => completed?.course.state === "passed",
         );
-        const earned = passed.reduce(
-          (sum, { item, completed }) =>
-            sum + (completed ? (item.creditOptions[0] ?? 0) : 0),
+        const earned = passed.reduce<number | null>(
+          (sum, { item, completed }) => {
+            const credit = requirementCredit(item, completed?.code);
+            return sum === null || credit === null ? null : sum + credit;
+          },
           0,
         );
-        const required = semester.items.reduce(
-          (sum, item) => sum + (item.creditOptions[0] ?? 0),
+        const required = semesterRows.reduce<number | null>(
+          (sum, { item, completed }) => {
+            const credit = requirementCredit(item, completed?.course.state === "passed" ? completed.code : undefined);
+            return sum === null || credit === null ? null : sum + credit;
+          },
           0,
         );
         return (
@@ -367,7 +381,7 @@ function ProgramAuditSection({
                             .join(" + ") ?? ""}
                         </td>
                         <td className="p-3">
-                          {completed ? value(item.creditOptions[0] ?? 0) : ""}
+                          {completed ? value(requirementCredit(item, completed.code)) : ""}
                         </td>
                         <td className="p-3">
                           {completed ? value(transcriptCredit) : ""}

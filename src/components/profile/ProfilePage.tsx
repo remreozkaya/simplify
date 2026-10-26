@@ -90,7 +90,7 @@ function editableInput(
   };
 }
 
-function ProgramFields({
+export function ProgramFields({
   enrollment,
   faculties,
   programs,
@@ -283,9 +283,11 @@ function ProgramFields({
                 <option
                   key={`${plan.planType}:${plan.programCode}:${plan.id}`}
                   value={plan.id}
+                  disabled={plan.primaryProgramEligibility === "unknown"}
                 >
                   {localizedAcademicName(plan, language)}
                   {plan.isCurrent ? ` · ${t("common.current")}` : ""}
+                  {plan.primaryProgramEligibility === "unknown" ? ` · ${t("profile.planEligibilityUnknown")}` : ""}
                 </option>
               ))}
             </select>

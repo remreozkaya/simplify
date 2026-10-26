@@ -57,3 +57,12 @@ describe("curriculum availability", () => {
     expect(availableCoursesForElectiveSlot(slot, curriculum, progress, progress.courses, offerings).map((course) => course.code)).toEqual(["YZV 411E"]);
   });
 });
+
+it("leaves one identical elective slot available after a single unassigned manual completion", () => {
+  const second = { ...slot, id: "second-elective" };
+  const plan = { ...curriculum, semesters: [{ semester: 7, items: [slot, second] }] };
+  const progress = emptyProgress(plan.planId);
+  progress.courses["YZV 411E"] = { state: "passed", source: "manual" };
+  expect(isCurriculumItemAvailableThisSemester(slot, plan, progress, progress.courses, new Set(["BLG 478E"]))).toBe(false);
+  expect(isCurriculumItemAvailableThisSemester(second, plan, progress, progress.courses, new Set(["BLG 478E"]))).toBe(true);
+});

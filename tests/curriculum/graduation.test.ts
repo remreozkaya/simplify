@@ -320,3 +320,80 @@ describe("graduation progress", () => {
     expect(result.progress.requirementSatisfactions?.["elective-a"]).toMatchObject({ satisfiedByCourseCodes: ["BLG 478"], satisfactionType: "language-equivalence" });
   });
 });
+
+it("uses the completed pool choice for a variable-credit elective from the stored Physics snapshot", () => {
+  const catalog = JSON.parse(readFileSync(join(process.cwd(), "src/data/itu/curriculum-catalog.json"), "utf8")) as typeof import("@/data/itu/curriculum-catalog.json");
+  const source = catalog.plans.find(plan => plan.id === 2611)!;
+  const rawSlot = source.courses.find(item => item.kind === "elective-slot" && item.groupId === 13204)!;
+  expect(rawSlot.credit).toBe("3 / 4");
+  const pool = catalog.electiveGroups["13204"].courses;
+  const choice = pool.find(course => course.code === "FIZ 362E")!;
+  expect(choice.credit).toBe("4");
+  const plan: ItuCurriculum = { ...curriculum, totalCredit: undefined, semesters: [{ semester: 7, items: [{
+    kind: "elective-slot", id: "physics", semester: 7, title: rawSlot.title, creditOptions: [3, 4], ectsOptions: [4],
+    courses: [{ code: choice.code, title: choice.title, language: "EN", creditOptions: [4], ectsOptions: [4] }],
+  }] }] };
+  expect(curriculumTotals(plan, emptyProgress(10))).toMatchObject({ requiredCredit: null, earnedCredit: 0 });
+  const progress = applyTranscriptImport(plan, emptyProgress(10), transcript("| 202610 | 1 | FIZ 362E | Methods II | 4 | AA |")).progress;
+  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 4, earnedEnglishCredit: 4, requiredCredit: 4 });
+  const slot = plan.semesters[0].items[0];
+  if (slot.kind !== "elective-slot") throw new Error("fixture");
+  slot.courses[0].creditOptions = [3, 4];
+  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: null, earnedEnglishCredit: null, requiredCredit: null });
+});
+
+it("keeps program GPA unknown when a graded manual completion has unresolved credit options", () => {
+  const plan = structuredClone(curriculum);
+  const item = plan.semesters[0].items[0];
+  item.creditOptions = [3, 4];
+  const progress = emptyProgress(plan.planId);
+  progress.courses["MAT 103E"] = { state: "passed", source: "manual", grade: "AA" };
+  expect(calculateProgramGpa(plan, progress)).toBeNull();
+});
+
+it.each(["transcript", "manual"])("finds a complete elective assignment without depending on %s course order", (source) => {
+  const plan = structuredClone(curriculum);
+  const choices = ["FIZ 101E", "FIZ 102E"].map(code => ({ code, title: code, language: "EN", creditOptions: [3], ectsOptions: [5] }));
+  plan.semesters = [{ semester: 1, items: [
+    { kind: "elective-slot", id: "flexible", semester: 1, title: "Flexible", creditOptions: [3], ectsOptions: [5], courses: choices },
+    { kind: "elective-slot", id: "restricted", semester: 1, title: "Restricted", creditOptions: [3], ectsOptions: [5], courses: [choices[0]] },
+  ] }];
+  for (const codes of [["FIZ 101E", "FIZ 102E"], ["FIZ 102E", "FIZ 101E"]]) {
+    let progress = emptyProgress(plan.planId);
+    if (source === "manual") progress.courses = Object.fromEntries(codes.map(courseCode => [courseCode, { state: "passed" as const, source: "manual" as const, courseCode }]));
+    else progress = applyTranscriptImport(plan, progress, transcript(codes.map((code, index) => `| 202610 | ${index + 1} | ${code} | Physics | 3 | AA |`).join("\n"))).progress;
+    expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 2, earnedCredit: 6 });
+    expect(progressForRequirement(plan.semesters[0].items[0], progress, plan)?.code).toBe("FIZ 102E");
+    expect(progressForRequirement(plan.semesters[0].items[1], progress, plan)?.code).toBe("FIZ 101E");
+  }
+});
+
+it.each(["transcript", "manual"])("moves an exact elective completion to preserve a remaining counterpart slot for %s", (source) => {
+  const plan = structuredClone(curriculum);
+  const choices = ["FIZ 101", "FIZ 102"].map(code => ({ code, title: code, language: "TR", creditOptions: [3], ectsOptions: [5] }));
+  plan.semesters = [{ semester: 1, items: [
+    { kind: "elective-slot", id: "flexible", semester: 1, title: "Flexible", creditOptions: [3], ectsOptions: [5], courses: choices },
+    { kind: "elective-slot", id: "restricted", semester: 1, title: "Restricted", creditOptions: [3], ectsOptions: [5], courses: [choices[0]] },
+  ] }];
+  let progress = emptyProgress(plan.planId);
+  if (source === "manual") progress.courses = { "FIZ 101": { state: "passed", source: "manual", courseCode: "FIZ 101" }, "FIZ 102E": { state: "passed", source: "manual", courseCode: "FIZ 102E" } };
+  else progress = applyTranscriptImport(plan, progress, transcript("| 202610 | 1 | FIZ 101 | Physics I | 3 | AA |\n| 202610 | 2 | FIZ 102E | Physics II | 3 | AA |")).progress;
+  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 2, earnedCredit: 6 });
+  expect(progressForRequirement(plan.semesters[0].items[0], progress, plan)?.code).toBe("FIZ 102E");
+  expect(progressForRequirement(plan.semesters[0].items[1], progress, plan)?.code).toBe("FIZ 101");
+});
+
+it.each(["transcript", "manual"])("prefers the most exact elective matches among equally complete %s assignments", (source) => {
+  const plan = structuredClone(curriculum);
+  const choice = (code: string) => ({ code, title: code, creditOptions: [3], ectsOptions: [5] });
+  plan.semesters = [{ semester: 1, items: [
+    { kind: "elective-slot", id: "first", semester: 1, title: "First", creditOptions: [3], ectsOptions: [5], courses: [choice("FIZ 101E"), choice("FIZ 102")] },
+    { kind: "elective-slot", id: "second", semester: 1, title: "Second", creditOptions: [3], ectsOptions: [5], courses: [choice("FIZ 101"), choice("FIZ 102E")] },
+  ] }];
+  let progress = emptyProgress(plan.planId);
+  if (source === "manual") progress.courses = { "FIZ 101": { state: "passed", source: "manual", courseCode: "FIZ 101" }, "FIZ 102": { state: "passed", source: "manual", courseCode: "FIZ 102" } };
+  else progress = applyTranscriptImport(plan, progress, transcript("| 202610 | 1 | FIZ 101 | Physics I | 3 | AA |\n| 202610 | 2 | FIZ 102 | Physics II | 3 | AA |")).progress;
+  expect(curriculumTotals(plan, progress).earnedCourses).toBe(2);
+  expect(progressForRequirement(plan.semesters[0].items[0], progress, plan)?.code).toBe("FIZ 102");
+  expect(progressForRequirement(plan.semesters[0].items[1], progress, plan)?.code).toBe("FIZ 101");
+});

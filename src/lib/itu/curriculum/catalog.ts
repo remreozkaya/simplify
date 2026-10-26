@@ -101,13 +101,9 @@ export function curriculumPlanKey(
   return `${plan.planType}:${plan.programCode}:${plan.id}`;
 }
 
-export function primaryProgramStem(programCode: string) {
-  return programCode.replace(/_LS$/i, "").replace(/E$/i, "");
-}
-
 export function isPrimaryProgramEligible(
   associated: readonly string[] | undefined,
   primaryProgramCode: string,
 ) {
-  return !associated?.length || associated.includes(primaryProgramCode);
+  return associated?.length ? associated.includes(primaryProgramCode) : undefined;
 }

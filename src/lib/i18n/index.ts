@@ -68,8 +68,8 @@ const creditFormatter = new Intl.NumberFormat("en", {
 });
 
 /** Credit displays use a decimal point and two digits in every UI language. */
-export function formatCredits(value: number) {
-  return creditFormatter.format(value);
+export function formatCredits(value: number | null) {
+  return value === null ? "—" : creditFormatter.format(value);
 }
 
 export function formatDate(

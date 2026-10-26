@@ -35,3 +35,9 @@ export function getStoredEquivalenceRules(programCode: string, planId: number): 
 export function getEquivalenceStore(): EquivalenceStore {
   return store;
 }
+
+
+/** Rules and refresh targets cannot prove that every official scope was checked. */
+export function getStoredEquivalenceCoverage(programCode: string, planId: number): "unavailable" | "incomplete" {
+  return getStoredEquivalenceRules(programCode, planId).length ? "incomplete" : "unavailable";
+}

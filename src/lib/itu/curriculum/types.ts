@@ -39,6 +39,8 @@ export type ItuCurriculumPlan = {
   planType: ItuPlanType;
   validityPeriod?: string;
   associatedPrimaryProgramCodes?: string[];
+  /** Missing association evidence must not authorize secondary enrollment. */
+  primaryProgramEligibility?: "unknown";
   associatedPrimaryProgramIds?: string[];
   primaryProgramId?: string;
   targetProgramId?: string;
