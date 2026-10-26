@@ -117,7 +117,8 @@ export async function getCurriculum(
       neededBranches.map(async (branch) => {
         const branchId = branchMap[branch];
         if (!branchId) {
-          warnings.push(`Prerequisite branch ${branch} is unavailable.`);
+          // A branch absent from the official prerequisite index has no prerequisites.
+          prerequisiteBranchesLoaded.push(branch);
           return;
         }
         try {

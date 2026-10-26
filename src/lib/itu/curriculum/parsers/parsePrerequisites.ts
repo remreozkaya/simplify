@@ -10,13 +10,19 @@ function clean(value: string): string {
 
 export function parsePrerequisiteBranches(html: string): Record<string, number> {
   const $ = cheerio.load(html);
+  if (!$('select[name="DersBransKoduId"]').length) {
+    throw new Error("İTÜ OBS returned an invalid prerequisite branch list.");
+  }
   const branches: Record<string, number> = {};
   $('select[name="DersBransKoduId"] option').each((_, option) => {
     const code = clean($(option).text()).toUpperCase();
-    const id = Number($(option).attr("value"));
-    if (/^[A-ZÇĞİÖŞÜ]{2,8}$/u.test(code) && Number.isInteger(id) && id > 0) {
-      branches[code] = id;
+    const rawId = $(option).attr("value")?.trim();
+    if (!rawId || rawId === "0" || rawId === "-1") return;
+    const id = Number(rawId);
+    if (!/^[A-ZÇĞİÖŞÜ]{2,8}$/u.test(code) || !Number.isInteger(id) || id <= 0) {
+      throw new Error("İTÜ OBS returned an invalid prerequisite branch entry.");
     }
+    branches[code] = id;
   });
   return branches;
 }

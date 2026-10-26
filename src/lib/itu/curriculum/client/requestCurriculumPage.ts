@@ -28,6 +28,7 @@ export async function requestCurriculumPage(
   if (!response.ok) {
     throw new ItuObsUpstreamError(
       `İTÜ OBS curriculum request failed with status ${response.status}.`,
+      { status: response.status },
     );
   }
   return response.text();

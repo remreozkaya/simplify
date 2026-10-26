@@ -148,6 +148,7 @@ export type ItuCurriculum = {
   noteEn?: string;
   prerequisites: Record<string, ItuCoursePrerequisite>;
   equivalenceRules: EquivalenceRule[];
+  /** Resolved lookups, including branches with no official prerequisite page. */
   prerequisiteBranchesLoaded: string[];
   prerequisiteDataAvailable: boolean;
   warnings: string[];
