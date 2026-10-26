@@ -28,8 +28,8 @@ it("counts source English language credits in the graduation audit", () => {
   const curriculum = {...parseCurriculumDetail(html,1562,"BLGE_LS"),prerequisites:{},equivalenceRules:[],prerequisiteBranchesLoaded:[],prerequisiteDataAvailable:true,warnings:[],fetchedAt:"2026-10-05T00:00:00Z"};
   const parsed = parseTranscriptMarkdown("| Completed English Courses |\n| 202610 | 1 | MAT 103E | Mathematics I | 4 | AA |");
   const progress = applyTranscriptImport(curriculum,emptyProgress(1562),parsed).progress;
-  // Source fixture marks Mathematics I (4) and Programming (4.5) English.
-  expect(curriculumTotals(curriculum,progress)).toMatchObject({earnedEnglishCredit:4,requiredEnglishCredit:8.5});
+  // Mathematics I (4), Programming (4.5), and the elective slot minimum (3).
+  expect(curriculumTotals(curriculum,progress)).toMatchObject({earnedEnglishCredit:4,requiredEnglishCredit:11.5});
 });
 
 it("normalizes English and Turkish curriculum language labels while preserving unknown labels", () => {

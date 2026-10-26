@@ -417,14 +417,17 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
     const completed = progressForRequirement(item, progress, curriculum);
     const credit = requirementCredit(item);
     requiredCredit = add(requiredCredit, credit);
-    const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : item.courses.length && item.courses.every((course) => normalizeCourseLanguage(course.language) === "EN") ? "EN" : undefined;
-    if (requiredLanguage === "EN") requiredEnglishCredit = add(requiredEnglishCredit, credit);
+    const elective = item.kind === "elective-slot" || item.requirementType === "elective";
+    const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : undefined;
+    // Electives count their minimum plan credit toward English credits,
+    // including Spanish/German choices, without changing their language metadata.
+    if (elective || requiredLanguage === "EN") requiredEnglishCredit = add(requiredEnglishCredit, credit);
     if (completed?.course.state !== "passed") return;
     earnedCourses += 1;
     // Elective requirements count their minimum official credit option.
     // Transcript weights remain separate for GPA.
     earnedCredit = add(earnedCredit, credit);
-    if (normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit = add(earnedEnglishCredit, credit);
+    if (elective || normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit = add(earnedEnglishCredit, credit);
   });
   return {
     requiredCourses: items.length,

@@ -26,5 +26,9 @@ it.each(["tr", "en"] as const)("shows minimum elective credit totals without unc
     ? "Geçerli ders planı kredileri belirsiz olduğundan bazı kredi toplamları hesaplanamıyor."
     : "Some credit totals are unavailable because the applicable curriculum credits are uncertain.");
   expect(html).toContain("0.00/3.00");
+  const englishLabel = translate(language, "graduationCalculator.englishCredits");
+  const englishSummary = html.slice(html.indexOf(`>${englishLabel}</p>`));
+  expect(englishSummary).toMatch(/0\.00\s*\/\s*3\.00/);
+  expect(englishSummary).not.toMatch(/0\.00\s*\/\s*0\.00/);
   expect(html).toContain(language === "tr" ? "Bu ders planı için resmî denklik kapsamı verisi mevcut değil." : "Official equivalence coverage is unavailable for this curriculum.");
 });

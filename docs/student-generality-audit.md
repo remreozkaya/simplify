@@ -12,6 +12,9 @@ minimum official value in Curriculum, Graduation Calculator and Smart Semester
 Planner. This replaces the completed-choice/unknown treatment described in the
 original audit below. Known requirement totals are summed using those minimum
 values; transcript GPA weights remain separate.
+Electives also contribute those minimum values to required and earned English
+credits, including non-English language choices, under the subsequently
+requested application policy.
 
 ## Confirmed issues and corrections
 

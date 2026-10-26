@@ -23,6 +23,8 @@ A course absent from the official prerequisite list, a branch absent from its in
 
 Curriculum, graduation and semester-planning totals use the minimum official elective credit option (for example, `3 / 4` counts as `3`). Totals sum those values with the remaining requirements. Transcript credits remain the weights for imported GPA calculations.
 
+Elective requirements also contribute their minimum plan credit to required and earned English-credit totals, including Spanish, German and other non-English choices. Earned credits require a passed completion; course teaching-language metadata is preserved.
+
 ## Local development
 
 Use Node.js 20.9 or newer and npm.
