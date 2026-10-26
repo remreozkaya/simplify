@@ -249,13 +249,15 @@ function ProgramAuditSection({
             className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-4 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-blue-600 sm:px-6">
-              <span className="text-lg font-semibold text-slate-950 dark:text-white">
-                {localizedCurriculumSection(
-                  language,
-                  curriculum.planType,
-                  semester.semester,
-                )}
-              </span>
+              {(!curriculum.planType || curriculum.planType === "undergraduate" || semester.semester === 99) ? (
+                <span className="text-lg font-semibold text-slate-950 dark:text-white">
+                  {localizedCurriculumSection(
+                    language,
+                    curriculum.planType,
+                    semester.semester,
+                  )}
+                </span>
+              ) : null}
               <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
                 {passed.length}/{semester.items.length} ·{" "}
                 {t("curriculum.creditsSummary", {

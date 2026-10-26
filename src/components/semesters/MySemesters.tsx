@@ -64,7 +64,7 @@ export default function MySemesters() {
   const [creditLookup, setCreditLookup] = useState<{ key: string; credits: Record<string, number | null>; failed: boolean }>({ key: "", credits: {}, failed: false });
   const creditCodes = [...new Set([
     ...storedCurrent.map(course => course.courseCode),
-    ...(weeklyProgram ? importWeeklySemesterCourses([], weeklyProgram, new Map()).map(course => course.courseCode) : []),
+    ...(weeklyProgram ? importWeeklySemesterCourses(weeklyProgram, new Map()).map(course => course.courseCode) : []),
   ].map(normalizeCourseCode))].sort();
   const creditKey = JSON.stringify(creditCodes);
 
@@ -151,7 +151,7 @@ export default function MySemesters() {
 
   function importWeeklyCourses() {
     if (!weeklyProgram) return;
-    save(resolveSemesterCourseCredits(importWeeklySemesterCourses(current, weeklyProgram, curriculumCourses), curriculumCourses, creditLookup.key === creditKey ? creditLookup.credits : {}));
+    save(resolveSemesterCourseCredits(importWeeklySemesterCourses(weeklyProgram, curriculumCourses), curriculumCourses, creditLookup.key === creditKey ? creditLookup.credits : {}));
   }
 
   const number = formatCredits;

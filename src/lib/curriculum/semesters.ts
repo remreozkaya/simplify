@@ -66,11 +66,10 @@ export function semesterTermLabel(term: string, language: Language) {
 }
 
 export function importWeeklySemesterCourses(
-  current: readonly CurrentSemesterCourse[],
   program: WeeklyProgram,
   metadata: ReadonlyMap<string, { title: string; creditOptions: number[] }>,
 ): CurrentSemesterCourse[] {
-  const courses = new Map(current.map(course => [normalizeCourseCode(course.courseCode), course]));
+  const courses = new Map<string, CurrentSemesterCourse>();
   const add = (rawCode: string, title?: string) => {
     const code = normalizeCourseCode(rawCode);
     if (!code || courses.has(code)) return;

@@ -28,22 +28,22 @@ it.each([
   expect(semesterTermLabel(term, language)).toBe(label);
 });
 
-it("imports weekly courses once, including selections without meetings, and preserves existing grades", () => {
+it("replaces current courses with deduplicated weekly courses, including selections without meetings", () => {
   const program: WeeklyProgram = { id: "p", name: "Plan", updatedAt: "", courseBlocks: [
     { id: "a", code: "MAT104E", title: "Math II", day: "Monday", startTime: "09:00", endTime: "10:00" },
     { id: "b", code: "MAT 104E", title: "Math II", day: "Tuesday", startTime: "09:00", endTime: "10:00" },
   ], courseSelections: [{ id: "s", facultyCode: "FIZ", courseId: "FIZ:FIZ 102E", sectionId: "1", courseBlockIds: [] }] };
-  const existing = [{ courseCode: "MAT 104E", courseName: "Math II", credit: 4, grade: "BA" as const }];
-  const result = importWeeklySemesterCourses(existing, program, new Map([["FIZ 102E", { title: "Physics II", creditOptions: [3] }]]));
+  const metadata = new Map([["FIZ 102E", { title: "Physics II", creditOptions: [3] }]]);
+  const result = importWeeklySemesterCourses(program, metadata);
   expect(result).toHaveLength(2);
-  expect(result[0]).toEqual(existing[0]);
+  expect(result[0]).toEqual({ courseCode: "MAT 104E", courseName: "Math II", credit: null, grade: null });
   expect(result[1]).toEqual({ courseCode: "FIZ 102E", courseName: "Physics II", credit: 3, grade: null });
-  expect(importWeeklySemesterCourses(result, program, new Map())).toEqual(result);
+  expect(importWeeklySemesterCourses(program, metadata)).toEqual(result);
 });
 
 it("keeps unknown weekly credits unset and excludes them from GPA until entered", () => {
   const program: WeeklyProgram = { id: "p", name: "Plan", updatedAt: "", courseBlocks: [{ id: "a", code: "XYZ 101", title: "Unknown course", day: "Monday", startTime: "09:00", endTime: "10:00" }], courseSelections: [] };
-  const courses = importWeeklySemesterCourses([], program, new Map());
+  const courses = importWeeklySemesterCourses(program, new Map());
   expect(courses[0].credit).toBeNull();
   expect(currentSemesterGpa([{ ...courses[0], grade: "AA" }])).toBeNull();
   expect(parseCurrentSemester(serializeCurrentSemester(courses))).toEqual(courses);
