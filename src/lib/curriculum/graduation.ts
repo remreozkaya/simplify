@@ -386,16 +386,18 @@ export function resolvedCourseProgress(curriculum: ItuCurriculum, progress: Curr
   return resolved;
 }
 
-/** Resolve source credit options without selecting an arbitrary first value. */
-export function requirementCredit(item: ItuCurriculumItem, completedCourseCode?: string): number | null {
+/** Elective alternatives count their lowest official credit option. */
+export function minimumCreditOption(options: readonly number[]): number | null {
+  return options.length && options.every(credit => Number.isFinite(credit) && credit >= 0)
+    ? Math.min(...options)
+    : null;
+}
+
+export function requirementCredit(item: ItuCurriculumItem): number | null {
   const options = [...new Set(item.creditOptions)];
-  if (options.length === 1) return options[0];
-  if (item.kind !== "elective-slot" || !completedCourseCode) return null;
-  const variants = new Set(courseLanguageVariants(completedCourseCode));
-  const exact = item.courses.filter((course) => normalizeCourseCode(course.code) === normalizeCourseCode(completedCourseCode));
-  const choices = exact.length ? exact : item.courses.filter((course) => variants.has(normalizeCourseCode(course.code)));
-  const possible = [...new Set(choices.flatMap((course) => course.creditOptions).filter((credit) => options.includes(credit)))];
-  return possible.length === 1 ? possible[0] : null;
+  return options.length === 1 || item.kind === "elective-slot" || item.requirementType === "elective"
+    ? minimumCreditOption(options)
+    : null;
 }
 
 export function curriculumTotals(curriculum: ItuCurriculum, progress: CurriculumProgress): {
@@ -413,20 +415,20 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
   const add = (total: number | null, credit: number | null) => total === null || credit === null ? null : total + credit;
   items.forEach((item) => {
     const completed = progressForRequirement(item, progress, curriculum);
-    const credit = requirementCredit(item, completed?.course.state === "passed" ? completed.code : undefined);
+    const credit = requirementCredit(item);
     requiredCredit = add(requiredCredit, credit);
     const requiredLanguage = item.kind === "course" ? normalizeCourseLanguage(item.language) : item.courses.length && item.courses.every((course) => normalizeCourseLanguage(course.language) === "EN") ? "EN" : undefined;
     if (requiredLanguage === "EN") requiredEnglishCredit = add(requiredEnglishCredit, credit);
     if (completed?.course.state !== "passed") return;
     earnedCourses += 1;
-    // Fixed requirements retain their own credit; variable slots use the
-    // completed pool choice. Transcript weights remain separate for GPA.
+    // Elective requirements count their minimum official credit option.
+    // Transcript weights remain separate for GPA.
     earnedCredit = add(earnedCredit, credit);
     if (normalizeCourseLanguage(completed.course.courseLanguage ?? completed.language ?? requiredLanguage) === "EN") earnedEnglishCredit = add(earnedEnglishCredit, credit);
   });
   return {
     requiredCourses: items.length,
-    requiredCredit: curriculum.totalCredit ?? requiredCredit,
+    requiredCredit: requiredCredit ?? curriculum.totalCredit ?? null,
     requiredEnglishCredit, earnedCourses, earnedCredit, earnedEnglishCredit,
   };
 }
@@ -450,7 +452,7 @@ export function calculateProgramGpa(curriculum: ItuCurriculum, progress: Curricu
       const courseCode = normalizeCourseCode(course.courseCode ?? matched.code);
       const identity = `${courseCode}:${course.term ?? ""}:${course.crn ?? ""}`;
       if (seen.has(identity)) return;
-      const courseCredits = course.transcriptCredit ?? course.countedCredit ?? requirementCredit(item, matched.code);
+      const courseCredits = course.transcriptCredit ?? course.countedCredit ?? requirementCredit(item);
       if (courseCredits === null) { unknownCredits = true; return; }
       if (courseCredits <= 0) return;
       seen.add(identity);

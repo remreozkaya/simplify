@@ -1039,9 +1039,7 @@ export default function CurriculumExplorer() {
                   { count: curriculum.semesters.length },
                 )}{" "}
                 ·{" "}
-                {curriculum.totalCredit === undefined
-                  ? "—"
-                  : formatCredits(curriculum.totalCredit)}{" "}
+                {formatCredits(auditTotals?.requiredCredit ?? curriculum.totalCredit ?? null)}{" "}
                 {t("common.credit")} ·{" "}
                 {curriculum.totalEcts === undefined
                   ? "—"

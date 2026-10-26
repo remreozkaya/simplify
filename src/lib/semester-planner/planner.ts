@@ -6,6 +6,7 @@ import {
 } from "@/lib/curriculum/eligibility";
 import {
   progressForRequirement,
+  minimumCreditOption,
   requirementCredit,
   resolvedCourseProgress,
 } from "@/lib/curriculum/graduation";
@@ -215,14 +216,13 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
         title: course.title,
         titleTr: course.nameTr,
         titleEn: course.nameEn,
-        credits: course.creditOptions.length ? uniqueOption(course.creditOptions) : requirementCredit(item),
+        credits: course.creditOptions.length ? minimumCreditOption(course.creditOptions) : requirementCredit(item),
         ects: course.ectsOptions.length ? uniqueOption(course.ectsOptions) : requirementEcts(item),
         direct: false,
         kind: "elective" as const,
       }));
 
       choices.forEach((choice) => {
-        if (choice.ects === null) unknownCredits = true;
         if (choice.credits === null) {
           unknownCredits = true;
           return;

@@ -19,6 +19,10 @@ The semester planner can send selected courses and sections to the schedule gene
 
 Transcript imports accumulate across semesters. The latest attempt determines current course results, while semester history supports reviewing previous attempts. Main-major, double-major, and minor requirements are evaluated independently against their selected curricula. Official course equivalences and Turkish/English language counterparts contribute to requirement matching. Manual completions are preserved when imported progress is reset. Current-semester grade estimates support projections without changing imported transcript results.
 
+A course absent from the official prerequisite list, a branch absent from its index, or a prerequisite page returning 404 is treated as having no prerequisite. Network failures and server errors remain unknown rather than removing prerequisite checks.
+
+Curriculum, graduation and semester-planning totals use the minimum official elective credit option (for example, `3 / 4` counts as `3`). Totals sum those values with the remaining requirements. Transcript credits remain the weights for imported GPA calculations.
+
 ## Local development
 
 Use Node.js 20.9 or newer and npm.

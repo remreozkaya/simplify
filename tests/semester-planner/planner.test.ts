@@ -568,7 +568,7 @@ describe("smart semester planner", () => {
   });
 });
 
-it("keeps unresolved requirement totals unknown while using an explicit elective choice credit", () => {
+it("uses minimum elective requirement totals while retaining an explicit course credit", () => {
   const slot = elective("variable", "Variable elective", ["BLG 101"]);
   slot.creditOptions = [3, 4];
   if (slot.kind !== "elective-slot") throw new Error("fixture");
@@ -576,9 +576,24 @@ it("keeps unresolved requirement totals unknown while using an explicit elective
   const program = makeProgram("main47", "main", "undergraduate", [slot]);
   const plan = buildSemesterPlan([program], options({ desiredCredits: 4 }));
   expect(plan.selectedCredits).toBe(4);
-  expect(plan.programSummaries[0].remainingCredits).toBeNull();
-  expect(plan.combinedRemainingCredits).toBeNull();
-  expect(plan.notices).toContainEqual({ kind: "credit-data-unknown" });
+  expect(plan.programSummaries[0].remainingCredits).toBe(3);
+  expect(plan.combinedRemainingCredits).toBe(3);
+  expect(plan.notices).not.toContainEqual({ kind: "credit-data-unknown" });
+});
+
+it.each(["slot", "named-elective"])("recommends minimum-credit %s alternatives without a credit warning", kind => {
+  const item = kind === "slot" ? elective("minimum", "Minimum elective", ["BLG 101"]) : { ...course("minimum", "BLG 101"), requirementType: "elective" as const };
+  item.creditOptions = [4, 3];
+  item.ectsOptions = [5, 6];
+  if (item.kind === "elective-slot") {
+    item.courses[0].creditOptions = [4, 3];
+    item.courses[0].ectsOptions = [5, 6];
+  }
+  const plan = buildSemesterPlan([makeProgram("main50", "main", "undergraduate", [item])], options({ desiredCredits: 3 }));
+  expect(plan.recommendations.map(course => course.code)).toEqual(["BLG 101"]);
+  expect(plan.selectedCredits).toBe(3);
+  expect(plan.combinedRemainingCredits).toBe(3);
+  expect(plan.notices).not.toContainEqual({ kind: "credit-data-unknown" });
 });
 
 it("does not invent a first-option credit for an unresolved course recommendation", () => {
@@ -596,5 +611,5 @@ it("keeps a course with known local credit eligible when its ECTS is unresolved"
   expect(plan.recommendations.map(course => course.code)).toEqual(["BLG 101"]);
   expect(plan.selectedCredits).toBe(3);
   expect(plan.selectedEcts).toBeNull();
-  expect(plan.notices).toContainEqual({ kind: "credit-data-unknown" });
+  expect(plan.notices).not.toContainEqual({ kind: "credit-data-unknown" });
 });

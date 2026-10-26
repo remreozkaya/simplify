@@ -87,12 +87,13 @@ it("does not automatically adopt an unverified secondary plan for a migrated enr
   expect(state.updates).toContain(null);
 });
 
-it("explains uncertain credit totals for an unselected variable-credit elective", () => {
+it("shows minimum credits without uncertainty warnings for an unselected variable-credit elective", () => {
   const slot = { kind: "elective-slot", id: "variable", semester: 1, title: "Variable-credit elective", category: "MT", creditOptions: [3, 4], ectsOptions: [5], courses: [{ code: "FIZ 362", title: "Physics", creditOptions: [4], ectsOptions: [5] }] };
   state.initialValues.set(7, { planId: 2, programCode: "FZT_LS", title: "Physics", planTitle: "Test plan", semesters: [{ semester: 1, items: [slot] }], prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: ["FIZ"], prerequisiteDataAvailable: true, warnings: ["Official equivalence coverage is unavailable for this curriculum."], fetchedAt: "2026-01-01T00:00:00.000Z" });
   state.initialValues.set(8, { version: 3, planId: 2, courses: {} });
   const html = renderToStaticMarkup(createElement(CurriculumExplorer));
-  expect(html).toContain("Some credit totals are unavailable because the applicable curriculum credits are uncertain.");
+  expect(html).not.toContain("Some credit totals are unavailable because the applicable curriculum credits are uncertain.");
+  expect(html).toContain("0.00 / 3.00");
   expect(html).not.toContain("NaN");
   expect(html).toContain("Official equivalence coverage is unavailable for this curriculum.");
 });

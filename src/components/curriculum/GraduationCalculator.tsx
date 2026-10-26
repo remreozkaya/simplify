@@ -243,15 +243,15 @@ export function ProgramAuditSection({
           ({ completed }) => completed?.course.state === "passed",
         );
         const earned = passed.reduce<number | null>(
-          (sum, { item, completed }) => {
-            const credit = requirementCredit(item, completed?.code);
+          (sum, { item }) => {
+            const credit = requirementCredit(item);
             return sum === null || credit === null ? null : sum + credit;
           },
           0,
         );
         const required = semesterRows.reduce<number | null>(
-          (sum, { item, completed }) => {
-            const credit = requirementCredit(item, completed?.course.state === "passed" ? completed.code : undefined);
+          (sum, { item }) => {
+            const credit = requirementCredit(item);
             return sum === null || credit === null ? null : sum + credit;
           },
           0,
@@ -381,7 +381,7 @@ export function ProgramAuditSection({
                             .join(" + ") ?? ""}
                         </td>
                         <td className="p-3">
-                          {completed ? value(requirementCredit(item, completed.code)) : ""}
+                          {completed ? value(requirementCredit(item)) : ""}
                         </td>
                         <td className="p-3">
                           {completed ? value(transcriptCredit) : ""}

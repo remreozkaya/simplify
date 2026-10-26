@@ -7,6 +7,12 @@ weekly plans, credits, JPEG geometry, and CRN bookmarklets. It covers the curren
 İTÜ undergraduate/main, double-major, and minor model. It does not certify every
 curriculum or university registration decision.
 
+Subsequent requested policy change: elective credit alternatives now count their
+minimum official value in Curriculum, Graduation Calculator and Smart Semester
+Planner. This replaces the completed-choice/unknown treatment described in the
+original audit below. Known requirement totals are summed using those minimum
+values; transcript GPA weights remain separate.
+
 ## Confirmed issues and corrections
 
 | Issue / affected students | Shared correction | Principal files |

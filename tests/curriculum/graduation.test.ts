@@ -321,7 +321,7 @@ describe("graduation progress", () => {
   });
 });
 
-it("uses the completed pool choice for a variable-credit elective from the stored Physics snapshot", () => {
+it("counts the minimum official elective credit from the stored Physics snapshot", () => {
   const catalog = JSON.parse(readFileSync(join(process.cwd(), "src/data/itu/curriculum-catalog.json"), "utf8")) as typeof import("@/data/itu/curriculum-catalog.json");
   const source = catalog.plans.find(plan => plan.id === 2611)!;
   const rawSlot = source.courses.find(item => item.kind === "elective-slot" && item.groupId === 13204)!;
@@ -333,13 +333,21 @@ it("uses the completed pool choice for a variable-credit elective from the store
     kind: "elective-slot", id: "physics", semester: 7, title: rawSlot.title, creditOptions: [3, 4], ectsOptions: [4],
     courses: [{ code: choice.code, title: choice.title, language: "EN", creditOptions: [4], ectsOptions: [4] }],
   }] }] };
-  expect(curriculumTotals(plan, emptyProgress(10))).toMatchObject({ requiredCredit: null, earnedCredit: 0 });
+  expect(curriculumTotals(plan, emptyProgress(10))).toMatchObject({ requiredCredit: 3, earnedCredit: 0 });
   const progress = applyTranscriptImport(plan, emptyProgress(10), transcript("| 202610 | 1 | FIZ 362E | Methods II | 4 | AA |")).progress;
-  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 4, earnedEnglishCredit: 4, requiredCredit: 4 });
+  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3, earnedEnglishCredit: 3, requiredCredit: 3 });
   const slot = plan.semesters[0].items[0];
   if (slot.kind !== "elective-slot") throw new Error("fixture");
   slot.courses[0].creditOptions = [3, 4];
-  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: null, earnedEnglishCredit: null, requiredCredit: null });
+  expect(curriculumTotals(plan, progress)).toMatchObject({ earnedCourses: 1, earnedCredit: 3, earnedEnglishCredit: 3, requiredCredit: 3 });
+});
+
+it("sums the minimum elective option with fixed credits regardless of option order", () => {
+  const plan = structuredClone(curriculum);
+  plan.totalCredit = 8;
+  plan.semesters[0].items[1].creditOptions = [4, 3];
+  const progress = applyTranscriptImport(plan, emptyProgress(10), transcript("| 202610 | 1 | MAT 103E | Math | 4 | AA |\n| 202610 | 2 | BLG 478E | Security | 3 | AA |")).progress;
+  expect(curriculumTotals(plan, progress)).toMatchObject({ requiredCredit: 7, earnedCredit: 7 });
 });
 
 it("keeps program GPA unknown when a graded manual completion has unresolved credit options", () => {
