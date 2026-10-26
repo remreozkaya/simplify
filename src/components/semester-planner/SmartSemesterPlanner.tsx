@@ -1,5 +1,7 @@
 "use client";
 
+import { academicStorage } from "@/lib/academic/storage";
+
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
 
 import { resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
@@ -121,8 +123,8 @@ export default function SmartSemesterPlanner() {
     if (!enrollments.length) return;
     const controller = new AbortController();
     const loadedTranscript = loadSharedTranscript(
-      localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
-      localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+      academicStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+      academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
     );
     const transcript = loadedTranscript.courses;
     if (loadedTranscript.migrated) persistSharedTranscript(transcript);
@@ -143,7 +145,7 @@ export default function SmartSemesterPlanner() {
         }>(response);
         const curriculum = groupCurriculum(raw);
         const stored = parseCurriculumProgress(
-          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+          academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
           curriculum.planId,
         );
         const evaluated = transcript.length

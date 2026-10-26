@@ -16,7 +16,7 @@ const currentCourseSchema = z.object({
   credit: z.number().finite().nonnegative().nullable(),
   grade: z.enum(GRADES).nullable(),
 });
-const currentSemesterSchema = z.object({ version: z.literal(1), courses: z.array(currentCourseSchema) });
+export const currentSemesterSchema = z.object({ version: z.literal(1), courses: z.array(currentCourseSchema) });
 export type CurrentSemesterCourse = z.infer<typeof currentCourseSchema>;
 
 export function displayedGpaChange(current: number | null, projected: number | null) {

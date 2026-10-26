@@ -1,3 +1,4 @@
+import AcademicProvider from "@/components/academic/AcademicProvider";
 import AppNavigation from "@/components/AppNavigation";
 import ProfileProvider from "@/components/profile/ProfileProvider";
 import { requireUser } from "@/lib/auth/session";
@@ -18,9 +19,11 @@ export default async function ProtectedAppLayout({
   const profile = parseStoredProfile(user.user_metadata.profile, facultyByProgram);
 
   return (
-    <ProfileProvider initialProfile={profile}>
+    <ProfileProvider key={user.id} initialProfile={profile}>
       <AppNavigation />
-      {children}
+      <AcademicProvider key={user.id} userId={user.id}>
+        {children}
+      </AcademicProvider>
     </ProfileProvider>
   );
 }

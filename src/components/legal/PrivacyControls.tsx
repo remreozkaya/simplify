@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useAcademicAccount } from '@/components/academic/AccountContext';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/client';
@@ -10,6 +11,7 @@ import { deleteAccountAction, exportAccountAction } from '@/app/privacy/actions'
 const button = 'rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:hover:bg-slate-800';
 export default function PrivacyControls({ account = false, deletionAvailable = false }: { account?: boolean; deletionAvailable?: boolean }) {
   const { language } = useLanguage();
+  const accountId = useAcademicAccount();
   const router = useRouter();
   const copy = legalCopy[language].controls;
   const [message, setMessage] = useState<keyof typeof copy | null>(null);
@@ -18,7 +20,7 @@ export default function PrivacyControls({ account = false, deletionAvailable = f
   const [confirmed, setConfirmed] = useState(false);
   function exportLocal() {
     try {
-      downloadPrivacyData({ exportedAt: new Date().toISOString(), scope: 'this-browser', storage: exportPlannerStorage(localStorage) }, 'simplify-browser-data.json');
+      downloadPrivacyData({ exportedAt: new Date().toISOString(), scope: 'this-browser', storage: exportPlannerStorage(localStorage, accountId ?? undefined) }, 'simplify-browser-data.json');
       setMessage('success');
     } catch { setMessage('error'); }
   }
@@ -31,7 +33,7 @@ export default function PrivacyControls({ account = false, deletionAvailable = f
     try {
       const result = await exportAccountAction();
       if (result.status === 'success') {
-        downloadPrivacyData({ exportedAt: new Date().toISOString(), scope: 'account-profile', account: result.account }, 'simplify-account-data.json');
+        downloadPrivacyData({ exportedAt: new Date().toISOString(), scope: 'account-profile-and-academic-work', account: result.account }, 'simplify-account-data.json');
         setMessage('success');
       } else { setMessage(result.status); }
     } catch { setMessage('error'); }
@@ -44,14 +46,14 @@ export default function PrivacyControls({ account = false, deletionAvailable = f
       const result = await deleteAccountAction({ password, confirm: confirmed });
       setPassword('');
       if (result.status === 'success') {
-        try { clearPlannerStorage(localStorage); router.replace('/login'); router.refresh(); }
+        try { clearPlannerStorage(localStorage, result.userId); router.replace('/login'); router.refresh(); }
         catch { setMessage('localFailed'); }
       } else { setMessage(result.status); }
     } catch { setMessage('error'); }
     finally { setBusy(false); }
   }
-  return <section id="privacy-controls" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 sm:p-6">
-    <h2 className="text-xl font-bold">{copy.title}</h2>
+  return <section id="privacy-controls" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 sm:p-6">
+    <h2 className="text-xl font-semibold text-slate-950 dark:text-white">{copy.title}</h2>
     <h3 className="font-semibold">{copy.local}</h3>
     <p className="max-w-3xl text-sm leading-6">{copy.localHelp}</p>
     <div className="flex flex-wrap gap-3"><button type="button" className={button} onClick={exportLocal} disabled={busy}>{copy.exportLocal}</button><button type="button" className={button} onClick={clearLocal} disabled={busy}>{copy.clear}</button></div>

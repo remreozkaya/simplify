@@ -1,5 +1,8 @@
 "use client";
 
+import { ACADEMIC_CHANGE_EVENT } from "@/lib/academic/keys";
+import { academicStorage } from "@/lib/academic/storage";
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useProfile } from "@/components/profile/ProfileProvider";
@@ -25,14 +28,14 @@ const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text
 const cell = "px-4 py-3 text-left";
 
 function subscribe(callback: () => void) {
-  const events = ["storage", SHARED_TRANSCRIPT_EVENT, CURRICULUM_PROGRESS_EVENT, CURRENT_SEMESTER_EVENT];
+  const events = [ACADEMIC_CHANGE_EVENT, "storage", SHARED_TRANSCRIPT_EVENT, CURRICULUM_PROGRESS_EVENT, CURRENT_SEMESTER_EVENT];
   events.forEach(event => window.addEventListener(event, callback));
   return () => events.forEach(event => window.removeEventListener(event, callback));
 }
 
 function useStoredValue(key: string) {
   return useSyncExternalStore(subscribe, () => {
-    try { return localStorage.getItem(key); } catch { return null; }
+    try { return academicStorage.getItem(key); } catch { return null; }
   }, () => null);
 }
 
@@ -129,7 +132,7 @@ export default function MySemesters() {
 
   function save(courses: CurrentSemesterCourse[]) {
     try {
-      localStorage.setItem(CURRENT_SEMESTER_STORAGE_KEY, serializeCurrentSemester(courses));
+      academicStorage.setItem(CURRENT_SEMESTER_STORAGE_KEY, serializeCurrentSemester(courses));
       window.dispatchEvent(new Event(CURRENT_SEMESTER_EVENT));
       setStorageError(false);
     } catch { setStorageError(true); }

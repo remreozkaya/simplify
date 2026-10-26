@@ -1,5 +1,7 @@
 "use client";
 
+import { academicStorage } from "@/lib/academic/storage";
+
 import PrivacyControls from "@/components/legal/PrivacyControls";
 import PageShell from "@/components/PageShell";
 import { responseJson } from "@/lib/http/responseJson";
@@ -549,7 +551,7 @@ export default function ProfilePage({
   function removeEnrollment(enrollment: ProgramEnrollment) {
     const progress = enrollment.curriculumPlanId
       ? parseCurriculumProgress(
-          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+          academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
           enrollment.curriculumPlanId,
         )
       : null;
@@ -825,8 +827,10 @@ export default function ProfilePage({
             <PasswordSection canChangePassword={canChangePassword} />
           </div>
         </section>
+        <div className="mt-5">
+          <PrivacyControls account deletionAvailable={deletionAvailable} />
+        </div>
       </div>
-      <PrivacyControls account deletionAvailable={deletionAvailable} />
     </PageShell>
   );
 }

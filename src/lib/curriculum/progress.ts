@@ -1,3 +1,5 @@
+
+import { academicStorage } from "@/lib/academic/storage";
 import { z } from "zod";
 
 import { courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
@@ -38,7 +40,7 @@ const planProgressSchema = z.object({
     equivalenceRuleId: z.string().optional(), sourceUrl: z.string().url().optional(),
   })).optional(),
 });
-const storeSchema = z.object({
+export const storeSchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   plans: z.record(z.string(), planProgressSchema),
 });
@@ -77,7 +79,7 @@ export function updateStoredCurriculumProgress(storedValue: string | null, progr
 }
 
 export function persistCurriculumProgress(progress: CurriculumProgress): void {
-  localStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, updateStoredCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY), progress));
+  academicStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, updateStoredCurriculumProgress(academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY), progress));
   window.dispatchEvent(new CustomEvent(CURRICULUM_PROGRESS_EVENT, { detail: progress.planId }));
 }
 
@@ -94,7 +96,7 @@ export function resetStoredCurriculumProgress(storedValue: string | null): strin
 }
 
 export function resetAllCurriculumProgress(): void {
-  localStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, resetStoredCurriculumProgress(localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY)));
+  academicStorage.setItem(CURRICULUM_PROGRESS_STORAGE_KEY, resetStoredCurriculumProgress(academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY)));
   window.dispatchEvent(new CustomEvent(CURRICULUM_PROGRESS_EVENT));
 }
 

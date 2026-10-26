@@ -1,3 +1,4 @@
+vi.mock("@/lib/academic/storage", () => ({ academicStorage: { getItem: (key: string) => globalThis.localStorage?.getItem(key) ?? null, setItem: (key: string, value: string) => globalThis.localStorage?.setItem(key, value), removeItem: (key: string) => globalThis.localStorage?.removeItem(key) } }));
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";

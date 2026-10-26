@@ -1,3 +1,5 @@
+
+import { academicStorage } from "@/lib/academic/storage";
 import { z } from "zod";
 
 import { GRADES } from "@/lib/curriculum/grades";
@@ -22,7 +24,7 @@ const recordSchema = z.object({
   calculated: z.boolean(),
 });
 
-const storeSchema = z.object({
+export const storeSchema = z.object({
   version: z.literal(1),
   courses: z.array(recordSchema),
   history: z.array(recordSchema).optional(),
@@ -124,8 +126,8 @@ export function mergeTranscriptCourses(
 }
 
 export function persistSharedTranscript(courses: readonly TranscriptCourseRecord[], attempts: readonly TranscriptCourseRecord[] = courses) {
-  const history = courses.length ? mergeTranscriptHistory(parseTranscriptHistory(localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY)), [...courses, ...attempts]) : [];
-  localStorage.setItem(SHARED_TRANSCRIPT_STORAGE_KEY, serializeSharedTranscript(courses, new Date().toISOString(), history));
+  const history = courses.length ? mergeTranscriptHistory(parseTranscriptHistory(academicStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY)), [...courses, ...attempts]) : [];
+  academicStorage.setItem(SHARED_TRANSCRIPT_STORAGE_KEY, serializeSharedTranscript(courses, new Date().toISOString(), history));
   window.dispatchEvent(new CustomEvent(SHARED_TRANSCRIPT_EVENT));
 }
 

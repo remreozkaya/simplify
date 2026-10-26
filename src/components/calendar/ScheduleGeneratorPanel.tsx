@@ -1,5 +1,7 @@
 "use client";
 
+import { academicStorage } from "@/lib/academic/storage";
+
 import type { ProgramMembership } from "@/lib/program-restrictions/eligibility";
 
 import { recordPlanningMilestone } from "@/lib/planning/checklist";
@@ -194,10 +196,10 @@ export default function ScheduleGeneratorPanel({
   }, [currentSchedule, onPreviewChange]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- The generator session is
-   * restored only after hydration so localStorage never affects server HTML. */
+   * restored only after hydration so academicStorage never affects server HTML. */
   useEffect(() => {
     try {
-      const storedSession = localStorage.getItem(GENERATOR_SESSION_STORAGE_KEY);
+      const storedSession = academicStorage.getItem(GENERATOR_SESSION_STORAGE_KEY);
       const session = storedSession
         ? parseGeneratorSession(JSON.parse(storedSession) as unknown)
         : null;

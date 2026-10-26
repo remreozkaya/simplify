@@ -13,10 +13,13 @@ export async function exportAccountAction() {
     const { data, error } = await client.auth.getUser();
     const user = data.user;
     if (error || !user?.email_confirmed_at) return { status: 'unauthorized' as const };
+    const { data: academicRecords, error: academicError } = await client.from('academic_records')
+      .select('record_key,payload,revision,schema_version,updated_at').eq('user_id', user.id);
+    if (academicError || !Array.isArray(academicRecords)) return { status: 'error' as const };
     return { status: 'success' as const, account: {
       id: user.id, email: user.email, createdAt: user.created_at,
       emailConfirmedAt: user.email_confirmed_at,
-      profile: exportStoredProfile(user.user_metadata.profile),
+      profile: exportStoredProfile(user.user_metadata.profile), academicRecords,
     } };
   } catch {
     return { status: 'error' as const };
@@ -37,8 +40,8 @@ export async function deleteAccountAction(input: unknown) {
     if (verification.error || verification.data.user?.id !== user.id || !verification.data.user.email_confirmed_at) {
       return { status: 'verification' as const };
     }
-    // This schema has only Auth user metadata: no application tables or uploaded objects.
-    // Hard-delete the authenticated user, including metadata and identities. Never accept a target ID.
+    // academic_records.user_id references auth.users with ON DELETE CASCADE.
+    // Hard deletion removes this user’s cloud work atomically; never accept a target ID.
     const deletion = await admin.auth.admin.deleteUser(user.id, false);
     if (deletion.error) return { status: 'error' as const };
     // Deletion may already invalidate the session; local cookies must still be cleared.
@@ -47,7 +50,7 @@ export async function deleteAccountAction(input: unknown) {
     for (const { name } of cookieStore.getAll()) {
       if (name.startsWith('sb-') || [REMEMBER_COOKIE, RECOVERY_COOKIE, RESEND_COOKIE].includes(name)) cookieStore.delete(name);
     }
-    return { status: 'success' as const };
+    return { status: 'success' as const, userId: user.id };
   } catch {
     return { status: 'error' as const };
   }

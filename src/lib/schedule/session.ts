@@ -1,3 +1,5 @@
+
+import { academicStorage } from "@/lib/academic/storage";
 import { days, type Day } from "@/types/calendar";
 
 export const GENERATOR_SESSION_STORAGE_KEY = "simplify-schedule-generator-session";
@@ -104,7 +106,7 @@ export function parseGeneratorSession(value: unknown): GeneratorSession | null {
 /** Keep successful onboarding milestones when course selections/preferences change. */
 export function persistGeneratorSession(session: GeneratorSession, storage?: Pick<Storage, "getItem" | "setItem">) {
   try {
-    const browser = storage ?? window.localStorage;
+    const browser = storage ?? academicStorage;
     let previous: GeneratorSession | null = null;
     try {
       const value = browser.getItem(GENERATOR_SESSION_STORAGE_KEY);

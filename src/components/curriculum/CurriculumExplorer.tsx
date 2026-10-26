@@ -1,5 +1,7 @@
 "use client";
 
+import { academicStorage } from "@/lib/academic/storage";
+
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
 
 import { responseJson } from "@/lib/http/responseJson";
@@ -278,7 +280,7 @@ export default function CurriculumExplorer() {
         setProgramsLoading(false);
         setPrograms(loaded);
         const saved = parseSavedCurriculum(
-          localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
+          academicStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
         );
         const programToRestore =
           requestedProgram ?? (defaultProfileProgram || saved?.programCode);
@@ -331,7 +333,7 @@ export default function CurriculumExplorer() {
         setPlansLoading(false);
         setPlans(loaded);
         const saved = parseSavedCurriculum(
-          localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
+          academicStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
         );
         const planToRestore =
           requestedProgram === programCode &&
@@ -405,12 +407,12 @@ export default function CurriculumExplorer() {
       .then(({ curriculum: loaded }) => {
         setCurriculum(groupCurriculum(loaded));
         const storedProgress = parseCurriculumProgress(
-          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+          academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
           loaded.planId,
         );
         const loadedTranscript = loadSharedTranscript(
-          localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
-          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+          academicStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+          academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
         );
         const sharedTranscript = loadedTranscript.courses;
         if (loadedTranscript.migrated) persistSharedTranscript(sharedTranscript);
@@ -428,7 +430,7 @@ export default function CurriculumExplorer() {
             : evaluated,
         );
         const saved = parseSavedCurriculum(
-          localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
+          academicStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
         );
         setSaveConfirmed(
           saved?.programCode === programCode && saved.planId === loaded.planId,
@@ -835,7 +837,7 @@ export default function CurriculumExplorer() {
 
   function saveCurriculum() {
     if (!programCode || !planId || !progress) return;
-    localStorage.setItem(
+    academicStorage.setItem(
       SAVED_CURRICULUM_STORAGE_KEY,
       serializeSavedCurriculum(programCode, planId),
     );

@@ -1,5 +1,9 @@
 "use client";
 
+import { SELECTED_WEEKLY_PROGRAM_KEY } from "@/lib/academic/keys";
+import { resolveSelectedWeeklyProgram } from "@/lib/calendar/selectedProgram";
+import { academicStorage } from "@/lib/academic/storage";
+
 import {
   DndContext,
   DragOverlay,
@@ -279,13 +283,13 @@ export default function WeeklyCalendar({
   );
 
   /* eslint-disable react-hooks/set-state-in-effect -- This one-time client
-   * hydration intentionally synchronizes React state with localStorage after
+   * hydration initializes React state from the loaded account store after
    * SSR, preventing stored user schedules from causing a hydration mismatch. */
   useEffect(() => {
-    // Access to the localStorage object itself can also throw (blocked storage).
+    // Preserve the recovery warning when the account store cannot be read.
     let loaded: ReturnType<typeof loadWeeklyPrograms>;
     try {
-      loaded = loadWeeklyPrograms(localStorage);
+      loaded = loadWeeklyPrograms(academicStorage);
     } catch {
       loaded = { programs: [], recoveryRequired: true };
     }
@@ -300,9 +304,10 @@ export default function WeeklyCalendar({
     const requestedProgramId = new URLSearchParams(window.location.search).get(
       "program",
     );
-    const firstProgram =
-      initialPrograms.find((program) => program.id === requestedProgramId) ??
-      initialPrograms[0];
+    const restoredProgramId = resolveSelectedWeeklyProgram(
+      initialPrograms, requestedProgramId, academicStorage.getItem(SELECTED_WEEKLY_PROGRAM_KEY),
+    );
+    const firstProgram = initialPrograms.find((program) => program.id === restoredProgramId)!;
 
     setWeeklyPrograms(initialPrograms);
     setSelectedProgramId(firstProgram.id);
@@ -310,6 +315,16 @@ export default function WeeklyCalendar({
     setHasLoadedPrograms(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!hasLoadedPrograms || storageRecoveryRequired) return;
+    try {
+      academicStorage.setItem(SELECTED_WEEKLY_PROGRAM_KEY, JSON.stringify(selectedProgramId));
+    } catch {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStorageWriteFailed(true);
+    }
+  }, [selectedProgramId, hasLoadedPrograms, storageRecoveryRequired]);
 
   useEffect(() => {
     if (isLoadingBranches) {
@@ -334,7 +349,7 @@ export default function WeeklyCalendar({
 
     let result: ReturnType<typeof saveWeeklyPrograms>;
     try {
-      result = saveWeeklyPrograms(localStorage, weeklyPrograms, storageRecoveryRequired);
+      result = saveWeeklyPrograms(academicStorage, weeklyPrograms, storageRecoveryRequired);
     } catch {
       result = "error";
     }

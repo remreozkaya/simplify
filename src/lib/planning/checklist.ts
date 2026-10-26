@@ -1,3 +1,5 @@
+
+import { academicStorage } from "@/lib/academic/storage";
 import { parseStoredWeeklyPrograms } from '@/lib/calendar/persistence';
 import { loadSharedTranscript } from '@/lib/curriculum/transcriptStore';
 import { isProfileComplete, type UserProfile } from '@/lib/profile/types';
@@ -27,7 +29,7 @@ export function getPlanningCompletion(profile: UserProfile, records: PlanningRec
 
 export function recordPlanningMilestone(step: PlanningMilestone, storage?: Pick<Storage, 'getItem' | 'setItem'>) {
   try {
-    const browser = storage ?? window.localStorage;
+    const browser = storage ?? academicStorage;
     const session = parseGeneratorSession(parseJson(browser.getItem(GENERATOR_SESSION_STORAGE_KEY))) ?? {
       version: 2 as const, courses: [], earliestStartTime: '', latestEndTime: '', excludedDays: [],
     };

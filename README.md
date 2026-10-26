@@ -54,15 +54,15 @@ These Supabase values identify the public project. Account deletion additionally
 4. Set `NEXT_PUBLIC_SITE_URL` to that origin without a trailing slash. Production can alternatively use `VERCEL_PROJECT_PRODUCTION_URL`.
 5. Configure production SMTP before launch. Confirmation and recovery emails use Supabase's email delivery.
 
-No application database tables are required. Profile details and program enrollments are saved in Supabase Auth user metadata. Signup verification and password recovery return through `/auth/callback`. Keep the provider's confirmation/recovery links intact if customizing email templates.
+Apply `supabase/migrations/202610260001_academic_records.sql` in the intended Supabase project before running the protected workspace. Academic work is stored in the RLS-protected `academic_records` table. Profile details and degree program enrollments remain in Supabase Auth user metadata. See [account storage setup and recovery](docs/account-storage.md). Signup verification and password recovery return through `/auth/callback`. Keep the provider's confirmation/recovery links intact if customizing email templates.
 
 **Remember me** controls persistent versus session-only auth cookies. Browser session restoration may retain session cookies. Passwords and auth tokens are not copied into application `localStorage`.
 
 ## Storage and privacy
 
-Schedules, generator preferences, shared transcripts, curriculum selections/progress, current-semester courses and grade estimates, language, and theme are stored in this browser's `localStorage`. They persist after logout, are shared by accounts using the same browser profile, and do not synchronize across devices. Transcript parsing and academic calculations run locally; catalog requests use same-origin API routes that fetch public İTÜ data server-side.
+Schedules, selected weekly programs, generator preferences, parsed transcript history, curriculum selections/progress, current-semester courses and grade estimates are saved to the verified Supabase account and restore across devices. Pending changes use separate account/session recovery records in `localStorage`; language and theme remain device preferences. Legacy unowned personal planning keys are discarded, as requested, rather than imported. Raw transcript parsing and calculations run locally; extracted academic records are synchronized to Supabase. Catalog requests fetch public İTÜ data independently.
 
-Public bilingual pages at `/legal/privacy`, `/legal/storage`, `/legal/terms`, and `/legal/requests` describe data handling. The storage page offers browser-data export and clearing. Profile offers verified account export and, when the server credential is configured, password-confirmed account deletion. Deleting an account does not automatically clear browser records.
+Public bilingual pages at `/legal/privacy`, `/legal/storage`, `/legal/terms`, and `/legal/requests` describe data handling. The storage page offers browser-data export and clearing. Profile offers verified account export and, when the server credential is configured, password-confirmed account deletion. Account deletion cascades to saved academic records and clears the deleted account’s recovery records on the current device. Other devices and provider backups need separate handling. Cloud read failure fails account export rather than claiming a complete download.
 
 ## Checks and builds
 
@@ -73,7 +73,7 @@ npm run test:run
 npm run build
 ```
 
-`npm test` runs Vitest in watch mode. Unit and component tests use fixtures and mocks; they do not send email or refresh official snapshots. Optional browser regression runners and their setup instructions live under `tests/auth/browser`, `tests/calendar/browser`, and `tests/i18n/browser`; they require external browser tooling.
+`npm test` runs Vitest in watch mode. Unit and component tests use fixtures and mocks; embedded PostgreSQL tests execute the account-storage migration with modeled Supabase roles/claims. Tests do not send email, contact the live database, or refresh official snapshots. Optional browser regression runners and their setup instructions live under `tests/auth/browser`, `tests/calendar/browser`, and `tests/i18n/browser`; they require external browser tooling.
 
 `npm run build` compiles with webpack. `npm start` serves that build. Geist fonts and their OFL license are bundled in `src/app/fonts`, so builds do not download fonts. Server-rendered metadata is Turkish; client metadata follows the saved language preference.
 

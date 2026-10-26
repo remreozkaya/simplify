@@ -1,5 +1,8 @@
 "use client";
 
+import { ACADEMIC_CHANGE_EVENT } from "@/lib/academic/keys";
+import { academicStorage } from "@/lib/academic/storage";
+
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { useProfile } from '@/components/profile/ProfileProvider';
@@ -16,14 +19,14 @@ const steps = [
   { href: '/generator', label: 'navigation.scheduleGenerator' },
   { href: '/weekly-planner', label: 'navigation.weeklyPlanner' },
 ];
-const events = ['storage', 'focus', SHARED_TRANSCRIPT_EVENT, PLANNING_PROGRESS_EVENT];
+const events = [ACADEMIC_CHANGE_EVENT, 'storage', 'focus', SHARED_TRANSCRIPT_EVENT, PLANNING_PROGRESS_EVENT];
 function subscribe(callback: () => void) {
   events.forEach(event => window.addEventListener(event, callback));
   return () => events.forEach(event => window.removeEventListener(event, callback));
 }
 function snapshot() {
   const read = (key: string) => {
-    try { return window.localStorage.getItem(key); } catch { return null; }
+    try { return academicStorage.getItem(key); } catch { return null; }
   };
   return JSON.stringify({
     transcript: read(SHARED_TRANSCRIPT_STORAGE_KEY),

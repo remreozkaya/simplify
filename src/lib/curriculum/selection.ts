@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SAVED_CURRICULUM_STORAGE_KEY = "simplify-saved-curriculum-v1";
 
-const savedCurriculumSchema = z.object({
+export const savedCurriculumSchema = z.object({
   version: z.literal(1),
   programCode: z.string().min(1),
   planId: z.number().int().positive(),

@@ -8,6 +8,7 @@ import PrivacyControls from './PrivacyControls';
 import { useLanguage } from '@/lib/i18n/client';
 import { legalConfig, type LegalDocument } from '@/lib/legal/config';
 import { legalCopy, legalSections } from '@/lib/legal/copy';
+import { RECOVERY_PREFIX, RECOVERY_ACK_PREFIX, SELECTED_WEEKLY_PROGRAM_KEY } from '@/lib/academic/keys';
 import { PLANNER_STORAGE_KEYS } from '@/lib/legal/browserStorage';
 
 export default function LegalPage({ document, sourceDates }: { document: LegalDocument; sourceDates: { catalog: string; equivalences: string } }) {
@@ -23,7 +24,10 @@ export default function LegalPage({ document, sourceDates }: { document: LegalDo
     ['simplify-password-recovery', tr ? 'Simplify / gerekli güvenlik' : 'Simplify / necessary security', tr ? 'Parola kurtarma oturumunu sınırlama' : 'Restrict password recovery session', tr ? '15 dakika' : '15 minutes'],
     ['simplify-verification-resend', tr ? 'Simplify / gerekli güvenlik' : 'Simplify / necessary security', tr ? 'Doğrulama e-postası yeniden gönderim sınırı' : 'Verification email resend throttle', tr ? '30 saniye' : '30 seconds'],
   ];
-  const storageRows = PLANNER_STORAGE_KEYS.map((key, index) => [`localStorage: ${key}`, copy.firstParty, copy.storedPurposes[index], copy.noExpiry]);
+  const storageRows = PLANNER_STORAGE_KEYS.map((key, index) => [`${key === 'simplify-language' || key === 'simplify-theme' ? 'localStorage' : 'Supabase academic_records'}: ${key}`, copy.firstParty, copy.storedPurposes[index], copy.noExpiry]);
+  storageRows.push([`Supabase academic_records: ${SELECTED_WEEKLY_PROGRAM_KEY}`, copy.firstParty, tr ? 'Seçili haftalık program' : 'Selected weekly plan', copy.noExpiry]);
+  storageRows.push([`localStorage: ${RECOVERY_PREFIX}<user-id>`, copy.firstParty, tr ? 'Hesaba bağlı bekleyen değişiklikler; cihaz erişimiyle okunabilir' : 'Account-separated pending edits; readable with device access', tr ? 'Etkin kayıt kaydedilince kaldırılır; eski kopyalar cihaz temizlenene kadar kalabilir' : 'Active record removed after saving; older copies may remain until device clearing']);
+  storageRows.push([`localStorage: ${RECOVERY_ACK_PREFIX}<user-id>:<writer-id>`, copy.firstParty, tr ? 'Kurtarılan kopyaların tamamlanma özetleri; önceki kopyalar cihazda kalabilir' : 'Completion digests for recovered copies; earlier snapshots may remain on the device', copy.noExpiry]);
   const rows = [...cookieRows.map(row => [`Cookie: ${row[0]}`, ...row.slice(1)]), ...storageRows];
   return <>
     <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-blue-700 focus:p-3 focus:text-white">{tr ? "İçeriğe geç" : "Skip to content"}</a>

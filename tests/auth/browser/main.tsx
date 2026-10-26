@@ -1,3 +1,4 @@
+import { bindAcademicStorage } from "@/lib/academic/storage";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import LocalizedMetadata from "@/components/LocalizedMetadata";
@@ -13,4 +14,6 @@ import "@/app/globals.css";
 
 const mode = new URLSearchParams(location.search).get("mode");
 const Form = mode === "profile" ? <ProfileProvider initialProfile={EMPTY_PROFILE}><ProfilePage email="fixture@example.invalid" canChangePassword deletionAvailable={false} /></ProfileProvider> : mode === "login" ? <LoginForm nextPath="/" /> : mode === "forgot" ? <ForgotPasswordForm /> : mode === "reset" ? <ResetPasswordForm /> : <SignupForm />;
-createRoot(document.getElementById("root")!).render(<main className="mx-auto max-w-md p-4"><LocalizedMetadata /><LanguageToggle />{Form}</main>);
+// Isolated fixture storage; production requires account hydration.
+bindAcademicStorage(window.localStorage);
+createRoot(document.getElementById("root")!).render(<main className={mode === "profile" ? "mx-auto p-4" : "mx-auto max-w-md p-4"}><LocalizedMetadata /><LanguageToggle />{Form}</main>);

@@ -3121,6 +3121,13 @@
       "version": "4.0.2",
       "license": "MIT",
       "path": "node_modules/zod-validation-error"
+    },
+    {
+      "name": "@electric-sql/pglite",
+      "version": "0.5.12",
+      "license": "Apache-2.0",
+      "path": "node_modules/@electric-sql/pglite",
+      "note": "Development-only embedded PostgreSQL test dependency added 2026-10-26."
     }
   ]
 }

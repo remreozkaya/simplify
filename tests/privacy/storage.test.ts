@@ -24,3 +24,19 @@ describe('privacy controls', () => {
     expect(getRouteDecision(path, '', true).type).toBe('allow');
   });
 });
+
+it('exports recovery namespaces without tokens and deletion clears only the deleted account recovery', () => {
+  const values = new Map([
+    ['simplify-academic-pending-v1:A', 'pending-A'], ['simplify-academic-pending-v1:B', 'pending-B'],
+    ['sb-token', 'secret'], ['itu-catalog', 'official'],
+  ]);
+  const storage = { get length() { return values.size; }, key: (i: number) => [...values.keys()][i] ?? null,
+    getItem: (k: string) => values.get(k) ?? null, removeItem: (k: string) => { values.delete(k); } };
+  expect(exportPlannerStorage(storage, 'A')).toEqual({ 'simplify-academic-pending-v1:A': 'pending-A' });
+  expect(exportPlannerStorage(storage)).toEqual({});
+  clearPlannerStorage(storage, 'A');
+  expect(values.has('simplify-academic-pending-v1:A')).toBe(false);
+  expect(values.get('simplify-academic-pending-v1:B')).toBe('pending-B');
+  expect(values.get('sb-token')).toBe('secret');
+  expect(values.get('itu-catalog')).toBe('official');
+});

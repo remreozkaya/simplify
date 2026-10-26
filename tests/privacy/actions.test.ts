@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ getUser: vi.fn(), signIn: vi.fn(), deleteUser: vi.fn(), signOut: vi.fn(), cookies: vi.fn(), admin: vi.fn() }));
-vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth: { getUser: mocks.getUser, signInWithPassword: mocks.signIn, signOut: mocks.signOut } }) }));
+const mocks = vi.hoisted(() => ({ getUser: vi.fn(), signIn: vi.fn(), deleteUser: vi.fn(), signOut: vi.fn(), cookies: vi.fn(), admin: vi.fn(), records: vi.fn() }));
+vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth: { getUser: mocks.getUser, signInWithPassword: mocks.signIn, signOut: mocks.signOut }, from: () => ({ select: () => ({ eq: mocks.records }) }) }) }));
 vi.mock('@/lib/legal/admin', () => ({ createDeletionClient: mocks.admin }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ getAll: () => [{ name: 'sb-test-auth-token' }, { name: 'simplify-remember' }], delete: mocks.cookies }) }));
 import { exportAccountAction, deleteAccountAction } from '@/app/privacy/actions';
 const user = { id: 'session-owner', email: 'test@example.invalid', email_confirmed_at: '2026-01-01', created_at: '2026-01-01', user_metadata: { profile: { version: 2, name: 'Test', surname: 'Student', birthdate: '', nickname: '', programEnrollments: [], profileUpdatedAt: null }, secret: 'do not export' }, app_metadata: { provider: 'email' } };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.records.mockResolvedValue({ data: [{ record_key: "simplify-selected-weekly-program", payload: "plan", revision: 2 }], error: null });
   mocks.admin.mockReturnValue({ auth: { admin: { deleteUser: mocks.deleteUser } } });
   mocks.getUser.mockResolvedValue({ data: { user }, error: null });
   mocks.signIn.mockResolvedValue({ data: { user }, error: null });
@@ -72,4 +73,12 @@ it('reports unavailable deletion without pretending to delete an account', async
   expect(await deleteAccountAction({ password: 'test-password', confirm: true })).toEqual({ status: 'unavailable' });
   expect(mocks.signIn).not.toHaveBeenCalled();
   expect(mocks.deleteUser).not.toHaveBeenCalled();
+});
+
+it('includes cloud academic work in account export and fails rather than returning a partial export', async () => {
+  const result = await exportAccountAction();
+  expect(result.status).toBe('success');
+  expect(result.account).toMatchObject({ academicRecords: [{ record_key: 'simplify-selected-weekly-program', payload: 'plan', revision: 2 }] });
+  mocks.records.mockResolvedValue({ data: null, error: new Error('database failed') });
+  expect(await exportAccountAction()).toEqual({ status: 'error' });
 });

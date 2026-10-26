@@ -1,5 +1,7 @@
 "use client";
 
+import { academicStorage } from "@/lib/academic/storage";
+
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
 
 import { responseJson } from "@/lib/http/responseJson";
@@ -422,7 +424,7 @@ export default function GraduationCalculator() {
 
   useEffect(() => {
     const saved = parseSavedCurriculum(
-      localStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
+      academicStorage.getItem(SAVED_CURRICULUM_STORAGE_KEY),
     );
     const enrollments = configuredEnrollments.length
       ? configuredEnrollments
@@ -464,13 +466,13 @@ export default function GraduationCalculator() {
         );
         const stored = curriculumResponses.map(({ curriculum }) =>
           parseCurriculumProgress(
-            localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+            academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
             curriculum.planId,
           ),
         );
         const loadedTranscript = loadSharedTranscript(
-          localStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
-          localStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
+          academicStorage.getItem(SHARED_TRANSCRIPT_STORAGE_KEY),
+          academicStorage.getItem(CURRICULUM_PROGRESS_STORAGE_KEY),
         );
         const transcript = loadedTranscript.courses;
         if (loadedTranscript.migrated) persistSharedTranscript(transcript);
