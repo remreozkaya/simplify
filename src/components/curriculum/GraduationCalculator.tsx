@@ -204,9 +204,6 @@ export function ProgramAuditSection({
                     useGrouping: false,
                   })}
             </p>
-            <OptionalHelp summary={t("graduationCalculator.gpaHelp")}>
-              <p>{t("graduationCalculator.programGpaDescription")}</p>
-            </OptionalHelp>
           </div>
         </div>
         <CurriculumWarnings warnings={curriculum.warnings} />

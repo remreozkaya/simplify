@@ -45,6 +45,7 @@ it.each(["tr", "en"] as const)("shows the 30%% minimum in the graduation audit a
   } }));
   const label = language === "tr" ? "Asgari İngilizce kredisi" : "Minimum English credit";
   expect(html).not.toContain(label);
+  expect(html).not.toContain(language === "tr" ? "GNO hesabı" : "GPA calculation");
   expect(html).toMatch(/0\.00\s*\/\s*45\.00/);
   const summary = renderToStaticMarkup(createElement(MinimumEnglishCredit, { credit: curriculumTotals(plan, progress).requiredEnglishCredit }));
   expect(summary).toContain(label);
