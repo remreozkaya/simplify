@@ -25,9 +25,19 @@ it("uses 30% of the published graduation credits rather than English-labelled ro
   expect(curriculumTotals(curriculum, emptyProgress(1)).requiredEnglishCredit).toBe(45);
 });
 
-it("keeps fractional targets and falls back to complete requirement credits when the published total is absent", () => {
-  expect(curriculumTotals(plan({ totalCredit: 151.5 }), emptyProgress(1)).requiredEnglishCredit).toBeCloseTo(45.45);
-  expect(curriculumTotals(plan({ totalCredit: undefined }), emptyProgress(1)).requiredEnglishCredit).toBeCloseTo(2.1);
+it.each([
+  { totalCredit: 150, minimum: 45 },
+  { totalCredit: 151, minimum: 46 },
+  { totalCredit: 151.5, minimum: 46 },
+  { totalCredit: 152, minimum: 46 },
+  { totalCredit: 160, minimum: 48 },
+  { totalCredit: 0, minimum: 0 },
+])("rounds the 30% target up for $totalCredit credits to $minimum", ({ totalCredit, minimum }) => {
+  expect(curriculumTotals(plan({ totalCredit }), emptyProgress(1)).requiredEnglishCredit).toBe(minimum);
+});
+
+it("rounds up the fallback requirement total when the published total is absent", () => {
+  expect(curriculumTotals(plan({ totalCredit: undefined }), emptyProgress(1)).requiredEnglishCredit).toBe(3);
 });
 
 it("does not invent a target when both credit sources are unresolved", () => {
