@@ -213,8 +213,6 @@ const en = {
     englishCredits: "English Credits",
     minimumEnglishCredit: "Minimum English credit",
     programGpa: "Program GPA",
-    programGpaDescription:
-      "Only graded courses matched to this program count, weighted by transcript credits.",
     term: "Term",
     crn: "CRN",
     requirement: "Requirement",
@@ -254,7 +252,6 @@ const en = {
       "1. Semester\nTerm\tCRN\tCourse Code\tCourse Name\tCourse Language\tGrade\tCounted Credit\tCredit\tStatus\n202510\t10705\tTUR 121\tTurkish I\tTR\tBL\t0\t0",
     auditHelp:
       "Each program uses its own curriculum. For repeated courses, the latest term is used.",
-    gpaHelp: "GPA calculation",
   },
   semesters: {
     addCourseButton: "Add course",

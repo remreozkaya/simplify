@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import AcademicProvider from '@/components/academic/AcademicProvider';
 import { academicStorage } from '@/lib/academic/storage';

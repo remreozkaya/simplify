@@ -1,5 +1,4 @@
 import { bindAcademicStorage } from "@/lib/academic/storage";
-import React from "react";
 import { createRoot } from "react-dom/client";
 import LocalizedMetadata from "@/components/LocalizedMetadata";
 import LanguageToggle from "@/components/LanguageToggle";

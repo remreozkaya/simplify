@@ -210,8 +210,6 @@ const tr = {
     englishCredits: "İngilizce Kredi",
     minimumEnglishCredit: "Asgari İngilizce kredisi",
     programGpa: "Program GNO'su",
-    programGpaDescription:
-      "Yalnızca bu programa sayılan notlu dersler kullanılır; transkript kredileriyle ağırlıklandırılır.",
     term: "Dönem",
     crn: "CRN",
     requirement: "Gereklilik",
@@ -250,7 +248,6 @@ const tr = {
       "1. Yarıyıl\nDönem\tCRN\tDers Kodu\tDers Adı\tDers Dili\tNot\tSayılan Kredi\tKredi\tDurum\n202510\t10705\tTUR 121\tTürk Dili I\tTR\tBL\t0\t0",
     auditHelp:
       "Her program kendi ders planıyla değerlendirilir. Tekrar alınan derslerde en güncel dönem kullanılır.",
-    gpaHelp: "GNO hesabı",
   },
   semesters: {
     addCourseButton: "Ders ekle",

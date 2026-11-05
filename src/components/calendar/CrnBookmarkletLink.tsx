@@ -1,7 +1,5 @@
 "use client";
 
-import React from "react";
-
 type Props = { url: string | null; label: string; tooltip: string };
 
 export default function CrnBookmarkletLink({ url, label, tooltip }: Props) {
