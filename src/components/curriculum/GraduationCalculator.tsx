@@ -634,112 +634,118 @@ export default function GraduationCalculator() {
       </section>
     );
 
+  const transcriptForm = (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+      <label
+        htmlFor="transcript-input"
+        className="text-lg font-semibold text-slate-950 dark:text-white"
+      >
+        {t("graduationCalculator.sharedTranscript")}
+      </label>
+      <p
+        id="transcript-help"
+        className="mt-2 text-sm text-slate-600 dark:text-slate-300"
+      >
+        {t("graduationCalculator.sharedDescription")}
+      </p>
+      <OptionalHelp summary={t("graduationCalculator.importHelp")}>
+        <p>{t("graduationCalculator.importFormat")}</p>
+        <p>{t("graduationCalculator.auditHelp")}</p>
+      </OptionalHelp>
+      <textarea
+        id="transcript-input"
+        value={input}
+        onChange={(event) => setInput(event.target.value)}
+        rows={6}
+        aria-describedby="transcript-help"
+        placeholder={t("graduationCalculator.transcriptPlaceholder")}
+        className="mt-4 w-full rounded-xl border border-slate-300 bg-white p-4 font-mono text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+      />
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={importCourses}
+          disabled={!input.trim()}
+          className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("graduationCalculator.importCourses")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setInput("")}
+          className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+        >
+          {t("graduationCalculator.clearInput")}
+        </button>
+        <button
+          type="button"
+          onClick={resetImported}
+          disabled={!sharedTranscript.length}
+          className="rounded-xl border border-red-300 bg-red-50 px-5 py-3 text-sm font-semibold text-red-800 disabled:opacity-50"
+        >
+          {t("graduationCalculator.resetImported")}
+        </button>
+      </div>
+      {lastReport ? (
+        <div className="mt-5" aria-live="polite">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
+              <p className="text-xs font-bold uppercase text-slate-500">
+                {t("graduationCalculator.parsedCourses")}
+              </p>
+              <p className="text-2xl font-semibold">
+                {lastReport.parsed.calculatedCourses.length +
+                  lastReport.parsed.nonCalculatedCourses.length}
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
+              <p className="text-xs font-bold uppercase text-slate-500">
+                {t("graduationCalculator.programsEvaluated")}
+              </p>
+              <p className="text-2xl font-semibold">{audits.length}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
+              <p className="text-xs font-bold uppercase text-slate-500">
+                {t("graduationCalculator.rowsAttention")}
+              </p>
+              <p className="text-2xl font-semibold">
+                {lastReport.parsed.invalidRows.length +
+                  lastReport.parsed.duplicateRows.length}
+              </p>
+            </div>
+          </div>
+          {lastReport.parsed.invalidRows.length ||
+          lastReport.parsed.duplicateRows.length ? (
+            <details className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              <summary className="cursor-pointer font-bold">
+                {t("graduationCalculator.reviewRows")}
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {[
+                  ...lastReport.parsed.invalidRows,
+                  ...lastReport.parsed.duplicateRows,
+                ].map((issue, index) => (
+                  <li key={`${issue.line}-${index}`}>
+                    <strong>
+                      {t("common.line")} {issue.line}
+                    </strong>
+                    : {localizeRuntimeMessage(language, issue.reason)}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-        <label
-          htmlFor="transcript-input"
-          className="text-lg font-semibold text-slate-950 dark:text-white"
-        >
-          {t("graduationCalculator.sharedTranscript")}
-        </label>
-        <p
-          id="transcript-help"
-          className="mt-2 text-sm text-slate-600 dark:text-slate-300"
-        >
-          {t("graduationCalculator.sharedDescription")}
-        </p>
-        <OptionalHelp summary={t("graduationCalculator.importHelp")}>
-          <p>{t("graduationCalculator.importFormat")}</p>
-          <p>{t("graduationCalculator.auditHelp")}</p>
-        </OptionalHelp>
-        <textarea
-          id="transcript-input"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          rows={6}
-          aria-describedby="transcript-help"
-          placeholder={t("graduationCalculator.transcriptPlaceholder")}
-          className="mt-4 w-full rounded-xl border border-slate-300 bg-white p-4 font-mono text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-        />
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={importCourses}
-            disabled={!input.trim()}
-            className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t("graduationCalculator.importCourses")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setInput("")}
-            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
-          >
-            {t("graduationCalculator.clearInput")}
-          </button>
-          <button
-            type="button"
-            onClick={resetImported}
-            disabled={!sharedTranscript.length}
-            className="rounded-xl border border-red-300 bg-red-50 px-5 py-3 text-sm font-semibold text-red-800 disabled:opacity-50"
-          >
-            {t("graduationCalculator.resetImported")}
-          </button>
-        </div>
-        {lastReport ? (
-          <div className="mt-5" aria-live="polite">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  {t("graduationCalculator.parsedCourses")}
-                </p>
-                <p className="text-2xl font-semibold">
-                  {lastReport.parsed.calculatedCourses.length +
-                    lastReport.parsed.nonCalculatedCourses.length}
-                </p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  {t("graduationCalculator.programsEvaluated")}
-                </p>
-                <p className="text-2xl font-semibold">{audits.length}</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
-                <p className="text-xs font-bold uppercase text-slate-500">
-                  {t("graduationCalculator.rowsAttention")}
-                </p>
-                <p className="text-2xl font-semibold">
-                  {lastReport.parsed.invalidRows.length +
-                    lastReport.parsed.duplicateRows.length}
-                </p>
-              </div>
-            </div>
-            {lastReport.parsed.invalidRows.length ||
-            lastReport.parsed.duplicateRows.length ? (
-              <details className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                <summary className="cursor-pointer font-bold">
-                  {t("graduationCalculator.reviewRows")}
-                </summary>
-                <ul className="mt-2 space-y-1">
-                  {[
-                    ...lastReport.parsed.invalidRows,
-                    ...lastReport.parsed.duplicateRows,
-                  ].map((issue, index) => (
-                    <li key={`${issue.line}-${index}`}>
-                      <strong>
-                        {t("common.line")} {issue.line}
-                      </strong>
-                      : {localizeRuntimeMessage(language, issue.reason)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </div>
-        ) : null}
-        {sharedTranscript.length ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      {!sharedTranscript.length ? transcriptForm : null}
+      {sharedTranscript.length ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
               <p className="text-xs font-bold uppercase text-slate-500">
                 {t("graduationCalculator.transcriptCourses")}
@@ -767,8 +773,8 @@ export default function GraduationCalculator() {
               </p>
             </div>
           </div>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       {audits.length > 1 ? (
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5">
@@ -830,6 +836,7 @@ export default function GraduationCalculator() {
           </ul>
         </section>
       ) : null}
+      {sharedTranscript.length ? transcriptForm : null}
     </div>
   );
 }
