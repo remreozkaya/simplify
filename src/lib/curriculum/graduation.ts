@@ -5,6 +5,7 @@ import type { TranscriptParseResult } from "@/lib/curriculum/transcript";
 import type { ItuCurriculum, ItuCurriculumItem } from "@/lib/itu/curriculum/types";
 import { courseLanguageFromCode, courseLanguageVariants, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 import { normalizeCourseLanguage } from "@/lib/itu/curriculum/language";
+import { minimumEnglishCredit } from "@/lib/curriculum/minimumEnglishCredit";
 
 export type CourseMatchIssue = { record: TranscriptCourseRecord; reason: string; requirementId?: string };
 export type ImportResult = { progress: CurriculumProgress; matched: TranscriptCourseRecord[]; unmatched: CourseMatchIssue[]; ambiguous: CourseMatchIssue[] };
@@ -432,7 +433,8 @@ export function curriculumTotals(curriculum: ItuCurriculum, progress: Curriculum
   return {
     requiredCourses: items.length,
     requiredCredit: requiredCredit ?? curriculum.totalCredit ?? null,
-    requiredEnglishCredit, earnedCourses, earnedCredit, earnedEnglishCredit,
+    requiredEnglishCredit: minimumEnglishCredit(curriculum, requiredCredit, requiredEnglishCredit),
+    earnedCourses, earnedCredit, earnedEnglishCredit,
   };
 }
 

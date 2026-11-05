@@ -1,5 +1,7 @@
 "use client";
 
+import { MinimumEnglishCredit } from "@/components/curriculum/MinimumEnglishCredit";
+
 import { academicStorage } from "@/lib/academic/storage";
 
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
@@ -1060,6 +1062,7 @@ export default function CurriculumExplorer() {
                   })}
                 </p>
               ) : null}
+              {auditTotals ? <MinimumEnglishCredit credit={auditTotals.requiredEnglishCredit} /> : null}
               {auditTotals && [auditTotals.earnedCredit, auditTotals.requiredCredit, auditTotals.earnedEnglishCredit, auditTotals.requiredEnglishCredit].some((credit) => credit === null) ? (
                 <p role="status" className="mt-2 text-sm text-amber-700 dark:text-amber-300">{t("curriculum.creditUncertainty")}</p>
               ) : null}

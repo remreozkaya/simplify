@@ -8,6 +8,8 @@ import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 const state = vi.hoisted(() => ({ language: "en" as "tr" | "en" }));
 vi.mock("@/lib/i18n/client", () => ({ useLanguage: () => ({ language: state.language, t: (key: string, values?: Record<string, string | number>) => translate(state.language, key, values) }) }));
 import { ProgramAuditSection } from "@/components/curriculum/GraduationCalculator";
+import { MinimumEnglishCredit } from "@/components/curriculum/MinimumEnglishCredit";
+import { curriculumTotals } from "@/lib/curriculum/graduation";
 
 const curriculum: ItuCurriculum = {
   planId: 19, programCode: "SYNTHETIC_LS", title: "Science", planTitle: "Variable credit plan", totalCredit: 4,
@@ -31,4 +33,20 @@ it.each(["tr", "en"] as const)("shows minimum elective credit totals without unc
   expect(englishSummary).toMatch(/0\.00\s*\/\s*3\.00/);
   expect(englishSummary).not.toMatch(/0\.00\s*\/\s*0\.00/);
   expect(html).toContain(language === "tr" ? "Bu ders planı için resmî denklik kapsamı verisi mevcut değil." : "Official equivalence coverage is unavailable for this curriculum.");
+});
+
+it.each(["tr", "en"] as const)("shows the 30%% minimum in the graduation audit and shared curriculum label in %s", language => {
+  state.language = language;
+  const plan: ItuCurriculum = { ...curriculum, programCode: "FIZ_LS", planType: "undergraduate", title: "Fizik Mühendisliği", totalCredit: 150 };
+  const progress = emptyProgress(plan.planId);
+  const html = renderToStaticMarkup(createElement(ProgramAuditSection, { audit: {
+    curriculum: plan, progress, program: null,
+    enrollment: { id: "main", type: "main", facultyId: "science", facultyName: "Science", educationLevel: "undergraduate", planType: "undergraduate", programCode: "FIZ_LS", programName: "Physics", curriculumPlanId: 19, curriculumPlanName: "2026" },
+  } }));
+  const label = language === "tr" ? "Asgari İngilizce kredisi" : "Minimum English credit";
+  expect(html).toContain(label);
+  expect(html).toMatch(/0\.00\s*\/\s*45\.00/);
+  const summary = renderToStaticMarkup(createElement(MinimumEnglishCredit, { credit: curriculumTotals(plan, progress).requiredEnglishCredit }));
+  expect(summary).toContain(label);
+  expect(summary).toContain("45.00");
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { MinimumEnglishCredit } from "@/components/curriculum/MinimumEnglishCredit";
+
 import { academicStorage } from "@/lib/academic/storage";
 
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
@@ -190,6 +192,7 @@ export function ProgramAuditSection({
               {value(totals.earnedEnglishCredit)} /{" "}
               {value(totals.requiredEnglishCredit)}
             </p>
+            <MinimumEnglishCredit credit={totals.requiredEnglishCredit} />
           </div>
           <div className="xl:text-right">
             <p className="text-xs font-bold uppercase text-slate-500">

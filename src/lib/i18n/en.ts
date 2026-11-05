@@ -211,6 +211,7 @@ const en = {
     requirements: "Requirements",
     countedCredits: "Counted Credits",
     englishCredits: "English Credits",
+    minimumEnglishCredit: "Minimum English credit",
     programGpa: "Program GPA",
     programGpaDescription:
       "Only graded courses matched to this program count, weighted by transcript credits.",

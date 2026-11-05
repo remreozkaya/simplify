@@ -208,6 +208,7 @@ const tr = {
     requirements: "Gereklilikler",
     countedCredits: "Sayılan Kredi",
     englishCredits: "İngilizce Kredi",
+    minimumEnglishCredit: "Asgari İngilizce kredisi",
     programGpa: "Program GNO'su",
     programGpaDescription:
       "Yalnızca bu programa sayılan notlu dersler kullanılır; transkript kredileriyle ağırlıklandırılır.",
