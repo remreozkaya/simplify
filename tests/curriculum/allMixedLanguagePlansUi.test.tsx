@@ -78,7 +78,7 @@ for (const language of ["tr", "en"] as const) {
           educationLevel: "undergraduate", planType: "undergraduate", programCode: source.programCode,
           programName: source.programName, curriculumPlanId: source.id, curriculumPlanName: source.title },
       } }));
-      expect(graduation.replace(/<[^>]*>/g, "")).toContain(expectedLabel);
+      expect(graduation.replace(/<[^>]*>/g, "")).not.toContain(expectedLabel);
       expect(graduation.replace(/<[^>]*>/g, "")).toContain(`0.00 / ${expectedMinimum}.00`);
     },
   );

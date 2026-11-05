@@ -44,7 +44,7 @@ it.each(["tr", "en"] as const)("shows the 30%% minimum in the graduation audit a
     enrollment: { id: "main", type: "main", facultyId: "science", facultyName: "Science", educationLevel: "undergraduate", planType: "undergraduate", programCode: "FIZ_LS", programName: "Physics", curriculumPlanId: 19, curriculumPlanName: "2026" },
   } }));
   const label = language === "tr" ? "Asgari İngilizce kredisi" : "Minimum English credit";
-  expect(html).toContain(label);
+  expect(html).not.toContain(label);
   expect(html).toMatch(/0\.00\s*\/\s*45\.00/);
   const summary = renderToStaticMarkup(createElement(MinimumEnglishCredit, { credit: curriculumTotals(plan, progress).requiredEnglishCredit }));
   expect(summary).toContain(label);
