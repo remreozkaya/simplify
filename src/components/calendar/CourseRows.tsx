@@ -21,7 +21,7 @@ const overlayFieldClassName =
   "flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm";
 
 export const courseRowGridClassName =
-  "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_5rem] items-end gap-3 rounded-xl p-2";
+  "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_5rem] items-end gap-3 rounded-xl px-2 py-1";
 
 type SortableCourseRowProps = {
   selection: CourseSelection;

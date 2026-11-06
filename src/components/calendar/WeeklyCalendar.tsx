@@ -983,7 +983,7 @@ export default function WeeklyCalendar({
                     items={courseSelections.map((selection) => selection.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {courseSelections.map((selection) => (
                         <SortableCourseRow
                           key={selection.id}
@@ -1102,7 +1102,7 @@ export default function WeeklyCalendar({
               return (
                 <div
                   key={course.id}
-                  className="absolute z-10 px-[1px] transition-[top,left,width,height] duration-200 ease-out"
+                  className="absolute z-10 px-[1px] transition-[top,left,width,height] duration-200 ease-out hover:z-20"
                   style={{
                     top,
                     height,
@@ -1116,7 +1116,7 @@ export default function WeeklyCalendar({
                     type="button"
                     onClick={() => setDetailsCourseId(course.id)}
                     aria-haspopup="dialog"
-                    className={`h-full w-full cursor-pointer overflow-hidden text-left focus-visible:outline-2 focus-visible:outline-blue-500 rounded-lg border p-2 text-xs shadow-sm ${colorStyle.block}`}
+                    className={`h-full w-full cursor-pointer overflow-hidden text-left focus-visible:outline-2 focus-visible:outline-blue-500 rounded-lg border p-2 text-xs shadow-sm transition-[transform,background-color,box-shadow] duration-200 ease-out hover:scale-[1.02] hover:shadow-md ${colorStyle.block}`}
                   >
                     <span className={`block font-semibold ${colorStyle.heading}`}>
                       {course.code}
