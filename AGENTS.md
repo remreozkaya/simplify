@@ -1,3 +1,8 @@
+# Branch naming
+
+- Create feature branches as `feature/<name>`.
+- Do not create branches with the `codex/` prefix in this project.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
