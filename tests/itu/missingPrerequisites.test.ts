@@ -37,6 +37,37 @@ async function results() {
 }
 
 describe("missing official prerequisite pages", () => {
+  it("loads published prerequisites when the directory includes U_ARCH", async () => {
+    const mathDetail = detail.replace("ARB 101", "MAT 102").replace("Arabic", "Mathematics");
+    const fetch = vi.fn(async (input: URL) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith("DersOnsartList")) {
+        return new Response('<select name="DersBransKoduId"><option value="26">MAT</option><option value="335">U_ARCH</option></select>');
+      }
+      if (url.pathname.endsWith("OnsartAra") && url.searchParams.get("DersBransKoduId") === "26") {
+        return new Response(`<table><tbody><tr>
+          <td><a>MAT 102</a><br><a>MAT 102E</a></td><td>Mathematics II</td>
+          <td><span>(</span><span>MAT 101</span><span>MIN. DD</span><span>Or</span><span>MAT 101E</span><span>MIN. DD</span><span>)</span><br>
+          <span>Or ( MAT 103 MIN. DD Or MAT 103E MIN. DD )</span><br>
+          <span>Or ( MAT 112 MIN. DD Or MAT 112E MIN. DD )</span></td><td></td>
+        </tr></tbody></table>`);
+      }
+      if (url.pathname.includes("DersPlanDetay")) return new Response(mathDetail);
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const curriculum = await getCurriculum(991, "TEST_LS");
+
+    expect(curriculum.prerequisites["MAT 102"]).toMatchObject({
+      rawExpression: "( MAT 101 MIN. DD Or MAT 101E MIN. DD ) Or ( MAT 103 MIN. DD Or MAT 103E MIN. DD ) Or ( MAT 112 MIN. DD Or MAT 112E MIN. DD )",
+      expression: { kind: "or" },
+    });
+    expect(curriculum.prerequisiteBranchesLoaded).toEqual(["MAT"]);
+    expect(curriculum.prerequisiteDataAvailable).toBe(true);
+    expect(curriculum.warnings).toEqual([]);
+  });
+
   it.each(["absent branch", "404 page", "absent course"])("treats %s as no prerequisite without downstream eligibility warnings", async mode => {
     upstream(mode === "absent branch" ? '<select name="DersBransKoduId"><option value="2">MAT</option></select>' : directory, mode === "404 page" ? 404 : 200);
     const { curriculum, plan, available } = await results();

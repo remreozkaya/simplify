@@ -19,7 +19,7 @@ export function parsePrerequisiteBranches(html: string): Record<string, number> 
     const rawId = $(option).attr("value")?.trim();
     if (!rawId || rawId === "0" || rawId === "-1") return;
     const id = Number(rawId);
-    if (!/^[A-ZÇĞİÖŞÜ]{2,8}$/u.test(code) || !Number.isInteger(id) || id <= 0) {
+    if (!/^(?=.{2,8}$)[A-ZÇĞİÖŞÜ]+(?:_[A-ZÇĞİÖŞÜ]+)*$/u.test(code) || !Number.isInteger(id) || id <= 0) {
       throw new Error("İTÜ OBS returned an invalid prerequisite branch entry.");
     }
     branches[code] = id;

@@ -37,7 +37,11 @@ export function getEquivalenceStore(): EquivalenceStore {
 }
 
 
-/** Rules and refresh targets cannot prove that every official scope was checked. */
-export function getStoredEquivalenceCoverage(programCode: string, planId: number): "unavailable" | "incomplete" {
+/** Missing rules mean no equivalents; only recorded import failures require a warning.
+ * "available" describes this policy, not proof of an exhaustive official import.
+ */
+export function getStoredEquivalenceCoverage(programCode: string, planId: number): "available" | "unavailable" | "incomplete" {
+  const failed = store.failures.some((failure) => failure.programCode === programCode && failure.planId === planId);
+  if (!failed) return "available";
   return getStoredEquivalenceRules(programCode, planId).length ? "incomplete" : "unavailable";
 }

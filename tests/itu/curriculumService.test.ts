@@ -48,20 +48,20 @@ it("preserves distinct exact prerequisite records when both language codes are p
   expect(curriculum.prerequisites["BLG 102E"]?.expression).toEqual({ kind: "course", courseCode: "MAT 103E", minimumGrade: "BB" });
 });
 
-it("warns that official equivalence evidence is unavailable for an uncovered curriculum", async () => {
+it("returns empty equivalences without a warning when none are listed for the curriculum", async () => {
   vi.mocked(fetchCurriculumDetailPage).mockResolvedValue(fixture("detail.html"));
   vi.mocked(fetchElectiveGroupPage).mockResolvedValue(fixture("elective.html"));
   vi.mocked(fetchPrerequisiteBranchesPage).mockRejectedValue(new Error("Prerequisites unavailable"));
   const curriculum = await getCurriculum(2611, "FZT_LS");
   expect(curriculum.equivalenceRules).toEqual([]);
-  expect(curriculum.warnings).toContain("Official equivalence coverage is unavailable for this curriculum.");
+  expect(curriculum.warnings.filter((warning) => warning.includes("equivalence coverage"))).toEqual([]);
 });
 
-it("keeps verified equivalence rules while reporting that exhaustive scope coverage is unproven", async () => {
+it("keeps verified equivalence rules without a blanket coverage warning", async () => {
   vi.mocked(fetchCurriculumDetailPage).mockResolvedValue(fixture("detail.html"));
   vi.mocked(fetchElectiveGroupPage).mockResolvedValue(fixture("elective.html"));
   vi.mocked(fetchPrerequisiteBranchesPage).mockRejectedValue(new Error("Prerequisites unavailable"));
   const curriculum = await getCurriculum(1562, "BLGE_LS");
   expect(curriculum.equivalenceRules.length).toBeGreaterThan(0);
-  expect(curriculum.warnings).toContain("Official equivalence coverage is incomplete for this curriculum.");
+  expect(curriculum.warnings.filter((warning) => warning.includes("equivalence coverage"))).toEqual([]);
 });

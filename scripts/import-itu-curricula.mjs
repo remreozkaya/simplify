@@ -99,7 +99,7 @@ function prerequisiteBranchesFrom(html) {
   $("select[name='DersBransKoduId'] option").each((_, option) => {
     const code = clean($(option).text()).toUpperCase();
     const id = Number($(option).attr("value"));
-    if (/^[A-ZÇĞİÖŞÜ]{2,8}$/u.test(code) && id) branches[code] = id;
+    if (/^(?=.{2,8}$)[A-ZÇĞİÖŞÜ]+(?:_[A-ZÇĞİÖŞÜ]+)*$/u.test(code) && Number.isInteger(id) && id > 0) branches[code] = id;
   });
   return branches;
 }

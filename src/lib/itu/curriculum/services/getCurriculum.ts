@@ -67,7 +67,8 @@ export async function getCurriculum(
   if (parsed.semesters.length === 0) {
     throw new ItuObsUpstreamError("İTÜ OBS returned a curriculum without course data.");
   }
-  const warnings: string[] = [getStoredEquivalenceCoverage(programCode, planId) === "unavailable"
+  const equivalenceCoverage = getStoredEquivalenceCoverage(programCode, planId);
+  const warnings: string[] = equivalenceCoverage === "available" ? [] : [equivalenceCoverage === "unavailable"
     ? "Official equivalence coverage is unavailable for this curriculum."
     : "Official equivalence coverage is incomplete for this curriculum."];
 

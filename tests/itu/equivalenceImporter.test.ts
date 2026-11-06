@@ -34,6 +34,22 @@ describe("official equivalence importer", () => {
     expect(mergeVerifiedScope(second.rules, [], { programCode: "BLG_LS", planId: 1561, branchCode: "BLG" }, "2026-09-02T00:00:00.000Z", false).rules).toEqual(second.rules);
   });
 
+  it.each(["", " &nbsp; ", "<br />"])("treats an empty equivalence cell as no equivalents: %s", (cell) => {
+    const parsed = parseOfficialEquivalenceTable(`<table><thead><tr><th>Plandaki Ders</th><th>Denk Dersler</th></tr></thead><tbody><tr><td>BLG 113E</td><td>${cell}</td></tr></tbody></table>`);
+    expect(parsed).toEqual({ records: [], failures: [] });
+  });
+
+  it("returns no equivalents when the section is absent, ignoring unrelated course tables", () => {
+    expect(parseOfficialEquivalenceTable('<table><tbody><tr><td>Credits</td><td>3</td></tr></tbody></table>'))
+      .toEqual({ records: [], failures: [] });
+  });
+
+  it("still reports nonempty, unparseable equivalents", () => {
+    const parsed = parseOfficialEquivalenceTable('<table><thead><tr><th>Plandaki Ders</th><th>Denk Dersler</th></tr></thead><tbody><tr><td>BLG 113E</td><td>unrecognized course</td></tr></tbody></table>');
+    expect(parsed.records).toEqual([]);
+    expect(parsed.failures).toHaveLength(1);
+  });
+
   it("stores unique, verified official records with source metadata", () => {
     const store = getEquivalenceStore();
     expect(store.rules.length).toBeGreaterThan(0);
@@ -43,11 +59,28 @@ describe("official equivalence importer", () => {
   });
 });
 
-it("distinguishes absent equivalence evidence from incomplete imported evidence", async () => {
+it("treats missing stored equivalences as empty without a coverage warning", async () => {
   const { getStoredEquivalenceCoverage } = await import("@/lib/curriculum/equivalenceStore");
   expect(typeof getStoredEquivalenceCoverage).toBe("function");
-  expect(getStoredEquivalenceCoverage("FZT_LS", 2611)).toBe("unavailable");
-  expect(getStoredEquivalenceCoverage("BLGE_LS", 1562)).toBe("incomplete");
+  expect(getStoredEquivalenceCoverage("FZT_LS", 2611)).toBe("available");
+  expect(getStoredEquivalenceCoverage("BLGE_LS", 1562)).toBe("available");
+});
+
+it("keeps coverage warnings for actual failures scoped to the selected curriculum", async () => {
+  const { getStoredEquivalenceCoverage } = await import("@/lib/curriculum/equivalenceStore");
+  const store = getEquivalenceStore();
+  const original = [...store.failures];
+  try {
+    store.failures.push(...[ ["FZT_LS", 2611], ["BLGE_LS", 1562] ].map(([programCode, planId]) => ({
+      programCode: String(programCode), planId: Number(planId), sourceUrl: "https://obs.itu.edu.tr/", attemptedAt: "2026-10-26T00:00:00Z", reason: "HTTP 500",
+    })));
+    expect(getStoredEquivalenceCoverage("FZT_LS", 2611)).toBe("unavailable");
+    expect(getStoredEquivalenceCoverage("BLGE_LS", 1562)).toBe("incomplete");
+    expect(getStoredEquivalenceCoverage("OTHER_LS", 1562)).toBe("available");
+    expect(getStoredEquivalenceCoverage("BLGE_LS", 9999)).toBe("available");
+  } finally {
+    store.failures.splice(0, store.failures.length, ...original);
+  }
 });
 
 

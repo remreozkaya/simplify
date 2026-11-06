@@ -36,7 +36,12 @@ export function parseOfficialEquivalenceTable(html, knownTargetCourseCodes = [])
   const $ = cheerio.load(html);
   const records = [];
   const failures = [];
-  $("tbody tr").each((rowIndex, row) => {
+  const tables = $("table").filter((_, table) => {
+    const heading = clean($(table).find("tr").first().text());
+    return /(Plandaki Ders|Course in Plan)/i.test(heading) && /(Denk Dersler|Equivalent Courses)/i.test(heading);
+  });
+  // An absent section or an empty cell declares no official equivalents.
+  tables.find("tbody tr").each((rowIndex, row) => {
     const cells = $(row).find("td");
     if (cells.length < 2) return;
     const target = leadingCourseCode($(cells[0]).text(), knownTargetCourseCodes);
@@ -44,7 +49,9 @@ export function parseOfficialEquivalenceTable(html, knownTargetCourseCodes = [])
       failures.push({ row: rowIndex + 1, reason: "Target course code could not be parsed.", raw: clean($(cells[0]).text()) });
       return;
     }
-    const alternatives = cellLines($, cells[1]).map((line) => leadingCourseCode(line)).filter(Boolean);
+    const lines = cellLines($, cells[1]);
+    if (!lines.length) return;
+    const alternatives = lines.map((line) => leadingCourseCode(line)).filter(Boolean);
     if (!alternatives.length) {
       failures.push({ row: rowIndex + 1, reason: "No valid equivalent course code was found.", raw: clean($(cells[1]).text()) });
       return;
