@@ -547,7 +547,7 @@ export default function ScheduleGeneratorPanel({
               return (
                 <div
                   key={row.id}
-                  className={`${desiredCourseRowGridClassName} border-b border-slate-200 py-4`}
+                  className={`${desiredCourseRowGridClassName} border-b border-slate-200 py-2`}
                 >
                   <label className="min-w-0">
                     <span className="sr-only">
@@ -653,7 +653,7 @@ export default function ScheduleGeneratorPanel({
       )}
 
       <fieldset className="mt-5 border-t border-gray-200 pt-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">
+        <legend className="px-1 text-sm font-semibold text-white">
           {t("courses.preferences")}
         </legend>
 
