@@ -622,7 +622,7 @@ export default function ProfilePage({
 
   return (
     <PageShell title={t("profile.title")}>
-      <div className="max-w-5xl">
+      <div className="mx-auto max-w-5xl">
         {missing ? (
           <p className="mb-5 text-sm text-amber-700 dark:text-amber-300">
             {t("profile.stillNeeded", { fields: missing })}

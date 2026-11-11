@@ -943,8 +943,8 @@ export default function WeeklyCalendar({
 
           {courseSelections.length > 0 && (
             <div className="relative mt-4 overflow-x-auto">
-              <div className="min-w-[640px] space-y-2">
-                <div className={`${courseRowGridClassName} border border-transparent text-sm font-medium text-slate-700`}>
+              <div className="min-w-0 space-y-2 sm:min-w-[640px]">
+                <div className={`${courseRowGridClassName} hidden border border-transparent text-sm font-medium text-slate-700 sm:grid`}>
                   <span aria-hidden="true" />
                   <span>{t("courses.prefix")}</span>
                   <span>{t("courses.desired")}</span>

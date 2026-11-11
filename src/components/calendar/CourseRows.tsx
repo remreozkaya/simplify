@@ -18,10 +18,10 @@ const selectClassName =
   "min-w-0 w-full truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
 
 const overlayFieldClassName =
-  "flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm";
+  "col-start-2 flex h-10 min-w-0 w-full items-center truncate rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm sm:col-auto";
 
 export const courseRowGridClassName =
-  "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_5rem] items-end gap-3 rounded-xl px-2 py-1";
+  "grid w-full min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] sm:grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,2fr)_minmax(0,3fr)_5rem] items-end gap-3 rounded-xl px-2 py-3 sm:py-1";
 
 type SortableCourseRowProps = {
   selection: CourseSelection;
@@ -115,7 +115,7 @@ export function SortableCourseRow({
         type="button"
         aria-label={t("weeklyPlanner.dragCourse")}
         title={t("weeklyPlanner.drag")}
-        className="flex h-10 w-9 touch-none cursor-grab items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+        className="row-span-3 flex h-11 w-11 sm:row-span-1 sm:h-10 sm:w-9 touch-none cursor-grab self-start items-center justify-center rounded-lg bg-transparent text-gray-400 transition-[background-color,color,transform] duration-150 ease-out active:scale-95 active:cursor-grabbing active:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
         {...attributes}
         {...listeners}
         aria-roledescription={t("courses.desired")}
@@ -123,8 +123,8 @@ export function SortableCourseRow({
         <DragHandleIcon />
       </button>
 
-      <label className="min-w-0">
-        <span className="sr-only">
+      <label className="col-start-2 min-w-0 sm:col-auto">
+        <span className="mb-1 block text-sm font-medium text-gray-700 sm:sr-only">
           {t("courses.prefix")}
         </span>
         <select
@@ -149,8 +149,8 @@ export function SortableCourseRow({
         </select>
       </label>
 
-      <label className="min-w-0">
-        <span className="sr-only">
+      <label className="col-start-2 min-w-0 sm:col-auto">
+        <span className="mb-1 block text-sm font-medium text-gray-700 sm:sr-only">
           {t("courses.desired")}
         </span>
         <select
@@ -175,8 +175,8 @@ export function SortableCourseRow({
         </select>
       </label>
 
-      <label className="min-w-0">
-        <span className="sr-only">
+      <label className="col-start-2 min-w-0 sm:col-auto">
+        <span className="mb-1 block text-sm font-medium text-gray-700 sm:sr-only">
           {t("weeklyPlanner.crnSection")}
         </span>
         <select
@@ -200,7 +200,7 @@ export function SortableCourseRow({
       <button
         type="button"
         onClick={() => onDelete(selection)}
-        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200"
+        className="col-start-2 shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm transition-colors duration-200 sm:col-auto"
       >
         {t("weeklyPlanner.delete")}
       </button>
@@ -244,7 +244,7 @@ export function DraggedCourseRow({
     <div
       className={`${courseRowGridClassName} cursor-grabbing border border-blue-300 bg-white shadow-xl ring-2 ring-blue-100/80`}
     >
-      <div className="flex h-10 w-9 items-center justify-center rounded-lg bg-transparent text-gray-500">
+      <div className="row-span-3 flex h-11 w-11 sm:row-span-1 sm:h-10 sm:w-9 self-start items-center justify-center rounded-lg bg-transparent text-gray-500">
         <DragHandleIcon />
       </div>
 
@@ -260,7 +260,7 @@ export function DraggedCourseRow({
         <span className="truncate">{sectionText}</span>
       </div>
 
-      <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm">
+      <div className="col-start-2 shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm sm:col-auto">
         {t("weeklyPlanner.delete")}
       </div>
     </div>
