@@ -81,7 +81,7 @@ function ProfileControl() {
         aria-label={t("navigation.profilePreview")}
         aria-controls={open ? "profile-preview" : undefined}
         aria-expanded={open}
-        className="inline-grid size-9 sm:size-10 place-items-center rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        className="inline-grid size-11 place-items-center rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
       >
         {initials ? (
           <span className="text-xs" aria-hidden="true">
@@ -97,7 +97,7 @@ function ProfileControl() {
           id="profile-preview"
           role="region"
           aria-label={t("navigation.profilePreview")}
-          className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          className="absolute right-0 top-[calc(100%+10px)] z-50 w-72 max-w-[calc(100vw-2rem)] break-words rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl dark:border-slate-700 dark:bg-slate-900"
         >
           {complete ? (
             <>
@@ -171,7 +171,7 @@ export default function AppNavigation() {
       >
         {t("navigation.skipContent")}
       </a>
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
         <Link
           href="/"
           className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
@@ -179,7 +179,7 @@ export default function AppNavigation() {
           <BrandMark />
           Simplify
         </Link>
-        <div className="order-3 flex w-full gap-1 overflow-x-auto text-xs font-semibold text-slate-600 dark:text-slate-300 sm:text-sm xl:order-none xl:w-auto xl:flex-1">
+        <div className="hidden flex-1 gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300 xl:flex">
           {planningTools.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
@@ -187,7 +187,7 @@ export default function AppNavigation() {
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-lg px-3 py-2 transition ${active ? "bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white" : "hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white"}`}
+                className={`shrink-0 inline-flex min-h-11 items-center rounded-lg px-3 py-2 transition ${active ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200" : "hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white"}`}
               >
                 {t(link.label)}
               </Link>
@@ -198,6 +198,22 @@ export default function AppNavigation() {
           <ThemeToggle />
           <LanguageToggle />
           <ProfileControl />
+          <details className="group xl:hidden" onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector("summary")?.focus();
+            }
+          }} onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+          }}>
+            <summary className="grid size-11 list-none place-items-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
+              <span className="sr-only">{t("navigation.primary")}</span>
+              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </summary>
+            <div className="absolute left-4 right-4 top-[calc(100%+8px)] grid max-h-[70svh] gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2">
+              {planningTools.map(link => <Link key={link.href} href={link.href} aria-current={pathname.startsWith(link.href) ? "page" : undefined} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")} className={`flex min-h-11 items-center rounded-lg px-3 py-3 text-sm font-medium ${pathname.startsWith(link.href) ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"}`}>{t(link.label)}</Link>)}
+            </div>
+          </details>
         </div>
       </div>
     </nav>

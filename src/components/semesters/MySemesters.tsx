@@ -204,7 +204,7 @@ export default function MySemesters() {
           {loaded.failed ? <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-300">{t("semesters.loadError")} <button type="button" className="underline" onClick={() => setRetry(value => value + 1)}>{t("semesters.retry")}</button></p> : null}
           {missingCredits ? <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">{t(creditLookup.key !== creditKey ? "semesters.loadingCredits" : "semesters.unavailableCredits")}{creditLookup.failed ? <> <button type="button" className="underline" onClick={() => setRetry(value => value + 1)}>{t("semesters.retry")}</button></> : null}</p> : null}
           {storageError ? <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-300">{t("semesters.storageError")}</p> : null}
-          {current.length ? <div className="mb-4 overflow-x-auto">
+          {current.length ? <div role="region" aria-label={t("semesters.current")} tabIndex={0} className="mb-4 overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm [&_th]:py-2 [&_td]:py-2 [&_select]:py-1.5 [&_button]:py-1.5">
               <caption className="sr-only">{t("semesters.current")}</caption>
               <thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr>{headers.map(header => <th scope="col" key={header} className={cell}>{t(header)}</th>)}<th scope="col" className={cell}><span className="sr-only">{t("common.remove")}</span></th></tr></thead>
@@ -261,7 +261,7 @@ export default function MySemesters() {
                 </span>
               </span>
             </summary>
-            <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-800">
+            <div role="region" aria-label={semesterTermLabel(semester.term, language)} tabIndex={0} className="overflow-x-auto border-t border-slate-200 dark:border-slate-800">
               <table className="w-full min-w-[520px] text-sm">
                 <caption className="sr-only">{semesterTermLabel(semester.term, language)}</caption>
                 <thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr>{headers.map(header => <th scope="col" key={header} className={cell}>{t(header)}</th>)}</tr></thead>

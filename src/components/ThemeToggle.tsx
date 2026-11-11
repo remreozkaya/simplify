@@ -43,7 +43,7 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="theme-toggle inline-grid size-9 sm:size-10 place-items-center rounded-xl border border-transparent bg-white text-lg font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:border-transparent dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+      className="theme-toggle inline-grid size-11 place-items-center rounded-xl border border-transparent bg-white text-lg font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:border-transparent dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       aria-label={t("theme.toggle")}
       aria-pressed={theme === "dark"}
       title={t("theme.toggle")}

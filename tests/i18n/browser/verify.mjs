@@ -24,6 +24,15 @@ const baseUrl = process.env.BROWSER_BASE_URL || 'http://127.0.0.1:3122';
   await page.waitForFunction(()=>document.title==='Simplify · ITU Student Planner');
   await page.getByRole('button', {name:'Switch language to Turkish'}).first().click();
   await page.waitForFunction(()=>document.title==='Simplify · İTÜ Öğrenci Planlayıcısı');
-  console.log('PASS: production metadata, client navigation, refresh, back navigation, saved EN, legal TR switch');
+  await page.evaluate(() => {
+    localStorage.setItem('simplify-language', 'en');
+    localStorage.setItem('simplify-theme', 'dark');
+  });
+  await page.goto(`${baseUrl}/legal/invalid`);
+  await page.waitForTimeout(1500);
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+  assert.equal(await page.locator('html').evaluate(element => element.classList.contains('dark')), true);
+  assert.equal(await page.getByRole('heading', { level: 1 }).innerText(), 'Page not found');
+  console.log('PASS: saved language/theme on 404, production metadata, client navigation, refresh, back navigation, saved EN, legal TR switch');
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

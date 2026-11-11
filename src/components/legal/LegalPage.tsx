@@ -31,40 +31,45 @@ export default function LegalPage({ document, sourceDates }: { document: LegalDo
   const rows = [...cookieRows.map(row => [`Cookie: ${row[0]}`, ...row.slice(1)]), ...storageRows];
   return <>
     <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-blue-700 focus:p-3 focus:text-white">{tr ? "İçeriğe geç" : "Skip to content"}</a>
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
+    <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
       <Link href="/" prefetch={false} className="flex items-center gap-3 font-semibold text-slate-950 dark:text-white"><BrandMark /> Simplify · {copy.home}</Link>
       <div className="flex gap-2"><ThemeToggle /><LanguageToggle /></div>
+      </div>
     </header>
-    <PageShell title={copy.titles[document]}>
-      <article className="mx-auto max-w-4xl space-y-6 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 sm:p-8">
-        <p className="text-sm">{copy.version}: {legalConfig.version} · {copy.effective}: {legalConfig.effectiveDate ?? copy.draft}</p>
-        {incomplete && <p role="note" className="rounded-xl border border-amber-300 p-3 text-sm leading-6 dark:border-amber-700">{copy.incomplete}</p>}
-        {sections.map(section => <section key={section.title} className="space-y-3"><h2 className="text-lg font-bold">{section.title}</h2>{section.paragraphs.map(paragraph => <p key={paragraph} className="text-sm leading-7">{paragraph}</p>)}</section>)}
+    <PageShell title={copy.titles[document]} reading>
+      <nav aria-label={copy.settings} className="mb-6 flex flex-wrap gap-2">
+        {(['privacy', 'storage', 'terms', 'requests'] as const).map(key => <Link key={key} href={`/legal/${key}`} aria-current={key === document ? 'page' : undefined} className={`inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-sm font-medium ${key === document ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white'}`}>{copy.titles[key]}</Link>)}
+      </nav>
+      <article className="legal-article min-w-0 space-y-8 rounded-2xl border border-slate-200 bg-white p-5 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 sm:p-8">
+        <p className="border-b border-slate-200 pb-5 text-sm leading-6 text-slate-500 dark:border-slate-700 dark:text-slate-400">{copy.version}: {legalConfig.version} · {copy.effective}: {legalConfig.effectiveDate ?? copy.draft}</p>
+        {incomplete && <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">{copy.incomplete}</p>}
+        {sections.map(section => <section key={section.title} className="space-y-3"><h2 className="text-lg font-semibold leading-7 text-slate-950 dark:text-white">{section.title}</h2>{section.paragraphs.map(paragraph => <p key={paragraph} className="text-base leading-8">{paragraph}</p>)}</section>)}
         {(document === 'privacy' || document === 'requests') && <section className="space-y-3">
-          <h2 className="text-lg font-bold">{copy.controller}</h2>
+          <h2 className="text-lg font-semibold leading-7 text-slate-950 dark:text-white">{copy.controller}</h2>
           <dl className="space-y-2 break-words text-sm leading-6">
             {[[copy.controller, legalConfig.controllerName], [copy.address, legalConfig.postalAddress], [copy.email, legalConfig.privacyEmail], ['KEP', legalConfig.kepAddress]].map(([label, value]) => <div key={label}><dt className="font-semibold">{label}</dt><dd>{value ?? copy.missing}</dd></div>)}
           </dl>
-          {document === 'requests' && (legalConfig.privacyEmail ? <><p className="text-sm leading-6">{copy.contact.emailHelp}</p><a href={`mailto:${legalConfig.privacyEmail}?subject=${encodeURIComponent(tr ? 'KVKK başvurusu' : 'KVKK privacy request')}`} className="inline-block font-semibold text-blue-700 underline dark:text-blue-300">{copy.contact.emailButton}</a></> : <p className="text-sm leading-6">{copy.contact.unavailable}</p>)}
+          {document === 'requests' && (legalConfig.privacyEmail ? <><p className="text-sm leading-7">{copy.contact.emailHelp}</p><a href={`mailto:${legalConfig.privacyEmail}?subject=${encodeURIComponent(tr ? 'KVKK başvurusu' : 'KVKK privacy request')}`} className="inline-block font-semibold text-blue-700 underline dark:text-blue-300">{copy.contact.emailButton}</a></> : <p className="text-sm leading-7">{copy.contact.unavailable}</p>)}
         </section>}
         {document === 'privacy' && <>
-          <section className="space-y-3"><h2 className="text-lg font-bold">{tr ? 'Sağlayıcılar ve yurt dışı erişim' : 'Providers and overseas access'}</h2>
+          <section className="space-y-3"><h2 className="text-lg font-semibold leading-7 text-slate-950 dark:text-white">{tr ? 'Sağlayıcılar ve yurt dışı erişim' : 'Providers and overseas access'}</h2>
             {[[tr ? 'Barındırma' : 'Hosting', legalConfig.hosting], [tr ? 'Kimlik doğrulama' : 'Authentication', legalConfig.authentication], [tr ? 'E-posta' : 'Email', legalConfig.email]] .map(([label, provider]) => {
               const item = provider as typeof legalConfig.hosting;
-              return <p key={String(label)} className="text-sm leading-6">{String(label)}: {item.name ?? copy.missing} · {tr ? 'İşleme/erişim konumları' : 'Processing/access locations'}: {item.locations ?? copy.missing}</p>;
+              return <p key={String(label)} className="text-sm leading-7">{String(label)}: {item.name ?? copy.missing} · {tr ? 'İşleme/erişim konumları' : 'Processing/access locations'}: {item.locations ?? copy.missing}</p>;
             })}
-            <p className="text-sm leading-6">{legalConfig.transferDisclosure[language] ?? (tr ? 'Supabase projesinin bölgesi, alt işleyenleri ve yabancı destek erişimi; barındırma ve e-posta konumları henüz doğrulanmadı. Yurt dışı aktarımın gerçekleşip gerçekleşmediği ve varsa KVKK m.9 mekanizması yayın öncesi belirlenmelidir. Genel sağlayıcı koşulları veya toplu rıza bu incelemenin yerine geçmez.' : 'Supabase project region, subprocessors and foreign support access, and hosting/email locations are unverified. Before launch determine whether overseas transfer occurs and, if so, its KVKK Article 9 mechanism. Generic provider terms or blanket consent do not replace this assessment.')}</p>
+            <p className="text-sm leading-7">{legalConfig.transferDisclosure[language] ?? (tr ? 'Supabase projesinin bölgesi, alt işleyenleri ve yabancı destek erişimi; barındırma ve e-posta konumları henüz doğrulanmadı. Yurt dışı aktarımın gerçekleşip gerçekleşmediği ve varsa KVKK m.9 mekanizması yayın öncesi belirlenmelidir. Genel sağlayıcı koşulları veya toplu rıza bu incelemenin yerine geçmez.' : 'Supabase project region, subprocessors and foreign support access, and hosting/email locations are unverified. Before launch determine whether overseas transfer occurs and, if so, its KVKK Article 9 mechanism. Generic provider terms or blanket consent do not replace this assessment.')}</p>
           </section>
-          <section className="space-y-3"><h2 className="text-lg font-bold">{tr ? 'Sunucu kayıtlarının saklanması' : 'Server record retention'}</h2>
-            {(['account', 'logs', 'requests', 'backups'] as const).map((key, index) => <p key={key} className="text-sm leading-6">{(tr ? ['Hesap/profil', 'Teknik günlükler', 'Veri başvuruları', 'Yedekler'] : ['Account/profile', 'Technical logs', 'Privacy requests', 'Backups'])[index]}: {legalConfig.retention[key][language] ?? copy.missing}</p>)}
+          <section className="space-y-3"><h2 className="text-lg font-semibold leading-7 text-slate-950 dark:text-white">{tr ? 'Sunucu kayıtlarının saklanması' : 'Server record retention'}</h2>
+            {(['account', 'logs', 'requests', 'backups'] as const).map((key, index) => <p key={key} className="text-sm leading-7">{(tr ? ['Hesap/profil', 'Teknik günlükler', 'Veri başvuruları', 'Yedekler'] : ['Account/profile', 'Technical logs', 'Privacy requests', 'Backups'])[index]}: {legalConfig.retention[key][language] ?? copy.missing}</p>)}
           </section>
         </>}
         {document === 'storage' && <>
-          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm leading-6"><caption className="mb-3 text-left font-semibold">{tr ? 'Bu sürümde kullanılan depolama' : 'Storage used in this version'}</caption><thead><tr>{copy.storageHeaders.map(header => <th key={header} scope="col" className="border-b p-2 align-top">{header}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row[0]}>{row.map((cell, index) => index === 0 ? <th key={index} scope="row" className="max-w-xs break-words border-b p-2 align-top font-medium">{cell}</th> : <td key={index} className="border-b p-2 align-top">{cell}</td>)}</tr>)}</tbody></table></div>
+          <div role="region" aria-label={copy.titles.storage} tabIndex={0} className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="legal-storage-table w-full min-w-[760px] table-fixed text-left text-sm leading-6"><caption className="bg-slate-50 p-4 text-left font-semibold text-slate-950 dark:bg-slate-800 dark:text-white">{tr ? 'Bu sürümde kullanılan depolama' : 'Storage used in this version'}</caption><thead><tr>{copy.storageHeaders.map(header => <th key={header} scope="col" className="border-b border-slate-200 bg-slate-50 p-3 align-top dark:border-slate-700 dark:bg-slate-800">{header}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row[0]}>{row.map((cell, index) => index === 0 ? <th key={index} scope="row" className="break-all border-b border-slate-200 p-3 align-top font-medium dark:border-slate-700">{cell}</th> : <td key={index} className="break-words border-b border-slate-200 p-3 align-top dark:border-slate-700">{cell}</td>)}</tr>)}</tbody></table></div>
           <PrivacyControls />
         </>}
-        {document === 'terms' && <p className="text-sm leading-6">{tr ? 'Program seçici görüntüsü' : 'Program selector snapshot'}: {sourceDates.catalog} · {tr ? 'Denklik görüntüsü' : 'Equivalence snapshot'}: {sourceDates.equivalences}. <a href="https://obs.itu.edu.tr/public/DersPlan/" rel="noreferrer" className="text-blue-700 underline dark:text-blue-300">İTÜ OBS</a></p>}
-        <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-4 text-sm dark:border-slate-700" aria-label={copy.settings}>{(['privacy', 'storage', 'terms', 'requests'] as const).filter(key => key !== document).map(key => <Link key={key} href={`/legal/${key}`} className="text-blue-700 underline dark:text-blue-300">{copy.titles[key]}</Link>)}</nav>
+        {document === 'terms' && <p className="text-sm leading-7">{tr ? 'Program seçici görüntüsü' : 'Program selector snapshot'}: {sourceDates.catalog} · {tr ? 'Denklik görüntüsü' : 'Equivalence snapshot'}: {sourceDates.equivalences}. <a href="https://obs.itu.edu.tr/public/DersPlan/" rel="noreferrer" className="text-blue-700 underline dark:text-blue-300">İTÜ OBS</a></p>}
+        <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-4 text-sm dark:border-slate-700" aria-label={copy.settings}>{(['privacy', 'storage', 'terms', 'requests'] as const).filter(key => key !== document).map(key => <Link key={key} href={`/legal/${key}`} className="inline-flex min-h-11 items-center text-blue-700 underline decoration-blue-300 underline-offset-4 hover:decoration-current dark:text-blue-300">{copy.titles[key]}</Link>)}</nav>
       </article>
     </PageShell>
   </>;

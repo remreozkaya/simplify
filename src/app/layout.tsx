@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import BrowserPreferences from "@/components/BrowserPreferences";
 import LocalizedMetadata from "@/components/LocalizedMetadata";
 import { localizedMetadata } from "@/lib/i18n/metadata";
 import "./globals.css";
@@ -37,7 +38,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col"><LocalizedMetadata />{children}<LegalFooter /></body>
+      <body className="min-h-full flex flex-col"><BrowserPreferences /><LocalizedMetadata />{children}<LegalFooter /></body>
     </html>
   );
 }

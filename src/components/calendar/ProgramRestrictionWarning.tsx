@@ -13,7 +13,7 @@ export default function ProgramRestrictionWarning({ eligibility }: { eligibility
 
   const labels = eligibility.allowedCodes.map((code) => programRestrictionLabel(code, language));
   const prefix = t("courses.programRestrictionWarning");
-  const className = "col-start-2 col-end-[-2] row-start-2 flex w-fit max-w-full items-start gap-2 rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-900";
+  const className = "col-span-full sm:col-start-2 sm:col-end-[-2] sm:row-start-2 flex w-fit max-w-full items-start gap-2 rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-900";
 
   // Native disclosure keeps a long list available to keyboard and screen-reader users.
   const content = labels.length > 4

@@ -854,7 +854,7 @@ export default function CurriculumExplorer() {
     ? t("curriculum.loadingUndergraduate")
     : plansLoading
       ? t("curriculum.loadingVersions")
-      : curriculumLoading
+      : curriculumLoading || (Boolean(programCode && planId) && !curriculum && !error)
         ? t("curriculum.loadingRequirements")
         : "";
 
