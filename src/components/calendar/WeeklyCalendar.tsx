@@ -38,6 +38,7 @@ import {
   courseRowGridClassName,
 } from "@/components/calendar/CourseRows";
 import CourseDetails from "@/components/calendar/CourseDetails";
+import CalendarExport from "@/components/calendar/CalendarExport";
 import CrnBookmarkletLink from "@/components/calendar/CrnBookmarkletLink";
 import { createCrnBookmarklet, getLocalCreditTotal } from "@/lib/calendar/planActions";
 import { generatedScheduleToWeeklyProgram } from "@/lib/schedule/conversion";
@@ -1167,6 +1168,7 @@ export default function WeeklyCalendar({
           >
             {t("weeklyPlanner.exportJpeg")}
           </button>
+          <CalendarExport key={selectedProgram?.id} plan={selectedProgram} />
         </div>
       )}
     </div>

@@ -39,6 +39,9 @@ const program = (id, courseSelections) => {
   return { id, name: id, courseSelections, courseBlocks, updatedAt: new Date().toISOString() };
 };
 const plans = [program("First", [selection("s1", "a", "a1"), selection("s2", "b", "b1")]), program("Second", [selection("s3", "b", "b1")]), program("Empty", [])];
+const legacy = program("Legacy", [selection("s4", "a", "a1")]);
+for (const block of legacy.courseBlocks) delete block.semester;
+plans.push(legacy);
 
 try {
   await server.listen();
@@ -46,6 +49,18 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, acceptDownloads: true });
   await context.route("**/api/itu/branches", (route) => route.fulfill({ json: { branches: [{ id: 1, code: "MAT" }] } }));
   await context.route("**/api/itu/courses?**", (route) => route.fulfill({ json: { catalog } }));
+  let academicCalendarAvailable = false;
+  await context.route("**/api/itu/academic-calendar**", (route) => {
+    const term = new URL(route.request().url()).searchParams.get("term");
+    if (!term) return route.fulfill({ json: { years: ["2026-2027"] } });
+    assert.equal(term, "202710");
+    return academicCalendarAvailable
+      ? route.fulfill({ json: { calendar: {
+        term, start: "2026-09-28", end: "2026-12-31",
+        breaks: [{ start: "2026-11-16", end: "2026-11-20" }],
+      }, source: "https://www.takvim.sis.itu.edu.tr/AkademikTakvim/TR/akademik-takvim/AkademikTakvimTablo.php" } })
+      : route.fulfill({ status: 502, json: { error: "CALENDAR_UNAVAILABLE" } });
+  });
   let informationState = "available";
   await context.route("**/api/itu/course-information?**", (route) => route.fulfill({
     status: informationState === "unknown" ? 502 : 200,
@@ -129,7 +144,7 @@ try {
   await page.waitForFunction(() => JSON.parse(localStorage.getItem("simplify-weekly-programs"))[0].courseSelections[0].id === "s2");
   assert.deepEqual(await crns(), ["98765", "00123"]);
   await credit("Credits: 5.5").waitFor();
-  const field = (label) => page.locator("label").filter({ has: page.locator("span.sr-only").filter({ hasText: label }) }).locator("select");
+  const field = (label) => page.locator("label").filter({ has: page.locator("span").filter({ hasText: label }) }).locator("select");
   const courses = field(/^Course$/);
   const sections = field(/^CRN \/ Section$/);
   await sections.nth(1).selectOption("a2");
@@ -150,6 +165,7 @@ try {
   assert.deepEqual(await crns(), ["98765"]);
   await page.locator("#weekly-program").selectOption("Empty");
   await credit("Credits: 0").waitFor();
+  assert.equal(await page.getByRole("button", { name: "Export calendar (.ics)" }).isDisabled(), true);
   assert.equal(await link.getAttribute("href"), null);
   assert.equal(await link.getAttribute("draggable"), "false");
   await page.getByRole("button", { name: "Add Course", exact: true }).click();
@@ -170,11 +186,42 @@ try {
   assert.equal(download.suggestedFilename(), "simplify-second.jpg");
   const jpeg = await readFile(await download.path());
   assert.equal(jpeg.subarray(0, 3).toString("hex"), "ffd8ff");
+
+  const calendarExport = page.getByRole("button", { name: "Export calendar (.ics)" });
+  await calendarExport.click({ timeout: 5_000 });
+  const calendarDialog = page.getByRole("dialog", { name: "Export calendar (.ics)" });
+  await calendarDialog.getByRole("alert").getByText(/could not be loaded/i).waitFor();
+  academicCalendarAvailable = true;
+  await calendarDialog.getByRole("button", { name: "Retry" }).click();
+  await calendarDialog.getByText("2026-2027 Fall Semester").waitFor();
+  await calendarDialog.getByText("Nov 16, 2026 – Nov 20, 2026").waitFor();
+  const icsPromise = page.waitForEvent("download");
+  await calendarDialog.getByRole("button", { name: "Download calendar" }).click();
+  const calendarFile = await icsPromise;
+  assert.equal(calendarFile.suggestedFilename(), "simplify-Second.ics");
+  await calendarFile.saveAs(resolve(screenshots, calendarFile.suggestedFilename()));
+  const ics = await readFile(await calendarFile.path(), "utf8");
+  assert.match(ics, /RRULE:FREQ=WEEKLY;UNTIL=20261231T060000Z/);
+  assert.match(ics, /EXDATE;TZID=Europe\/Istanbul:20261119T090000/);
+  await page.keyboard.press("Escape");
+  await page.locator("#weekly-program").selectOption("Legacy");
+  await calendarExport.click();
+  assert.equal(await calendarDialog.getByRole("button", { name: "Download calendar" }).isDisabled(), true);
+  await calendarDialog.getByLabel("Semester").selectOption("202710");
+  await calendarDialog.getByText("2026-2027 Fall Semester", { exact: true }).last().waitFor();
+  assert.equal(await calendarDialog.getByRole("button", { name: "Download calendar" }).isEnabled(), true);
+  await page.keyboard.press("Escape");
   for (const language of ["en", "tr"]) {
     await page.evaluate((language) => {
       document.documentElement.lang = language;
       window.dispatchEvent(new Event("simplify-language-change"));
     }, language);
+    if (language === "tr") {
+      await page.locator("#weekly-program").selectOption("Second");
+      await page.getByRole("button", { name: "Takvimi dışa aktar (.ics)" }).click();
+      await page.getByRole("dialog").getByText("2026-2027 Güz Dönemi").waitFor();
+      await page.keyboard.press("Escape");
+    }
     await page.locator("#weekly-program").selectOption("Empty");
     await credit(language === "en" ? "Credits: 3.50" : "Kredi: 3.50").waitFor();
     for (const width of [1280, 768, 390, 320]) {
@@ -218,7 +265,7 @@ try {
   assert.deepEqual(await registration.evaluate(() => window.fixtureEvents), ["input:first:true", "input:second:true", "submit", "confirm"]);
   assert.deepEqual(await registration.locator('input[type="number"]').evaluateAll((inputs) => inputs.map((input) => input.value)), ["", "", "00123", "", "98765", ""]);
   assert.deepEqual(errors, []);
-  console.log("PASS: course information links, missing/error states, mobile popup, planner selection changes, plan switching, reordering, CRNs, native drag data, click suppression, JPEG, English/Turkish and 4 viewport widths.");
+  console.log("PASS: course information links, missing/error states, mobile popup, planner selection changes, plan switching, reordering, CRNs, native drag data, click suppression, JPEG and calendar export, English/Turkish and 4 viewport widths.");
   console.log(`Screenshots: ${screenshots}`);
 } finally {
   await browser?.close();
