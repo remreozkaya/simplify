@@ -2,7 +2,7 @@ import type {
   Grade,
   PrerequisiteExpression,
 } from "@/lib/itu/curriculum/types";
-import { normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
+import { COURSE_CODE_SOURCE, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
 export { normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
@@ -10,8 +10,7 @@ type Token =
   | { kind: "course"; courseCode: string; minimumGrade?: Grade }
   | { kind: "and" | "or" | "left" | "right" };
 
-const COURSE_PATTERN =
-  /^([A-ZÇĞİÖŞÜ]{2,8})\s*(\d{2,5})([A-Z]{0,3})\b/u;
+const COURSE_PATTERN = new RegExp(String.raw`^${COURSE_CODE_SOURCE}\b`, "u");
 const GRADE_PATTERN = /^(?:MIN(?:IMUM)?\.?\s*)?(AA|BA\+?|BB\+?|CB\+?|CC\+?|DC\+?|DD\+?|FD|FF|VF|BL)(?![A-Z+])/i;
 
 function tokenize(value: string): Token[] | null {

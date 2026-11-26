@@ -5,6 +5,7 @@ import { MinimumEnglishCredit } from "@/components/curriculum/MinimumEnglishCred
 import { academicStorage } from "@/lib/academic/storage";
 
 import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
+import { ITU_OBS_ORIGIN, ITU_PREREQUISITE_DIRECTORY_PATH } from "@/lib/itu/constants";
 
 import { responseJson } from "@/lib/http/responseJson";
 
@@ -720,6 +721,8 @@ export default function CurriculumExplorer() {
   const selectedPrerequisite = selectedCode
     ? curriculum?.prerequisites[selectedCode]
     : undefined;
+  const selectedPrerequisiteUnverified = curriculum && selectedItem?.kind === "course" &&
+    !curriculumPrerequisitesKnown(curriculum, selectedItem.code);
   const selectedStatus = selectedNodeId
     ? nodeStatuses[selectedNodeId]
     : undefined;
@@ -1005,7 +1008,7 @@ export default function CurriculumExplorer() {
               }
             : {})}
         >
-          <CurriculumWarnings warnings={curriculum.warnings} />
+          <CurriculumWarnings warnings={curriculum.warnings} hidePrerequisiteWarnings />
           <section className="grid gap-4 border-b border-slate-200 pb-5 text-slate-900 lg:grid-cols-[1fr_auto]">
             <div>
               <p className="text-sm font-medium text-slate-500">
@@ -1400,16 +1403,20 @@ export default function CurriculumExplorer() {
                         <h4 className="text-sm font-semibold text-slate-900">
                           {t("curriculum.prerequisites")}
                         </h4>
-                        {selectedPrerequisite?.rawExpression ? (
+                        {selectedPrerequisiteUnverified && (
+                          <PrerequisiteSourceLink label={t("curriculum.checkPrerequisitesOnObs")} />
+                        )}
+                        {selectedPrerequisite?.rawExpression && (
                           <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
                             {selectedPrerequisite.rawExpression}
                           </p>
-                        ) : (
+                        )}
+                        {!selectedPrerequisiteUnverified && !selectedPrerequisite?.rawExpression && selectedPrerequisite?.minimumCredits === undefined && (
                           <p className="mt-2 text-sm text-slate-500">
                             {t("curriculum.noPrerequisite")}
                           </p>
                         )}
-                        {selectedPrerequisite && (
+                        {!selectedPrerequisiteUnverified && selectedPrerequisite && (
                           <div className="mt-3">
                             <MissingList
                               requirements={getMissingPrerequisites(
@@ -1502,6 +1509,19 @@ export default function CurriculumExplorer() {
   );
 }
 
+function PrerequisiteSourceLink({ label }: { label: string }) {
+  return (
+    <a
+      href={ITU_OBS_ORIGIN + ITU_PREREQUISITE_DIRECTORY_PATH}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-2 inline-block text-sm font-medium text-blue-700 underline dark:text-blue-300"
+    >
+      {label}
+    </a>
+  );
+}
+
 export function ElectiveDetails({
   slot,
   curriculum,
@@ -1567,55 +1587,63 @@ export function ElectiveDetails({
             const languageEquivalent = Boolean(
               actualCode && actualCode !== expectedCode,
             );
+            const prerequisiteKnown = curriculumPrerequisitesKnown(curriculum, course.code);
             const eligibility = evaluateCourseEligibility(
               curriculum.prerequisites[course.code],
               effectiveProgress,
-              curriculumPrerequisitesKnown(curriculum, course.code),
+              prerequisiteKnown,
             );
+            const statusKey = courseProgress?.state === "passed"
+              ? "curriculum.passed"
+              : courseProgress?.state === "failed"
+                ? "curriculum.failed"
+                : eligibility === "unknown" ? undefined : `curriculum.eligibility_${eligibility}`;
             return (
-              <button
-                key={course.code}
-                type="button"
-                onClick={() => onSelectCourse(course)}
-                className="w-full rounded-xl border border-slate-200 p-3 text-left hover:bg-slate-50"
-              >
-                <div className="flex justify-between gap-2">
-                  <span className="font-bold text-slate-900">
-                    {course.code}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold uppercase ${courseProgress?.state === "passed" ? "text-emerald-700" : courseProgress?.state === "failed" ? "text-red-700" : "text-slate-500"}`}
-                  >
-                    {t(
-                      courseProgress?.state === "passed"
-                        ? "curriculum.passed"
-                        : courseProgress?.state === "failed"
-                          ? "curriculum.failed"
-                          : `curriculum.eligibility_${eligibility}`,
+              <div key={course.code} className="rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => onSelectCourse(course)}
+                  className="w-full rounded-xl p-3 text-left hover:bg-slate-50"
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="font-bold text-slate-900">
+                      {course.code}
+                    </span>
+                    {statusKey && (
+                      <span
+                        className={`text-[10px] font-bold uppercase ${courseProgress?.state === "passed" ? "text-emerald-700" : courseProgress?.state === "failed" ? "text-red-700" : "text-slate-500"}`}
+                      >
+                        {t(statusKey)}
+                        {courseProgress?.grade ? ` · ${courseProgress.grade}` : ""}
+                      </span>
                     )}
-                    {courseProgress?.grade ? ` · ${courseProgress.grade}` : ""}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-600">
-                  {localizedCourseTitle(course, language)}
-                </p>
-                {languageEquivalent && (
-                  <p className="mt-1 text-[10px] font-semibold text-blue-700">
-                    {t("curriculum.languageEquivalent", {
-                      code: actualCode ?? "",
-                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {localizedCourseTitle(course, language)}
                   </p>
+                  {languageEquivalent && (
+                    <p className="mt-1 text-[10px] font-semibold text-blue-700">
+                      {t("curriculum.languageEquivalent", {
+                        code: actualCode ?? "",
+                      })}
+                    </p>
+                  )}
+                  {courseProgress?.source === "transcript" && (
+                    <p className="mt-1 text-[10px] font-semibold text-emerald-700">
+                      {t("curriculum.termDetail", {
+                        term: courseProgress.term ?? "",
+                        crn: courseProgress.crn ?? "",
+                        grade: courseProgress.grade ?? "",
+                      })}
+                    </p>
+                  )}
+                </button>
+                {!prerequisiteKnown && (
+                  <div className="px-3 pb-3">
+                    <PrerequisiteSourceLink label={t("curriculum.checkPrerequisitesOnObs")} />
+                  </div>
                 )}
-                {courseProgress?.source === "transcript" && (
-                  <p className="mt-1 text-[10px] font-semibold text-emerald-700">
-                    {t("curriculum.termDetail", {
-                      term: courseProgress.term ?? "",
-                      crn: courseProgress.crn ?? "",
-                      grade: courseProgress.grade ?? "",
-                    })}
-                  </p>
-                )}
-              </button>
+              </div>
             );
           })}
         </div>

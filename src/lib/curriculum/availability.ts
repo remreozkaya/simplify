@@ -10,7 +10,9 @@ export function courseBranch(courseCode: string): string {
 export function curriculumPrerequisitesKnown(curriculum: ItuCurriculum, courseCode: string): boolean {
   return (
     curriculum.prerequisiteDataAvailable &&
-    curriculum.prerequisiteBranchesLoaded.includes(courseBranch(courseCode))
+    curriculum.prerequisites[courseCode]?.expression?.kind !== "unknown" &&
+    (curriculum.prerequisiteBranchesLoaded.includes(courseBranch(courseCode)) ||
+      curriculum.prerequisiteCoursesVerified?.includes(courseCode) === true)
   );
 }
 

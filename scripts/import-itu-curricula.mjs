@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { isValidCourseBranchCode } from "../src/lib/itu/courseCode.mjs";
 
 const academicLabels = JSON.parse(await readFile(resolve(process.cwd(), "src/data/itu/academic-translations.json"), "utf8")).labels;
 const englishLabel = (name) => academicLabels[name];
@@ -99,7 +100,7 @@ function prerequisiteBranchesFrom(html) {
   $("select[name='DersBransKoduId'] option").each((_, option) => {
     const code = clean($(option).text()).toUpperCase();
     const id = Number($(option).attr("value"));
-    if (/^(?=.{2,8}$)[A-ZÇĞİÖŞÜ]+(?:_[A-ZÇĞİÖŞÜ]+)*$/u.test(code) && Number.isInteger(id) && id > 0) branches[code] = id;
+    if (isValidCourseBranchCode(code) && Number.isInteger(id) && id > 0) branches[code] = id;
   });
   return branches;
 }

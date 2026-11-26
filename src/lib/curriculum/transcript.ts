@@ -1,7 +1,7 @@
 import { gradePoint, isGrade, isPassingGrade } from "@/lib/curriculum/grades";
 import type { Grade } from "@/lib/curriculum/grades";
 import type { TranscriptCourseRecord } from "@/lib/curriculum/types";
-import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { isValidCourseCode, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 
 export type TranscriptRowError = { line: number; row: string; reason: string };
 export type TranscriptParseResult = {
@@ -54,7 +54,7 @@ function makeRecord(cells: string[], section: Exclude<Section, null>): string | 
   if (!courseCode) return "Course code is required.";
   if (!courseName) return "Course name is required.";
   const normalizedCode = normalizeCourseCode(courseCode);
-  if (!/^[A-ZÇĞİÖŞÜ]{2,8}\s\d{2,5}[A-Z]{0,3}$/u.test(normalizedCode)) return "Course code is invalid.";
+  if (!isValidCourseCode(normalizedCode)) return "Course code is invalid.";
   const credit = parseCredit(creditValue ?? "");
   if (!credit) return "Credit must be a number or counted/transcript pair.";
   if (!gradeValue || !isGrade(gradeValue)) return `Unknown grade: ${gradeValue || "empty"}.`;

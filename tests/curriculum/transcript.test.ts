@@ -12,6 +12,12 @@ const turkishSample = readFileSync(join(process.cwd(), "tests/fixtures/transcrip
 const semesterSample = readFileSync(join(process.cwd(), "tests/fixtures/transcript/semester-tr.txt"), "utf8");
 
 describe("transcript parser", () => {
+  it("keeps grades for courses with punctuated OBS branch codes", () => {
+    const parsed = parseTranscriptMarkdown("Completed English Courses\n202610\t12301\tU_IPF-B06E\tEngineering Mathematics\t3\tDD");
+    expect(parsed.invalidRows).toEqual([]);
+    expect(parsed.calculatedCourses).toMatchObject([{ courseCode: "U_IPF-B 06E", grade: "DD" }]);
+  });
+
   it("totals 99 earned credits including unused courses and the counted side of split credits", () => {
     const parsed = parseTranscriptMarkdown(`${semesterSample}\n${turkishSample}\nCompleted English Courses\n202610\t12301\tECN 105E\tMicroeconomics\t3.5\tAA\n202620\t23672\tECN 102E\tMacroeconomics\t3.5\tAA\n202620\t23682\tECN 201E\tIntermediate Microeconomics\t3.5\tAA\n202610\t12308\tECN 211E\tStatistics\t4\tAA\n202620\t23689\tECN 301E\tEconometrics\t3.5\tAA`);
     const courses = [...parsed.calculatedCourses, ...parsed.nonCalculatedCourses];

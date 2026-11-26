@@ -206,7 +206,7 @@ export function ProgramAuditSection({
             </p>
           </div>
         </div>
-        <CurriculumWarnings warnings={curriculum.warnings} />
+        <CurriculumWarnings warnings={curriculum.warnings} hidePrerequisiteWarnings />
         {[totals.earnedCredit, totals.requiredCredit, totals.earnedEnglishCredit, totals.requiredEnglishCredit].some(credit => credit === null) ? (
           <p role="status" className="mt-4 text-sm text-amber-800 dark:text-amber-200">
             {t("curriculum.creditUncertainty")}

@@ -11,7 +11,7 @@ import {
   resolvedCourseProgress,
 } from "@/lib/curriculum/graduation";
 import type { CourseProgress } from "@/lib/curriculum/types";
-import { courseBranch } from "@/lib/curriculum/availability";
+import { courseBranch, curriculumPrerequisitesKnown } from "@/lib/curriculum/availability";
 import type {
   ItuCoursePrerequisite,
   ItuCurriculumItem,
@@ -65,11 +65,6 @@ function prerequisiteForCode(program: SemesterPlannerProgram, code: string) {
   return courseLanguageVariants(code)
     .map((variant) => program.curriculum.prerequisites[variant])
     .find((value): value is ItuCoursePrerequisite => Boolean(value));
-}
-
-function prerequisitesKnown(program: SemesterPlannerProgram, code: string) {
-  return program.curriculum.prerequisiteDataAvailable &&
-    program.curriculum.prerequisiteBranchesLoaded.includes(courseBranch(code));
 }
 
 function addProgress(target: Record<string, CourseProgress>, code: string, progress: CourseProgress) {
@@ -169,7 +164,7 @@ function unlocksForCandidate(
       targets.add(target);
       reverseEdges.set(dependency, targets);
     });
-    if (!dependencies.includes(code) || !prerequisitesKnown(program, target)) return;
+    if (!dependencies.includes(code) || !curriculumPrerequisitesKnown(program.curriculum, target)) return;
     const before = evaluateCourseEligibility(prerequisite, progress, true);
     const after = evaluateCourseEligibility(prerequisite, simulated, true);
     if (before !== "satisfied" && after === "satisfied") immediate.add(target);
@@ -258,7 +253,7 @@ function collectCandidates(programs: readonly SemesterPlannerProgram[]) {
         existing.ects = existing.ects === null || choice.ects === null ? null : Math.max(existing.ects, choice.ects);
         const source = {
           prerequisite: prerequisiteForCode(program, code),
-          prerequisiteKnown: prerequisitesKnown(program, code),
+          prerequisiteKnown: curriculumPrerequisitesKnown(program.curriculum, code),
         };
         if (!existing.prerequisiteSources.some((candidate) => candidate.prerequisite === source.prerequisite && candidate.prerequisiteKnown === source.prerequisiteKnown)) {
           existing.prerequisiteSources.push(source);
@@ -469,13 +464,16 @@ export function buildSemesterPlan(
   const notices: PlannerNotice[] = [];
   const { candidates: candidateMap, unknownCredits } = collectCandidates(programs);
   const candidates: SemesterCourseCandidate[] = [];
-  let hasUnknownEligibility = false;
+  const prerequisiteReviewCourses: SemesterPlan["prerequisiteReviewCourses"] = [];
   let hasUnknownAvailability = options.availabilityMode === "unknown";
 
   candidateMap.forEach((candidate, code) => {
     if (courseLanguageVariants(code).some((variant) => confirmedProgress[variant]?.state === "passed")) return;
     const { eligibility, missing } = evaluateCandidateEligibility(candidate.prerequisiteSources, confirmedProgress, confirmedProgress);
-    if (eligibility === "unknown") hasUnknownEligibility = true;
+    if (eligibility === "unknown") {
+      const { title, titleTr, titleEn } = candidate;
+      prerequisiteReviewCourses.push({ code, title, titleTr, titleEn });
+    }
     if (eligibility !== "confirmed") return;
     const availability = evaluateAvailability(code, options);
     if (availability === "unknown") hasUnknownAvailability = true;
@@ -635,7 +633,7 @@ export function buildSemesterPlan(
   if (options.maxCourses && selected.length >= options.maxCourses && available.some((candidate) => !selected.includes(candidate))) notices.push({ kind: "max-courses", count: options.maxCourses });
   if (searchLimited) notices.push({ kind: "search-limited" });
   if (hasUnknownAvailability) notices.push({ kind: "availability-unknown" });
-  if (hasUnknownEligibility) notices.push({ kind: "eligibility-unknown" });
+  if (prerequisiteReviewCourses.length) notices.push({ kind: "eligibility-unknown" });
   if (restrictedCourseCount) notices.push({ kind: "program-restriction-blocked", count: restrictedCourseCount });
   if (selected.some((course) => course.programEligibility === "unknown")) notices.push({ kind: "program-restriction-unknown" });
   notices.push({ kind: "registration-limit-unknown" }, { kind: "corequisites-unknown" });
@@ -686,6 +684,7 @@ export function buildSemesterPlan(
   };
   return {
     ...primaryProgram,
+    prerequisiteReviewCourses: prerequisiteReviewCourses.sort((first, second) => first.code.localeCompare(second.code, "en")),
     weeklyPrograms,
     searchLimited,
     searchStats,

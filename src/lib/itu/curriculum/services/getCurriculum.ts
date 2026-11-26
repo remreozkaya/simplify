@@ -110,39 +110,60 @@ export async function getCurriculum(
   const allKnownCourseCodes = new Set([...courseCodes, ...electiveCourseCodes].flatMap(courseLanguageVariants));
   const neededBranches = collectPrerequisiteBranchCodes(parsed);
   const prerequisites: Record<string, ItuCoursePrerequisite> = {};
-  const prerequisiteBranchesLoaded: string[] = [];
-  let prerequisiteDataAvailable = true;
+  const prerequisiteBranchesLoaded = new Set<string>();
+  const prerequisiteCoursesVerified = new Set<string>();
   try {
-    const branchMap = parsePrerequisiteBranches(await fetchPrerequisiteBranchesPage());
+    const { branches, unverifiedBranches, hasUnidentifiedBranch } =
+      parsePrerequisiteBranches(await fetchPrerequisiteBranchesPage());
+    const unresolvedDirectoryBranches: string[] = [];
     await Promise.all(
       neededBranches.map(async (branch) => {
-        const branchId = branchMap[branch];
+        const branchId = branches[branch];
         if (!branchId) {
-          // A branch absent from the official prerequisite index has no prerequisites.
-          prerequisiteBranchesLoaded.push(branch);
+          if (hasUnidentifiedBranch || unverifiedBranches.has(branch)) {
+            unresolvedDirectoryBranches.push(branch);
+          } else {
+            prerequisiteBranchesLoaded.add(branch);
+          }
           return;
         }
         try {
-          const records = parsePrerequisites(await fetchPrerequisitesPage(branchId));
-          records.forEach((record) => {
-            if (allKnownCourseCodes.has(record.courseCode)) prerequisites[record.courseCode] = record;
-          });
-          prerequisiteBranchesLoaded.push(branch);
+          const page = await fetchPrerequisitesPage(branchId);
+          if (page === null) {
+            prerequisiteBranchesLoaded.add(branch);
+            return;
+          }
+          const { records, hasUnidentifiedCourse } = parsePrerequisites(page);
+          for (const record of records) {
+            if (!allKnownCourseCodes.has(record.courseCode)) continue;
+            prerequisites[record.courseCode] = record;
+            if (hasUnidentifiedCourse && record.expression?.kind !== "unknown") {
+              prerequisiteCoursesVerified.add(record.courseCode);
+            }
+          }
+          if (hasUnidentifiedCourse) {
+            warnings.push(`Some prerequisites for ${branch} could not be verified.`);
+          } else {
+            prerequisiteBranchesLoaded.add(branch);
+          }
         } catch {
           warnings.push(`Prerequisites for ${branch} could not be loaded.`);
         }
       }),
     );
-    if (prerequisiteBranchesLoaded.length === 0) prerequisiteDataAvailable = false;
+    if (unresolvedDirectoryBranches.length) {
+      warnings.push(...(prerequisiteBranchesLoaded.size || prerequisiteCoursesVerified.size
+        ? unresolvedDirectoryBranches.map((branch) => `Prerequisites for ${branch} could not be loaded.`)
+        : ["Prerequisite information is temporarily unavailable."]));
+    }
   } catch {
-    prerequisiteDataAvailable = false;
     warnings.push("Prerequisite information is temporarily unavailable.");
   }
 
   // Keep the published record authoritative. Under the existing language
   // counterpart model, use its evidence only where the exact code is absent.
   [...courseCodes, ...electiveCourseCodes].forEach((code) => {
-    if (prerequisites[code]) return;
+    if (prerequisites[code] || !prerequisiteBranchesLoaded.has(code.split(" ")[0])) return;
     const counterpart = courseLanguageVariants(code).slice(1)
       .map((variant) => prerequisites[variant]).find(Boolean);
     if (counterpart) prerequisites[code] = { ...counterpart, courseCode: code };
@@ -153,8 +174,9 @@ export async function getCurriculum(
     planType,
     equivalenceRules: getStoredEquivalenceRules(programCode, planId),
     prerequisites,
-    prerequisiteBranchesLoaded: prerequisiteBranchesLoaded.sort(),
-    prerequisiteDataAvailable,
+    prerequisiteBranchesLoaded: [...prerequisiteBranchesLoaded].sort(),
+    ...(prerequisiteCoursesVerified.size ? { prerequisiteCoursesVerified: [...prerequisiteCoursesVerified].sort() } : {}),
+    prerequisiteDataAvailable: prerequisiteBranchesLoaded.size > 0 || prerequisiteCoursesVerified.size > 0,
     warnings,
     fetchedAt: new Date().toISOString(),
   };
