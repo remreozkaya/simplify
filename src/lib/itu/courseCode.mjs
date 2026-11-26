@@ -1,4 +1,13 @@
-const COURSE_CODE_PATTERN = /^([A-ZÇĞİÖŞÜ]{2,8})(\d{2,5}[A-Z]{0,3})$/u;
+// OBS branch codes can include separators, for example U_ARCH and U_IPF-B.
+export const COURSE_BRANCH_SOURCE = /(?=[A-ZÇĞİÖŞÜ_-]{2,8}(?![A-ZÇĞİÖŞÜ_-]))[A-ZÇĞİÖŞÜ]+(?:[_-][A-ZÇĞİÖŞÜ]+)*/u.source;
+export const COURSE_CODE_SOURCE = String.raw`(${COURSE_BRANCH_SOURCE})\s*(\d{2,5})([A-Z]{0,3})`;
+const COURSE_BRANCH_PATTERN = new RegExp(`^${COURSE_BRANCH_SOURCE}$`, "u");
+const COURSE_CODE_PATTERN = new RegExp(`^${COURSE_CODE_SOURCE}$`, "u");
+
+/** @param {string} value */
+export function isValidCourseBranchCode(value) {
+  return COURSE_BRANCH_PATTERN.test(value);
+}
 
 /**
  * Canonical course-code representation used by curriculum, transcript, and
@@ -10,7 +19,7 @@ export function normalizeCourseCode(value) {
   const normalized = value.replace(/\s+/g, "").toUpperCase();
   const match = normalized.match(COURSE_CODE_PATTERN);
   return match
-    ? `${match[1]} ${match[2]}`
+    ? `${match[1]} ${match[2]}${match[3]}`
     : value.replace(/\s+/g, " ").trim().toUpperCase();
 }
 
@@ -29,9 +38,7 @@ export function isValidCourseCode(value) {
  */
 export function courseLanguageVariants(value) {
   const normalized = normalizeCourseCode(value);
-  const match = normalized.match(
-    /^([A-ZÇĞİÖŞÜ]{2,8})\s(\d{2,5})([A-Z]{0,3})$/u,
-  );
+  const match = normalized.match(COURSE_CODE_PATTERN);
   if (!match) return [normalized];
   const [, branch, number, suffix] = match;
   const counterpartSuffix =

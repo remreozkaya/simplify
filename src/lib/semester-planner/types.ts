@@ -101,6 +101,7 @@ export type SemesterWeeklyProgram = {
 };
 
 export type SemesterPlan = Omit<SemesterWeeklyProgram, "schedule"> & {
+  prerequisiteReviewCourses: Pick<SemesterCourseCandidate, "code" | "title" | "titleTr" | "titleEn">[];
   schedule: GeneratedSchedule | null;
   weeklyPrograms: SemesterWeeklyProgram[];
   combinedRemainingCredits: number | null;

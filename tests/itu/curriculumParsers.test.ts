@@ -95,6 +95,13 @@ describe("ITU curriculum parsers", () => {
     expect(group.courses.find((course) => course.code === "BLG 442E")?.title).toBe("Tech.&Innov. Mng.for Inf.Tech.");
   });
 
+  it("keeps punctuated OBS branch codes in elective groups", () => {
+    const group = parseElectiveGroup(`<table class="datalist"><tbody>
+      <tr><td>U_IPF-B09E<br>Engineering Mathematics</td><td>English</td><td>3</td><td>5</td></tr>
+    </tbody></table>`);
+    expect(group.courses).toMatchObject([{ code: "U_IPF-B 09E", title: "Engineering Mathematics" }]);
+  });
+
   it("recovers incomplete language codes only from a unique same-group official identity", () => {
     const html = fixture("elective-incomplete-codes.html");
     const identities = [
@@ -157,11 +164,11 @@ describe("ITU curriculum parsers", () => {
   });
 
   it("parses branch IDs, prerequisite logic, grades, and earned-credit conditions", () => {
-    expect(parsePrerequisiteBranches(fixture("branches.html"))).toEqual({
+    expect(parsePrerequisiteBranches(fixture("branches.html")).branches).toEqual({
       BLG: 3,
       BBF: 310,
     });
-    const records = parsePrerequisites(fixture("prerequisites.html"));
+    const { records } = parsePrerequisites(fixture("prerequisites.html"));
     expect(records).toHaveLength(3);
     expect(
       records.find((record) => record.courseCode === "BLG 212E")?.expression,

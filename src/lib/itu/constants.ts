@@ -6,6 +6,8 @@ import type { ItuWeekday } from "@/lib/itu/types";
 export const ITU_OBS_ORIGIN =
   "https://obs.itu.edu.tr";
 
+export const ITU_PREREQUISITE_DIRECTORY_PATH = "/public/GenelTanimlamalar/DersOnsartList";
+
 export const ITU_OBS_PATHS = {
   activeSemester: "/public/DersProgram/GetAktifDonemByProgramSeviye",
   courseSchedule: "/public/DersProgram",

@@ -2,7 +2,7 @@
 
 import { academicStorage } from "@/lib/academic/storage";
 
-import CurriculumWarnings from "@/components/curriculum/CurriculumWarnings";
+import CurriculumWarnings, { withoutPrerequisiteWarnings } from "@/components/curriculum/CurriculumWarnings";
 
 import { resolveProgramMemberships } from "@/lib/program-restrictions/eligibility";
 
@@ -38,6 +38,7 @@ import {
   localizeRuntimeMessage,
 } from "@/lib/i18n";
 import { useLanguage } from "@/lib/i18n/client";
+import { ITU_OBS_ORIGIN, ITU_PREREQUISITE_DIRECTORY_PATH } from "@/lib/itu/constants";
 import type { ItuCurriculum } from "@/lib/itu/curriculum/types";
 import {
   courseLanguageVariants,
@@ -219,6 +220,7 @@ export default function SmartSemesterPlanner() {
   ) ?? 0);
   const selectedProgram = generatedPlan?.weeklyPrograms[selectedProgramIndex];
   const plan = generatedPlan ? { ...generatedPlan, ...selectedProgram } : null;
+  const visibleNotices = plan?.notices.filter((notice) => notice.kind !== "eligibility-unknown") ?? [];
   const alternativePrograms = generatedPlan?.weeklyPrograms
     .map((program, index) => ({ program, index }))
     .filter(({ program }) => program.schedule.id !== selectedProgram?.schedule.id) ?? [];
@@ -352,12 +354,15 @@ export default function SmartSemesterPlanner() {
 
   return (
     <div className="space-y-6">
-      {programs.map((program) => program.curriculum.warnings.length ? (
-        <div key={program.enrollment.id} className="space-y-2">
-          <p className="text-sm font-semibold">{localizedAcademicName({ name: program.enrollment.programName, nameTr: program.enrollment.programNameTr, nameEn: program.enrollment.programNameEn }, language)}</p>
-          <CurriculumWarnings warnings={program.curriculum.warnings} />
-        </div>
-      ) : null)}
+      {programs.map((program) => {
+        const warnings = withoutPrerequisiteWarnings(program.curriculum.warnings);
+        return warnings.length ? (
+          <div key={program.enrollment.id} className="space-y-2">
+            <p className="text-sm font-semibold">{localizedAcademicName({ name: program.enrollment.programName, nameTr: program.enrollment.programNameTr, nameEn: program.enrollment.programNameEn }, language)}</p>
+            <CurriculumWarnings warnings={warnings} />
+          </div>
+        ) : null;
+      })}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div
           data-testid="planner-config-fields"
@@ -531,12 +536,12 @@ export default function SmartSemesterPlanner() {
             </div>
           </section>
 
-          {plan.notices.length ? (
+          {visibleNotices.length ? (
             <section
               aria-label={t("semesterPlanner.planNotices")}
               className="space-y-2 rounded-xl bg-amber-50 p-4 dark:bg-amber-950"
             >
-              {plan.notices.map((notice, index) => (
+              {visibleNotices.map((notice, index) => (
                 <Notice key={`${notice.kind}-${index}`} notice={notice} />
               ))}
             </section>
@@ -570,6 +575,25 @@ export default function SmartSemesterPlanner() {
               </div>
             )}
           </section>
+
+          {plan.prerequisiteReviewCourses.length > 0 && (
+            <OptionalHelp summary={t("semesterPlanner.prerequisiteReviewCourses", { count: plan.prerequisiteReviewCourses.length })}>
+              <ul className="space-y-1">
+                {plan.prerequisiteReviewCourses.map((course) => (
+                  <li key={course.code}>
+                    <a
+                      href={ITU_OBS_ORIGIN + ITU_PREREQUISITE_DIRECTORY_PATH}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-700 underline dark:text-blue-300"
+                    >
+                      {course.code} · {localizedCourseTitle(course, language)}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </OptionalHelp>
+          )}
 
           {alternativePrograms.length ? (
             <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -14,7 +14,12 @@ import { curriculumTotals } from "@/lib/curriculum/graduation";
 const curriculum: ItuCurriculum = {
   planId: 19, programCode: "SYNTHETIC_LS", title: "Science", planTitle: "Variable credit plan", totalCredit: 4,
   semesters: [{ semester: 1, items: [{ kind: "elective-slot", id: "slot", semester: 1, title: "Elective", creditOptions: [3, 4], ectsOptions: [5], courses: [] }] }],
-  prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: [], prerequisiteDataAvailable: true, warnings: ["Official equivalence coverage is unavailable for this curriculum."], fetchedAt: "2026-01-01T00:00:00Z",
+  prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: [], prerequisiteDataAvailable: true, warnings: [
+    "Official equivalence coverage is unavailable for this curriculum.",
+    "Prerequisites for MAT could not be loaded.",
+    "Some prerequisites for MAT could not be verified.",
+    "Prerequisite information is temporarily unavailable.",
+  ], fetchedAt: "2026-01-01T00:00:00Z",
 };
 
 it.each(["tr", "en"] as const)("shows minimum elective credit totals without uncertainty warnings in %s", language => {
@@ -33,6 +38,9 @@ it.each(["tr", "en"] as const)("shows minimum elective credit totals without unc
   expect(englishSummary).toMatch(/0\.00\s*\/\s*3\.00/);
   expect(englishSummary).not.toMatch(/0\.00\s*\/\s*0\.00/);
   expect(html).toContain(language === "tr" ? "Bu ders planı için resmî denklik kapsamı verisi mevcut değil." : "Official equivalence coverage is unavailable for this curriculum.");
+  expect(html).not.toContain(language === "tr" ? "MAT dersleri için ön koşul bilgileri yüklenemedi." : "Prerequisites for MAT could not be loaded.");
+  expect(html).not.toContain(language === "tr" ? "MAT dersleri için bazı ön koşullar doğrulanamadı." : "Some prerequisites for MAT could not be verified.");
+  expect(html).not.toContain(language === "tr" ? "Ön koşul bilgileri geçici olarak kullanılamıyor." : "Prerequisite information is temporarily unavailable.");
 });
 
 it.each(["tr", "en"] as const)("shows the 30%% minimum in the graduation audit and shared curriculum label in %s", language => {

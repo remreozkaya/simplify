@@ -3,6 +3,9 @@ import { translations, type Language } from "@/lib/i18n/translations";
 const runtimeMessages: Record<string, string> = {
   "Official equivalence coverage is unavailable for this curriculum.": "Bu ders planı için resmî denklik kapsamı verisi mevcut değil.",
   "Official equivalence coverage is incomplete for this curriculum.": "Bu ders planı için resmî denklik kapsamı eksik.",
+  "Prerequisite information is temporarily unavailable.": "Ön koşul bilgileri geçici olarak kullanılamıyor.",
+  "Prerequisites for {branch} could not be loaded.": "{branch} dersleri için ön koşul bilgileri yüklenemedi.",
+  "Some prerequisites for {branch} could not be verified.": "{branch} dersleri için bazı ön koşullar doğrulanamadı.",
   "Email is required.": "E-posta gereklidir.",
   "Enter a valid email address.": "Geçerli bir e-posta adresi girin.",
   "Password is required.": "Parola gereklidir.",

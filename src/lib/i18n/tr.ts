@@ -363,6 +363,7 @@ const tr = {
     unlimitedHint: "0 = sınırsız",
     whyCourse: "Neden bu ders?",
     planNotices: "Plan uyarıları",
+    prerequisiteReviewCourses: "OBS’de kontrol edilecek dersler ({count})",
   },
   curriculum: {
     creditUncertainty: "Geçerli ders planı kredileri belirsiz olduğundan bazı kredi toplamları hesaplanamıyor.",
@@ -410,6 +411,7 @@ const tr = {
     notProvided: "Belirtilmedi",
     prerequisites: "Önkoşullar",
     noPrerequisite: "Ders önkoşulu belirtilmemiş.",
+    checkPrerequisitesOnObs: "OBS’de kontrol et",
     unlocks: "Açtığı dersler",
     noDownstream: "Sonraki müfredat dersi yok.",
     andRequirement: "VE gerekliliği",

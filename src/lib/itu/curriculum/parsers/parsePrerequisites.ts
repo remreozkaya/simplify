@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 
-import { normalizeCourseCode, parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { isValidCourseBranchCode, isValidCourseCode, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
+import { ITU_EMPTY_CELL_VALUES } from "@/lib/itu/constants";
+import { parsePrerequisiteExpression } from "@/lib/itu/curriculum/prerequisiteExpression";
 import { firstNumericValue } from "@/lib/itu/curriculum/parsers/numbers";
 import type { ItuCoursePrerequisite } from "@/lib/itu/curriculum/types";
 
@@ -8,36 +10,54 @@ function clean(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function parsePrerequisiteBranches(html: string): Record<string, number> {
+export function parsePrerequisiteBranches(html: string) {
   const $ = cheerio.load(html);
-  if (!$('select[name="DersBransKoduId"]').length) {
+  const options = $('select[name="DersBransKoduId"] option');
+  if (!options.length) {
     throw new Error("İTÜ OBS returned an invalid prerequisite branch list.");
   }
   const branches: Record<string, number> = {};
-  $('select[name="DersBransKoduId"] option').each((_, option) => {
+  const unverifiedBranches = new Set<string>();
+  let hasUnidentifiedBranch = false;
+  options.each((_, option) => {
     const code = clean($(option).text()).toUpperCase();
     const rawId = $(option).attr("value")?.trim();
-    if (!rawId || rawId === "0" || rawId === "-1") return;
-    const id = Number(rawId);
-    if (!/^(?=.{2,8}$)[A-ZÇĞİÖŞÜ]+(?:_[A-ZÇĞİÖŞÜ]+)*$/u.test(code) || !Number.isInteger(id) || id <= 0) {
-      throw new Error("İTÜ OBS returned an invalid prerequisite branch entry.");
+    if ((!rawId || rawId === "0" || rawId === "-1") &&
+        /^(?:SELECT(?: (?:COURSE )?BRANCH CODE)?|(?:DERS BRANŞ KODU )?SEÇ[İI]N[İI]Z)?$/u.test(code)) return;
+    if (!isValidCourseBranchCode(code)) {
+      hasUnidentifiedBranch = true;
+      return;
     }
-    branches[code] = id;
+    const id = Number(rawId);
+    if (!Number.isSafeInteger(id) || id <= 0 || (branches[code] && branches[code] !== id)) {
+      unverifiedBranches.add(code);
+      delete branches[code];
+      return;
+    }
+    if (!unverifiedBranches.has(code)) branches[code] = id;
   });
-  return branches;
+  return { branches, unverifiedBranches, hasUnidentifiedBranch };
 }
 
-export function parsePrerequisites(html: string): ItuCoursePrerequisite[] {
+export function parsePrerequisites(html: string) {
   const $ = cheerio.load(html);
-  const prerequisites: ItuCoursePrerequisite[] = [];
-  $("table tbody tr").each((_, row) => {
-    const cells = $(row).find("td");
-    if (cells.length < 4) return;
-    const targets = $(cells[0])
+  const bodies = $("table tbody");
+  if (!bodies.length) throw new Error("İTÜ OBS returned an invalid prerequisite table.");
+
+  const records = new Map<string, ItuCoursePrerequisite>();
+  let hasUnidentifiedCourse = false;
+  bodies.children("tr").each((_, row) => {
+    const cells = $(row).children("td");
+    if (!cells.length) return;
+    const anchors = $(cells[0])
       .find("a")
-      .map((__, anchor) => normalizeCourseCode(clean($(anchor).text())))
-      .get()
-      .filter((code) => /^[A-ZÇĞİÖŞÜ]{2,8}\s\d{2,5}[A-Z]{0,3}$/u.test(code));
+      .map((__, anchor) => $(anchor).text())
+      .get();
+    const codes = (anchors.length ? anchors : [$(cells[0]).text()]).map(normalizeCourseCode);
+    const targets = codes.filter(isValidCourseCode);
+    if (targets.length !== codes.length) hasUnidentifiedCourse = true;
+    if (!targets.length) return;
+
     const expressionCell = $(cells[2]).clone();
     expressionCell.find("br").replaceWith(" ");
     const rawExpression = clean(
@@ -47,19 +67,28 @@ export function parsePrerequisites(html: string): ItuCoursePrerequisite[] {
         .get()
         .join(" "),
     );
-    const minimumCredits = firstNumericValue($(cells[3]).text());
+    const rawCredits = clean($(cells[3]).text());
+    const minimumCredits = firstNumericValue(rawCredits);
+    let expression: ItuCoursePrerequisite["expression"];
+    try {
+      if (cells.length < 4 || (minimumCredits === undefined && !ITU_EMPTY_CELL_VALUES.has(rawCredits))) {
+        expression = { kind: "unknown", raw: rawExpression || rawCredits };
+      } else if (rawExpression) {
+        expression = parsePrerequisiteExpression(rawExpression);
+      }
+    } catch {
+      expression = { kind: "unknown", raw: rawExpression };
+    }
     targets.forEach((courseCode) => {
-      prerequisites.push({
+      // A later valid row cannot resolve a separate unreadable row for the same course.
+      if (records.get(courseCode)?.expression?.kind === "unknown") return;
+      records.set(courseCode, {
         courseCode,
-        ...(rawExpression
-          ? {
-              rawExpression,
-              expression: parsePrerequisiteExpression(rawExpression),
-            }
-          : {}),
+        ...(rawExpression ? { rawExpression } : {}),
+        ...(expression ? { expression } : {}),
         ...(minimumCredits !== undefined ? { minimumCredits } : {}),
       });
     });
   });
-  return prerequisites;
+  return { records: [...records.values()], hasUnidentifiedCourse };
 }

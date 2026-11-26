@@ -148,8 +148,10 @@ export type ItuCurriculum = {
   noteEn?: string;
   prerequisites: Record<string, ItuCoursePrerequisite>;
   equivalenceRules: EquivalenceRule[];
-  /** Resolved lookups, including branches with no official prerequisite page. */
+  /** Complete lookups, including branches with no official prerequisite page. */
   prerequisiteBranchesLoaded: string[];
+  /** Courses with individually verified rules on otherwise incomplete branch pages. */
+  prerequisiteCoursesVerified?: string[];
   prerequisiteDataAvailable: boolean;
   warnings: string[];
   fetchedAt: string;
@@ -160,6 +162,7 @@ export type ParsedCurriculum = Omit<
   | "prerequisites"
   | "equivalenceRules"
   | "prerequisiteBranchesLoaded"
+  | "prerequisiteCoursesVerified"
   | "prerequisiteDataAvailable"
   | "warnings"
   | "fetchedAt"

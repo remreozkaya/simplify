@@ -367,6 +367,7 @@ const en = {
     unlimitedHint: "0 = unlimited",
     whyCourse: "Why this course?",
     planNotices: "Plan notices",
+    prerequisiteReviewCourses: "Courses to check on OBS ({count})",
   },
   curriculum: {
     creditUncertainty: "Some credit totals are unavailable because the applicable curriculum credits are uncertain.",
@@ -415,6 +416,7 @@ const en = {
     notProvided: "Not provided",
     prerequisites: "Prerequisites",
     noPrerequisite: "No course prerequisite listed.",
+    checkPrerequisitesOnObs: "Check on OBS",
     unlocks: "Unlocks",
     noDownstream: "No downstream curriculum course.",
     andRequirement: "AND requirement",

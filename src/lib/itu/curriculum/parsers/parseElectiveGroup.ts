@@ -1,11 +1,14 @@
 import * as cheerio from "cheerio";
 
-import { normalizeCourseCode } from "@/lib/itu/curriculum/prerequisiteExpression";
+import { COURSE_BRANCH_SOURCE, COURSE_CODE_SOURCE, isValidCourseCode, normalizeCourseCode } from "@/lib/itu/courseCode.mjs";
 import { normalizeCourseLanguage } from "@/lib/itu/curriculum/language";
 import { firstNumericValue, parseNumericOptions } from "@/lib/itu/curriculum/parsers/numbers";
 import type { ItuElectiveCourse } from "@/lib/itu/curriculum/types";
 
 export type ParsedElectiveGroup = { title: string; courses: ItuElectiveCourse[] };
+
+const COURSE_WITH_TITLE = new RegExp(String.raw`^${COURSE_CODE_SOURCE}(?=\s|$)`, "u");
+const BRANCH_WITH_TITLE = new RegExp(String.raw`^(${COURSE_BRANCH_SOURCE})\s+(.+)$`, "u");
 
 function clean(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -24,11 +27,11 @@ export function parseElectiveGroup(
     courseCell.find("br").replaceWith(" ");
     const whole = clean(courseCell.text());
     // OBS also renders codes as plain text followed by a <br> and the title.
-    let rawCode = clean($(cells[0]).find("a").first().text()) || whole.match(/^[A-ZÇĞİÖŞÜ]{2,8}\s*\d{2,5}[A-Z]{0,3}(?=\s|$)/u)?.[0] || "";
+    let rawCode = clean($(cells[0]).find("a").first().text()) || whole.match(COURSE_WITH_TITLE)?.[0] || "";
     let code = normalizeCourseCode(rawCode);
     // Some live OBS rows omit the number entirely (e.g. "ISP" / "İspanyolca I").
     // Recover only an unambiguous identity from this same group's official snapshot.
-    const incomplete = !rawCode && whole.match(/^([A-ZÇĞİÖŞÜ]{2,8})\s+(.+)$/u);
+    const incomplete = !rawCode && whole.match(BRANCH_WITH_TITLE);
     if (incomplete) {
       const matches = new Set(knownCourses.filter((course) =>
         normalizeCourseCode(course.code).split(" ")[0] === incomplete[1] &&
@@ -39,7 +42,7 @@ export function parseElectiveGroup(
         code = [...matches][0];
       }
     }
-    if (!/^[A-ZÇĞİÖŞÜ]{2,8}\s\d{2,5}[A-Z]{0,3}$/u.test(code)) return;
+    if (!isValidCourseCode(code)) return;
     const title = clean(whole.slice(whole.indexOf(rawCode) + rawCode.length));
     if (!title) return;
     const language = normalizeCourseLanguage($(cells[1]).text());

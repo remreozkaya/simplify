@@ -20,8 +20,10 @@ vi.mock("react", async original => {
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams(state.query) }));
 vi.mock("@/components/profile/ProfileProvider", () => ({ useProfile: () => ({ profile: state.profile ?? EMPTY_PROFILE }) }));
 vi.mock("@/hooks/useItuCourseCatalog", () => ({ useItuCourseCatalog: () => ({ branches: [], courseCatalog: [], loadedBranchCodes: new Set(), isLoadingBranches: false }) }));
-vi.mock("@/lib/i18n/client", () => ({ useLanguage: () => ({ language: "en", t: (key: string) => translate("en", key) }) }));
-import CurriculumExplorer from "@/components/curriculum/CurriculumExplorer";
+vi.mock("@/lib/i18n/client", () => ({ useLanguage: () => ({
+  language: "en", t: (key: string, values?: Record<string, string | number>) => translate("en", key, values),
+}) }));
+import CurriculumExplorer, { ElectiveDetails } from "@/components/curriculum/CurriculumExplorer";
 
 afterEach(() => { state.effects = []; state.updates = []; state.query = ""; state.initialValues.clear(); state.currentValues.clear(); state.hookIndex = 0; state.profile = null; vi.unstubAllGlobals(); });
 
@@ -99,6 +101,55 @@ it("shows minimum credits without uncertainty warnings for an unselected variabl
   expect(html).toContain("Official equivalence coverage is unavailable for this curriculum.");
 });
 
+it("keeps affected courses visible and provides an OBS link in details without a warning", () => {
+  const items = ["MAT 102", "MAT 103"].map(code => ({
+    kind: "course", id: code, code, title: code, semester: 1, requirementType: "compulsory", creditOptions: [3], ectsOptions: [5],
+  }));
+  state.initialValues.set(7, {
+    planId: 2, programCode: "TEST_LS", title: "Math", planTitle: "Test plan",
+    semesters: [{ semester: 1, items }], prerequisites: {}, equivalenceRules: [],
+    prerequisiteBranchesLoaded: [], prerequisiteCoursesVerified: ["MAT 102"],
+    prerequisiteDataAvailable: true, warnings: [
+      "Prerequisites for MAT could not be loaded.",
+      "Some prerequisites for MAT could not be verified.",
+      "Prerequisite information is temporarily unavailable.",
+      "Official equivalence coverage is unavailable for this curriculum.",
+    ], fetchedAt: "2026-01-01T00:00:00Z",
+  });
+  state.initialValues.set(8, { version: 3, planId: 2, courses: {} });
+  state.initialValues.set(14, "MAT 103");
+  const html = renderToStaticMarkup(createElement(CurriculumExplorer));
+  expect(html).toContain("MAT 102");
+  expect(html).toContain("MAT 103");
+  expect(html).toContain('href="https://obs.itu.edu.tr/public/GenelTanimlamalar/DersOnsartList"');
+  expect(html).toContain(">Check on OBS</a>");
+  expect(html).not.toContain("Prerequisite could not be verified");
+  expect(html).not.toContain("Prerequisites for MAT could not be loaded.");
+  expect(html).not.toContain("Some prerequisites for MAT could not be verified.");
+  expect(html).not.toContain("Prerequisite information is temporarily unavailable.");
+  expect(html).not.toContain("No course prerequisite listed.");
+  expect(html).toContain("Official equivalence coverage is unavailable for this curriculum.");
+});
+
+it("keeps an affected elective visible with an OBS link and no prerequisite warning", () => {
+  const slot = { kind: "elective-slot" as const, id: "slot", semester: 1, title: "Elective", creditOptions: [3], ectsOptions: [5], courses: [
+    { code: "MAT 103", title: "Mathematics", creditOptions: [3], ectsOptions: [5] },
+  ] };
+  const html = renderToStaticMarkup(createElement(ElectiveDetails, {
+    slot,
+    curriculum: {
+      planId: 2, programCode: "TEST_LS", title: "Math", planTitle: "Plan", semesters: [{ semester: 1, items: [slot] }],
+      prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: [], prerequisiteDataAvailable: false, warnings: [], fetchedAt: "2026-01-01T00:00:00Z",
+    },
+    progress: { version: 3, planId: 2, courses: {} }, resolvedProgress: {}, onlyTakeable: false,
+    availableCourseCodes: new Set<string>(), onSelectCourse: () => {},
+  }));
+  expect(html).toContain("MAT 103");
+  expect(html).toContain(">Check on OBS</a>");
+  expect(html).not.toContain("Prerequisites unknown");
+  expect(html).not.toContain("Prerequisite could not be verified");
+});
+
 it("keeps an available faculty's programs when another faculty endpoint fails", async () => {
   state.query = "program=BLGE_LS&plan=2340";
   vi.stubGlobal("localStorage", { getItem: () => null });
@@ -129,4 +180,28 @@ it("shows equivalence evidence limitations before generating a semester plan", a
   state.initialValues.set(1, false);
   const html = renderToStaticMarkup(createElement(SmartSemesterPlanner));
   expect(html).toContain("Official equivalence coverage is unavailable for this curriculum.");
+});
+
+it("offers a collapsed OBS review for skipped courses without showing prerequisite warnings", async () => {
+  const { default: SmartSemesterPlanner } = await import("@/components/semester-planner/SmartSemesterPlanner");
+  const enrollment = { id: "main", type: "main", facultyId: "1", facultyName: "Science", educationLevel: "undergraduate", planType: "undergraduate", programCode: "MAT_LS", programName: "Mathematics", curriculumPlanId: 2611, curriculumPlanName: "Plan" };
+  state.profile = { ...EMPTY_PROFILE, programEnrollments: [enrollment] };
+  state.initialValues.set(0, [{
+    enrollment,
+    curriculum: {
+      planId: 2611, programCode: "MAT_LS", title: "Mathematics", planTitle: "Plan",
+      semesters: [{ semester: 1, items: [{ kind: "course", id: "mat", code: "MAT 102", title: "Mathematics II", semester: 1, requirementType: "compulsory", creditOptions: [3], ectsOptions: [5] }] }],
+      prerequisites: {}, equivalenceRules: [], prerequisiteBranchesLoaded: [], prerequisiteDataAvailable: false,
+      warnings: ["Prerequisites for MAT could not be loaded."], fetchedAt: "2026-01-01T00:00:00Z",
+    },
+    progress: { version: 3, planId: 2611, courses: {} },
+  }]);
+  state.initialValues.set(1, false);
+  state.initialValues.set(7, { desiredCredits: 3, priority: "balanced" });
+  const html = renderToStaticMarkup(createElement(SmartSemesterPlanner));
+  expect(html).toMatch(/<details [^>]*><summary [^>]*>Courses to check on OBS \(1\)<\/summary>/);
+  expect(html).toContain("MAT 102");
+  expect(html).toContain('href="https://obs.itu.edu.tr/public/GenelTanimlamalar/DersOnsartList"');
+  expect(html).not.toContain("Prerequisites for MAT could not be loaded.");
+  expect(html).not.toContain("Courses whose prerequisites could not be confirmed were not recommended.");
 });
